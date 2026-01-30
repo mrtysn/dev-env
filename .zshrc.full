@@ -247,6 +247,14 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   _TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claudep
   _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cad
   _TAB_TEAL="33 140 116"      # #218c74 Palm Springs Splash - mow
+  _TAB_RED="179 57 57"        # #b33939 - redis
+
+  # Deployment shortcuts (pre-types the command, ready to edit/run)
+  alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/cypher-backend-core && print -z './deployment_manager.sh -e '"
+  alias caddeploy="iterm_tab_color $_TAB_YELLOW && iterm_tab_title '🚀 cad deploy' && cd \$HOME/dev/cypher-admin-dashboard && print -z './deployment_script_admin_dashboard.sh --'"
+
+  # Service shortcuts
+  alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-server' && redis-server"
 
   # Claude shortcuts
   alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=\$HOME/.claude-personal claude"
@@ -290,6 +298,15 @@ alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 function iterm_tab_color() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
   printf "\e]6;1;bg;red;brightness;%d\a\e]6;1;bg;green;brightness;%d\a\e]6;1;bg;blue;brightness;%d\a" "$1" "$2" "$3" 2>/dev/null
+  return 0
+}
+
+# Set iTerm2 tab title (disables oh-my-zsh auto title for this session)
+# Usage: iterm_tab_title "My Tab"
+function iterm_tab_title() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  DISABLE_AUTO_TITLE=true
+  print -Pn "\e]1;$1\a" 2>/dev/null
   return 0
 }
 
