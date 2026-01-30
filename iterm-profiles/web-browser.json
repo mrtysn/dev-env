@@ -3,7 +3,7 @@
     {
       "Guid": "23083A2A-C321-43BD-9FE5-69E8FAE0D77E",
       "Vertical Spacing": 1.0,
-      "Command": "/bin/bash --login",
+      "Scrollback Lines": 1000,
       "Normal Font": "FiraCodeNFM-Reg 12",
       "Name": "Web Browser",
       "Prompt Before Closing 2": false,
@@ -15,12 +15,12 @@
       ],
       "Tags": [],
       "Non Ascii Font": "Monaco 12",
-      "Default Bookmark": "No",
-      "Custom Command": "Browser",
-      "Instant Replay": true,
-      "Icon": 1,
       "Horizontal Spacing": 1.0,
-      "Scrollback Lines": 1000
+      "Default Bookmark": "No",
+      "Command": "/bin/bash --login",
+      "Instant Replay": true,
+      "Custom Command": "Browser",
+      "Icon": 1
     }
   ]
 }

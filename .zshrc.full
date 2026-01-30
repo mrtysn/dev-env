@@ -242,18 +242,23 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   alias cad="cd $HOME/dev/cypher-admin-dashboard"
   alias mow="cd $HOME/dev/merge-of-wonders"
 
+  # Tab colors (Flat UI Spanish palette) - "R G B" format
+  _TAB_BLUE="52 172 224"      # #34ace0 Summer Sky - cbc
+  _TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claudep
+  _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cad
+  _TAB_TEAL="33 140 116"      # #218c74 Palm Springs Splash - mow
+
   # Claude shortcuts
-  alias claude="$HOME/.local/bin/claude"
-  alias claudep='cd $HOME/dev/personal && CLAUDE_CONFIG_DIR=$HOME/.claude-personal claude'
-  alias claudepany='CLAUDE_CONFIG_DIR=$HOME/.claude-personal claude'
-  alias cbcc="cd $HOME/dev/cypher-backend-core && claude"
-  alias cadc="cd $HOME/dev/cypher-admin-dashboard && claude"
-  alias mowc="cd $HOME/dev/merge-of-wonders && claude"
-  alias cbccad="cd $HOME/dev/cypher-backend-core && claude --add-dir $HOME/dev/cypher-admin-dashboard"
-  alias cadcbc="cd $HOME/dev/cypher-admin-dashboard && claude --add-dir $HOME/dev/cypher-backend-core"
-  alias mowcbc="cd $HOME/dev/merge-of-wonders && claude --add-dir $HOME/dev/cypher-backend-core"
-  alias cbcmow="cd $HOME/dev/cypher-backend-core && claude --add-dir $HOME/dev/merge-of-wonders"
-  alias cbccadmow="cd $HOME/dev/cypher-backend-core && claude --add-dir $HOME/dev/cypher-admin-dashboard --add-dir $HOME/dev/merge-of-wonders"
+  alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=\$HOME/.claude-personal claude"
+  alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=\$HOME/.claude-personal claude"
+  alias cbcc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude"
+  alias cadc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && claude"
+  alias mowc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude"
+  alias cbccad="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard"
+  alias cadcbc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && claude --add-dir \$HOME/dev/cypher-backend-core"
+  alias mowcbc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude --add-dir \$HOME/dev/cypher-backend-core"
+  alias cbcmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/merge-of-wonders"
+  alias cbccadmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard --add-dir \$HOME/dev/merge-of-wonders"
 fi
 
 # ─── Aliases: Git ───────────────────────────────────────────────────────────────
@@ -275,6 +280,25 @@ alias lta="lt -a"
 
 # show all files whose names begin with '.' except . and ..
 alias lsa="ls -A"
+
+# tailscale cli
+alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
+
+# ─── iTerm2 Helpers ──────────────────────────────────────────────────────────
+# Set iTerm2 tab color (RGB 0-255)
+# Usage: iterm_tab_color 80 120 200
+function iterm_tab_color() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  printf "\e]6;1;bg;red;brightness;%d\a\e]6;1;bg;green;brightness;%d\a\e]6;1;bg;blue;brightness;%d\a" "$1" "$2" "$3" 2>/dev/null
+  return 0
+}
+
+# Reset iTerm2 tab color to default
+function iterm_tab_color_reset() {
+  [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
+  echo -e "\033]6;1;bg;*;default\007" 2>/dev/null
+  return 0
+}
 
 # ─── Hooks ──────────────────────────────────────────────────────────────────────
 autoload -Uz add-zsh-hook
