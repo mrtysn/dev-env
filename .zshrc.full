@@ -98,6 +98,7 @@ fi
 source "$ZSH/oh-my-zsh.sh"
 
 # ─── Environment (post-OMZ) ─────────────────────────────────────────────────────
+unalias _ 2>/dev/null  # OMZ sets _='sudo'; prefer explicit sudo
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
@@ -230,6 +231,19 @@ function zshrc_bench() {
   echo "min=$min  median=$median  avg=$avg  p95=$p95  max=$max"
 }
 
+# jump to nth most recent aw worktree
+# usage: awcd [n|list]
+awcd() {
+  case "$1" in
+    list) aw list-numbered ;;
+    *)
+      if aw go "$1" && source /tmp/aw_go; then
+        [[ -n "$_TAB_NAVY" ]] && iterm_tab_color ${=_TAB_NAVY}
+      fi
+      ;;
+  esac
+}
+
 # ─── Aliases: Navigation ────────────────────────────────────────────────────────
 alias dl="cd $HOME/Downloads"
 alias dt="cd $HOME/Desktop"
@@ -237,17 +251,24 @@ alias dv="cd $HOME/dev"
 
 # ─── Aliases: Machine-Specific (mert-cypher-m3max) ──────────────────────────────
 if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
-  # Project shortcuts
-  alias cbc="cd $HOME/dev/cypher-backend-core"
-  alias cad="cd $HOME/dev/cypher-admin-dashboard"
-  alias mow="cd $HOME/dev/merge-of-wonders"
-
   # Tab colors (Flat UI Spanish palette) - "R G B" format
   _TAB_BLUE="52 172 224"      # #34ace0 Summer Sky - cbc
+  _TAB_NAVY="30 80 140"       # #1e508c - awcd
   _TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claudep
   _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cad
   _TAB_TEAL="33 140 116"      # #218c74 Palm Springs Splash - mow
   _TAB_RED="179 57 57"        # #b33939 - redis
+
+  # Claude config dirs
+  _CLAUDE_DIR="$HOME/.claude"
+  _CLAUDE_PERSONAL_DIR="$HOME/.claude-personal"
+
+  # Project shortcuts
+  alias cbc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core"
+  alias cad="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard"
+  alias mow="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders"
+  alias oj="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj"
+  alias ojc="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
 
   # Deployment shortcuts (pre-types the command, ready to edit/run)
   alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/cypher-backend-core && print -z './deployment_manager.sh -e '"
@@ -257,8 +278,8 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-server' && redis-server"
 
   # Claude shortcuts
-  alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=\$HOME/.claude-personal claude"
-  alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=\$HOME/.claude-personal claude"
+  alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+  alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
   alias cbcc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude"
   alias cadc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && claude"
   alias mowc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude"
@@ -267,6 +288,10 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   alias mowcbc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude --add-dir \$HOME/dev/cypher-backend-core"
   alias cbcmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/merge-of-wonders"
   alias cbccadmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard --add-dir \$HOME/dev/merge-of-wonders"
+
+  # Peon-ping mute/unmute (all config dirs)
+  alias peon-ping-mute="touch \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
+  alias peon-ping-unmute="rm -f \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
 fi
 
 # ─── Aliases: Git ───────────────────────────────────────────────────────────────
