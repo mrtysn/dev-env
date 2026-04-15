@@ -1,0 +1,3 @@
+# tmux-sessions.conf — session-name:/path/to/repo
+# Used by tgo and tmux-start to create named sessions
+cypher-backend-core:/Users/mert/dev/cypher-backend-core

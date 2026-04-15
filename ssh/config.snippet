@@ -1,0 +1,13 @@
+# --- Tmux Cross-SSH ---
+Host c1
+	HostName C1-PLACEHOLDER
+	User mert
+	RequestTTY yes
+	RemoteCommand tmux attach 2>/dev/null || tmux new
+
+Host c2
+	HostName C2-PLACEHOLDER
+	User mert
+	RequestTTY yes
+	RemoteCommand tmux attach 2>/dev/null || tmux new
+# ----------------------

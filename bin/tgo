@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# tgo — attach or create tmux sessions, local or remote
+#
+# Usage:
+#   tgo repo-name          Attach/create local session named "repo-name"
+#   tgo c2:repo-name       SSH to c2, attach/create session "repo-name"
+#   tgo c1:repo-name       SSH to c1, attach/create session "repo-name"
+#   tgo                    List local sessions
+
+set -euo pipefail
+
+if [[ $# -eq 0 ]]; then
+    echo "Local tmux sessions:"
+    tmux list-sessions 2>/dev/null || echo "  (none)"
+    exit 0
+fi
+
+TARGET="$1"
+
+# Check for remote prefix (host:session)
+if [[ "$TARGET" == *:* ]]; then
+    HOST="${TARGET%%:*}"
+    SESSION="${TARGET#*:}"
+
+    # Validate host
+    if [[ "$HOST" != "c1" && "$HOST" != "c2" ]]; then
+        echo "Unknown host: $HOST (expected c1 or c2)" >&2
+        exit 1
+    fi
+
+    # SSH to remote, create session if missing, then attach
+    exec ssh -t "$HOST" "tmux new-session -A -s '$SESSION'"
+else
+    SESSION="$TARGET"
+
+    # Local: attach if exists, otherwise check sessions config for a path
+    if tmux has-session -t "$SESSION" 2>/dev/null; then
+        exec tmux attach-session -t "$SESSION"
+    fi
+
+    # Check sessions config for a start directory
+    START_DIR=""
+    if [[ -f ~/.tmux-sessions.conf ]]; then
+        while IFS=: read -r name path; do
+            [[ -z "$name" || "$name" == \#* ]] && continue
+            if [[ "$name" == "$SESSION" ]]; then
+                START_DIR="$path"
+                break
+            fi
+        done < ~/.tmux-sessions.conf
+    fi
+
+    if [[ -n "$START_DIR" ]]; then
+        exec tmux new-session -s "$SESSION" -c "$START_DIR"
+    else
+        exec tmux new-session -s "$SESSION"
+    fi
+fi

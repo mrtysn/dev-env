@@ -12,7 +12,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo "=== iTerm ZSH Dev Config Import ==="
+echo "=== Dev Environment Import ==="
 echo ""
 
 # Check if running on macOS
@@ -409,6 +409,106 @@ else
         fi
     else
         print "${YELLOW}! Skipped setting default shell${NC}"
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 11: Tmux Configuration (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 11: Tmux Configuration ==="
+
+if ! command_exists tmux; then
+    print "${YELLOW}! tmux not installed, skipping (install with: brew install tmux)${NC}"
+else
+    # Detect machine
+    MACHINE_HOSTNAME=$(hostname -s)
+    TMUX_CONF=""
+
+    if [[ "$MACHINE_HOSTNAME" == "mert-cypher-m3max" ]]; then
+        TMUX_CONF="tmux/c1.conf"
+        MACHINE_LABEL="C1 (Office)"
+    elif [[ "$MACHINE_HOSTNAME" == "mrtysn-mbp-m2max" ]]; then
+        TMUX_CONF="tmux/c2.conf"
+        MACHINE_LABEL="C2 (Home)"
+    else
+        print "${BLUE}Unknown hostname: $MACHINE_HOSTNAME${NC}"
+        echo "  1) C1 — Office Mac (Ctrl-a prefix, blue status bar)"
+        echo "  2) C2 — Home Mac (Ctrl-s prefix, green status bar)"
+        echo "  3) Skip"
+        echo ""
+        read "tmux_choice?Select machine [1/2/3]: "
+
+        case "$tmux_choice" in
+            1)
+                TMUX_CONF="tmux/c1.conf"
+                MACHINE_LABEL="C1 (Office)"
+                ;;
+            2)
+                TMUX_CONF="tmux/c2.conf"
+                MACHINE_LABEL="C2 (Home)"
+                ;;
+            *)
+                print "${YELLOW}! Skipped tmux configuration${NC}"
+                ;;
+        esac
+    fi
+
+    if [[ -n "$TMUX_CONF" ]]; then
+        print "${BLUE}Detected: $MACHINE_LABEL${NC}"
+
+        if ask_yes_no "Setup tmux configuration?"; then
+            # Symlink tmux config
+            TMUX_CONF_ABS="$SCRIPT_DIR/$TMUX_CONF"
+            if [ -L ~/.tmux.conf ] && [ "$(readlink ~/.tmux.conf)" = "$TMUX_CONF_ABS" ]; then
+                print "${GREEN}✓ ~/.tmux.conf already symlinked to $TMUX_CONF${NC}"
+            else
+                if [ -f ~/.tmux.conf ]; then
+                    print "${YELLOW}→ Backing up existing ~/.tmux.conf${NC}"
+                    cp ~/.tmux.conf ~/.tmux.conf.backup-$(date +%Y%m%d-%H%M%S)
+                fi
+                ln -sf "$TMUX_CONF_ABS" ~/.tmux.conf
+                print "${GREEN}✓ Symlinked ~/.tmux.conf → $TMUX_CONF${NC}"
+            fi
+
+            # Copy bin scripts
+            mkdir -p ~/bin
+            cp "$SCRIPT_DIR/bin/tgo" ~/bin/tgo
+            chmod +x ~/bin/tgo
+            print "${GREEN}✓ Copied tgo to ~/bin/${NC}"
+
+            cp "$SCRIPT_DIR/bin/tmux-start" ~/bin/tmux-start
+            chmod +x ~/bin/tmux-start
+            print "${GREEN}✓ Copied tmux-start to ~/bin/${NC}"
+
+            # Copy sessions config example (only if not present)
+            if [ ! -f ~/.tmux-sessions.conf ]; then
+                cp "$SCRIPT_DIR/tmux/tmux-sessions.conf.example" ~/.tmux-sessions.conf
+                print "${GREEN}✓ Created ~/.tmux-sessions.conf from example${NC}"
+            else
+                print "${GREEN}✓ ~/.tmux-sessions.conf already exists (kept)${NC}"
+            fi
+
+            # Append SSH config snippet (guarded by marker comment)
+            SSH_MARKER="# --- Tmux Cross-SSH ---"
+            if [ -f ~/.ssh/config ] && grep -qF "$SSH_MARKER" ~/.ssh/config; then
+                print "${GREEN}✓ SSH config already contains tmux cross-SSH entries${NC}"
+            else
+                if ask_yes_no "Append tmux cross-SSH entries to ~/.ssh/config?"; then
+                    mkdir -p ~/.ssh
+                    chmod 700 ~/.ssh
+                    echo "" >> ~/.ssh/config
+                    cat "$SCRIPT_DIR/ssh/config.snippet" >> ~/.ssh/config
+                    chmod 600 ~/.ssh/config
+                    print "${GREEN}✓ Appended cross-SSH entries to ~/.ssh/config${NC}"
+                    print "${YELLOW}  Note: Update C1-PLACEHOLDER and C2-PLACEHOLDER with actual IPs${NC}"
+                else
+                    print "${YELLOW}! Skipped SSH config${NC}"
+                fi
+            fi
+        else
+            print "${YELLOW}! Skipped tmux configuration${NC}"
+        fi
     fi
 fi
 echo ""

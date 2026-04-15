@@ -10,12 +10,12 @@ HOSTNAME=$(hostname -s)
 USERNAME=$(whoami)
 DATE=$(date +"%Y-%m-%d %H:%M")
 
-echo "=== Exporting terminal configuration ==="
+echo "=== Exporting dev environment configuration ==="
 echo ""
 echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
-echo "This will export your ~/.zshrc, ~/.p10k.zsh, and iTerm2 profiles to this repository."
+echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, and iTerm2 profiles to this repository."
 echo ""
 echo "Files in this repo that will be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.full"
@@ -23,8 +23,10 @@ echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/brew-packages.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
+echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
+echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
 echo ""
-echo "Your actual ~/.zshrc and ~/.p10k.zsh will NOT be modified."
+echo "Your actual config files will NOT be modified."
 echo ""
 read "REPLY?Continue? (y/N) "
 REPLY=${REPLY:-N}
@@ -73,12 +75,13 @@ else
 fi
 
 # Write brew package dependencies (static list, not scanned from system)
-# These are packages required by the zsh config:
+# These are packages required by the dev environment:
 #   powerlevel10k - prompt theme (sourced in zshrc)
 #   fzf           - fuzzy finder (fzf --zsh integration + fzf-tab plugin)
 #   asdf          - version manager (paths, commands, plugin)
 #   coreutils     - GNU utilities (gnubin in PATH)
 #   tree          - directory tree (used by ls plugin)
+#   tmux          - terminal multiplexer
 echo "✓ Writing brew package dependencies"
 cat > brew-packages.list << 'EOF'
 powerlevel10k
@@ -86,7 +89,51 @@ fzf
 asdf
 coreutils
 tree
+tmux
 EOF
+
+# Export tmux config
+echo "✓ Exporting tmux configuration"
+MACHINE_HOSTNAME=$(hostname -s)
+TMUX_TARGET=""
+
+if [[ "$MACHINE_HOSTNAME" == "mert-cypher-m3max" ]]; then
+    TMUX_TARGET="tmux/c1.conf"
+    echo "  Detected: C1 (Office)"
+elif [[ "$MACHINE_HOSTNAME" == "mrtysn-mbp-m2max" ]]; then
+    TMUX_TARGET="tmux/c2.conf"
+    echo "  Detected: C2 (Home)"
+else
+    echo "  Unknown hostname: $MACHINE_HOSTNAME, skipping tmux config export"
+fi
+
+if [[ -n "$TMUX_TARGET" ]]; then
+    mkdir -p tmux bin
+
+    if [ -f ~/.tmux.conf ]; then
+        # Resolve symlink to get actual content
+        cp -L ~/.tmux.conf "$TMUX_TARGET"
+        echo "  Exported ~/.tmux.conf → $TMUX_TARGET"
+    else
+        echo "  ~/.tmux.conf not found, skipping"
+    fi
+
+    if [ -f ~/bin/tgo ]; then
+        cp ~/bin/tgo bin/tgo
+        chmod +x bin/tgo
+        echo "  Exported ~/bin/tgo"
+    else
+        echo "  ~/bin/tgo not found, skipping"
+    fi
+
+    if [ -f ~/bin/tmux-start ]; then
+        cp ~/bin/tmux-start bin/tmux-start
+        chmod +x bin/tmux-start
+        echo "  Exported ~/bin/tmux-start"
+    else
+        echo "  ~/bin/tmux-start not found, skipping"
+    fi
+fi
 
 # Export iTerm2 profiles
 echo "✓ Exporting iTerm2 profiles"
@@ -196,6 +243,11 @@ echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/brew-packages.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
+if [[ -n "${TMUX_TARGET:-}" ]]; then
+echo "  - $SCRIPT_DIR/$TMUX_TARGET"
+echo "  - $SCRIPT_DIR/bin/tgo"
+echo "  - $SCRIPT_DIR/bin/tmux-start"
+fi
 echo "  - $SCRIPT_DIR/EXPORTS.md (updated)"
 echo ""
 echo "Next steps:"

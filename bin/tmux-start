@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# tmux-start — create tmux sessions from ~/.tmux-sessions.conf
+#
+# Each line: session-name:/path/to/directory
+# Skips sessions that already exist. Safe to run multiple times.
+
+set -euo pipefail
+
+CONF="$HOME/.tmux-sessions.conf"
+
+if [[ ! -f "$CONF" ]]; then
+    echo "No sessions config found at $CONF" >&2
+    exit 1
+fi
+
+CREATED=0
+SKIPPED=0
+
+while IFS=: read -r name path; do
+    # Skip empty lines and comments
+    [[ -z "$name" || "$name" == \#* ]] && continue
+
+    # Trim whitespace
+    name="$(echo "$name" | xargs)"
+    path="$(echo "$path" | xargs)"
+
+    if tmux has-session -t "$name" 2>/dev/null; then
+        echo "  skip  $name (exists)"
+        ((SKIPPED++))
+        continue
+    fi
+
+    if [[ ! -d "$path" ]]; then
+        echo "  warn  $name — directory not found: $path" >&2
+        continue
+    fi
+
+    tmux new-session -d -s "$name" -c "$path"
+    echo "  start $name -> $path"
+    ((CREATED++))
+done < "$CONF"
+
+echo ""
+echo "Done: $CREATED created, $SKIPPED already running"
