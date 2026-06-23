@@ -289,6 +289,18 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   alias cbcmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/merge-of-wonders"
   alias cbccadmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard --add-dir \$HOME/dev/merge-of-wonders"
 
+  # OpenCode (local model) shortcuts — OpenCode sets its own tab title; color marks the project
+  alias cbco="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && opencode"
+  alias cado="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && opencode"
+  alias mowo="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && opencode"
+
+  # tmux opencode sessions (detached, locked title) per project
+  alias cbct="tmux_opencode cbc \$HOME/dev/cypher-backend-core"
+  alias cadt="tmux_opencode cad \$HOME/dev/cypher-admin-dashboard"
+  alias mowt="tmux_opencode mow \$HOME/dev/merge-of-wonders"
+  alias tls="tmux ls 2>/dev/null || echo 'no live tmux sessions'"
+  alias tlw="tmux list-windows -a -F '#{session_name}  #{window_index}:#{window_name}#{?window_active, *,}' 2>/dev/null || echo 'no live tmux sessions'"
+
   # Peon-ping mute/unmute (all config dirs)
   alias peon-ping-mute="touch \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
   alias peon-ping-unmute="rm -f \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
@@ -340,6 +352,46 @@ function iterm_tab_color_reset() {
   [[ "$TERM_PROGRAM" == "iTerm.app" ]] || return 0
   echo -e "\033]6;1;bg;*;default\007" 2>/dev/null
   return 0
+}
+
+# fzf picker over a project's opencode tmux sessions, with a live screen preview.
+# Row: name · attached-dot · window count · last activity. Preview = the session's screen.
+# Enter: attach/create   Ctrl-X: kill highlighted session   Esc: cancel.
+# Usage: tmux_opencode <base-name> <project-dir>
+function tmux_opencode() {
+  local base="$1" d="$2" fmt list out key line choice
+  fmt=$'#{session_name}\t#{?session_attached,●, }\t#{session_windows}\t#{t:session_activity}'
+  while true; do
+    list=$(tmux ls -F "$fmt" 2>/dev/null | awk -F'\t' -v b="$base" '
+      $1==b || index($1,b"-")==1 {
+        split($4, t, /[ ]+/)                                 # Tue Jun 23 14:42:31 2026
+        printf "%s\t%-12s %s %sw  %s %s %s\n", $1, $1, $2, $3, t[2], t[3], substr(t[4],1,5)
+      }')
+    out=$( { [[ -n "$list" ]] && print -r -- "$list"; print -r -- $'＋ new session\t＋ new session'; } \
+           | fzf --delimiter=$'\t' --with-nth=2 --expect=ctrl-x --prompt="$base ▶ " \
+                 --height=70% --reverse --header='↵ attach/create   ^X kill   esc cancel' \
+                 --preview 'tmux capture-pane -ep -t {1} 2>/dev/null || echo "↳ spawns a fresh opencode session"' \
+                 --preview-window='right,55%,wrap' )
+    [[ -z "$out" ]] && return                          # Esc = abort
+    key="${out%%$'\n'*}"                               # line 1 = pressed key ('' for Enter)
+    line="${out#*$'\n'}"                               # line 2 = selected row
+    choice="${line%%$'\t'*}"                           # first field = session name
+    if [[ "$key" == ctrl-x ]]; then
+      [[ "$choice" != '＋ new session' ]] && tmux kill-session -t "$choice" 2>/dev/null
+      continue                                         # reopen picker, list refreshed
+    fi
+    break
+  done
+  if [[ "$choice" == '＋ new session' ]]; then
+    local name="$base" n=2 w
+    while tmux has-session -t "$name" 2>/dev/null; do name="$base-$n"; ((n++)); done
+    w=$(tmux new-session -d -s "$name" -c "$d" -n '🦙 opencode' -P -F '#{window_id}')
+    tmux set-window-option -t "$w" automatic-rename off
+    tmux set-window-option -t "$w" allow-rename off
+    tmux send-keys -t "$w" 'opencode' C-m
+    choice="$name"
+  fi
+  if [[ -n "$TMUX" ]]; then tmux switch-client -t "$choice"; else tmux attach -t "$choice"; fi
 }
 
 # ─── Hooks ──────────────────────────────────────────────────────────────────────
