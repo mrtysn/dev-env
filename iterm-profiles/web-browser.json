@@ -17,10 +17,10 @@
       "Non Ascii Font": "Monaco 12",
       "Default Bookmark": "No",
       "Custom Command": "Browser",
-      "Horizontal Spacing": 1.0,
       "Instant Replay": true,
-      "Icon": 1,
-      "Command": "/bin/bash --login"
+      "Horizontal Spacing": 1.0,
+      "Command": "/bin/bash --login",
+      "Icon": 1
     }
   ]
 }
