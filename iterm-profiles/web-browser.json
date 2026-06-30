@@ -15,12 +15,12 @@
       ],
       "Tags": [],
       "Non Ascii Font": "Monaco 12",
-      "Default Bookmark": "No",
       "Custom Command": "Browser",
-      "Instant Replay": true,
       "Horizontal Spacing": 1.0,
-      "Command": "/bin/bash --login",
-      "Icon": 1
+      "Default Bookmark": "No",
+      "Icon": 1,
+      "Instant Replay": true,
+      "Command": "/bin/bash --login"
     }
   ]
 }

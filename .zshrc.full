@@ -68,7 +68,7 @@ typeset -U PATH path
 DOTNET_ROOT=""
 if command -v asdf >/dev/null 2>&1; then
   dotnet_path="$(asdf which dotnet 2>/dev/null)" || dotnet_path=""
-  [[ -n "$dotnet_path" ]] && DOTNET_ROOT="${dotnet_path:h}"   # :h = dirname in zsh
+  [[ -n "$dotnet_path" ]] && export DOTNET_ROOT="${dotnet_path:h}"   # :h = dirname in zsh
 fi
 
 # Only include optional paths if they're non-empty
@@ -237,7 +237,7 @@ awcd() {
   case "$1" in
     list) aw list-numbered ;;
     *)
-      if aw go "$1" && source /tmp/aw_go; then
+      if aw go "$1" && [[ -f /tmp/aw_go && -O /tmp/aw_go && ! -L /tmp/aw_go ]] && source /tmp/aw_go; then
         [[ -n "$_TAB_NAVY" ]] && iterm_tab_color ${=_TAB_NAVY}
       fi
       ;;
@@ -258,17 +258,54 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cad
   _TAB_TEAL="33 140 116"      # #218c74 Palm Springs Splash - mow
   _TAB_RED="179 57 57"        # #b33939 - redis
+  _TAB_GREEN="51 217 178"     # #33d9b2 Aurora Green - bm
+  _TAB_ORANGE="255 121 63"    # #ff793f Synthetic Pumpkin - cs
 
   # Claude config dirs
   _CLAUDE_DIR="$HOME/.claude"
   _CLAUDE_PERSONAL_DIR="$HOME/.claude-personal"
 
-  # Project shortcuts
-  alias cbc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core"
-  alias cad="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard"
-  alias mow="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders"
+  # Codex compatibility for shared Claude-oriented hook configs
+  codex() {
+    CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" command codex "$@"
+  }
+
+  # ── Project alias generators ──────────────────────────────────────────────
+  # _proj NAME COLOR DIR  ->  NAME (cd) · NAMEc (claude) · NAMEo (opencode) · NAMEt (tmux)
+  _proj() {
+    alias "$1=iterm_tab_color $2 && cd $3"
+    alias "${1}c=iterm_tab_color $2 && cd $3 && claude"
+    alias "${1}o=iterm_tab_color $2 && cd $3 && opencode"
+    alias "${1}t=tmux_opencode $1 $3"
+  }
+  # _combo NAME COLOR DIR ADD-DIRS...  ->  cd $DIR && claude --add-dir <each>
+  _combo() {
+    local n=$1 c=$2 d=$3; shift 3; local a=""
+    for x in "$@"; do a+=" --add-dir $x"; done
+    alias "$n=iterm_tab_color $c && cd $d && claude$a"
+  }
+
+  # Projects (add a repo = one line)
+  _proj cbc "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"
+  _proj cad "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard"
+  _proj mow "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"
+  _proj bm  "$_TAB_GREEN"  "$HOME/dev/backend-multi"
+  _proj cs  "$_TAB_ORANGE" "$HOME/dev/cannon-smash"
+
+  # Cross-repo combos (open one repo with others added to the session)
+  _combo cbccad    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard"
+  _combo cadcbc    "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/cypher-backend-core"
+  _combo mowcbc    "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"       "$HOME/dev/cypher-backend-core"
+  _combo cbcmow    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/merge-of-wonders"
+  _combo cbccadmow "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/merge-of-wonders"
+  _combo bmcbc     "$_TAB_GREEN"  "$HOME/dev/backend-multi"          "$HOME/dev/cypher-backend-core"
+  _combo csbm      "$_TAB_ORANGE" "$HOME/dev/cannon-smash"           "$HOME/dev/backend-multi"
+
+  # Personal / non-uniform shortcuts (different claude config dir)
   alias oj="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj"
   alias ojc="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+  alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+  alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
 
   # Deployment shortcuts (pre-types the command, ready to edit/run)
   alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/cypher-backend-core && print -z './deployment_manager.sh -e '"
@@ -277,27 +314,7 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   # Service shortcuts
   alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-server' && redis-server"
 
-  # Claude shortcuts
-  alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
-  alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
-  alias cbcc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude"
-  alias cadc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && claude"
-  alias mowc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude"
-  alias cbccad="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard"
-  alias cadcbc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && claude --add-dir \$HOME/dev/cypher-backend-core"
-  alias mowcbc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && claude --add-dir \$HOME/dev/cypher-backend-core"
-  alias cbcmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/merge-of-wonders"
-  alias cbccadmow="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && claude --add-dir \$HOME/dev/cypher-admin-dashboard --add-dir \$HOME/dev/merge-of-wonders"
-
-  # OpenCode (local model) shortcuts — OpenCode sets its own tab title; color marks the project
-  alias cbco="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/cypher-backend-core && opencode"
-  alias cado="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cypher-admin-dashboard && opencode"
-  alias mowo="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/merge-of-wonders && opencode"
-
-  # tmux opencode sessions (detached, locked title) per project
-  alias cbct="tmux_opencode cbc \$HOME/dev/cypher-backend-core"
-  alias cadt="tmux_opencode cad \$HOME/dev/cypher-admin-dashboard"
-  alias mowt="tmux_opencode mow \$HOME/dev/merge-of-wonders"
+  # tmux session listing
   alias tls="tmux ls 2>/dev/null || echo 'no live tmux sessions'"
   alias tlw="tmux list-windows -a -F '#{session_name}  #{window_index}:#{window_name}#{?window_active, *,}' 2>/dev/null || echo 'no live tmux sessions'"
 
