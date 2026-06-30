@@ -101,6 +101,7 @@ What it exports:
 - Your `.p10k.zsh` configuration
 - List of installed custom plugins
 - List of required brew packages
+- Claude Code `settings.json` for both config dirs (`agents/claude/`, `agents/claude-personal/`); machine-local `*.local.json` and memory are never exported
 
 After export, you should:
 1. Review the changes
@@ -126,6 +127,8 @@ What it does:
 8. Backs up existing configs and copies repo configs to home directory
 9. Installs iTerm2 profiles (full profiles or font-only)
 10. Sets zsh as default shell
+11. Sets up tmux configuration (per-machine)
+12. Backs up and copies Claude Code `settings.json` into `~/.claude` and `~/.claude-personal`
 
 The script is idempotent - it checks what's already installed and skips those steps.
 

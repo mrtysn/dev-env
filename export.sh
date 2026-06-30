@@ -10,12 +10,18 @@ HOSTNAME=$(hostname -s)
 USERNAME=$(whoami)
 DATE=$(date +"%Y-%m-%d %H:%M")
 
+# Claude Code config dirs — override via env if your layout differs.
+# Not derived from $CLAUDE_CONFIG_DIR on purpose: that var is session-contextual
+# (the claudep alias flips it), so it can't be trusted to name the work dir.
+CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
+
 echo "=== Exporting dev environment configuration ==="
 echo ""
 echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
-echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, and iTerm2 profiles to this repository."
+echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles, and Claude Code settings to this repository."
 echo ""
 echo "Files in this repo that will be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.full"
@@ -25,6 +31,7 @@ echo "  - $SCRIPT_DIR/brew-packages.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
+echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -221,6 +228,40 @@ if [ ! -f iterm-profiles/font-only.json ]; then
 EOF
 fi
 
+# Export Claude Code settings (both config dirs)
+# Only settings.json is synced. *.local.json (machine-local) and memory/ (private)
+# are deliberately never read here.
+echo "✓ Exporting Claude Code settings"
+
+# "<source config dir>:<repo subdir>"  (braces required — bare $VAR:c is a zsh modifier)
+AGENTS_DIR="agents"
+CLAUDE_PAIRS=(
+    "${CLAUDE_DIR}:$AGENTS_DIR/claude"
+    "${CLAUDE_PERSONAL_DIR}:$AGENTS_DIR/claude-personal"
+)
+# Churny state fields stripped on export — they regenerate locally and only add diff noise.
+CLAUDE_STRIP_FILTER='del(.feedbackSurveyState)'
+
+for pair in "${CLAUDE_PAIRS[@]}"; do
+    src="${pair%%:*}/settings.json"
+    repo_sub="${pair##*:}"
+    dest="$repo_sub/settings.json"
+
+    if [ ! -f "$src" ]; then
+        echo "  $src not found, skipping"
+        continue
+    fi
+
+    mkdir -p "$repo_sub"
+    if command -v jq >/dev/null 2>&1 && jq "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
+        mv "$dest.tmp" "$dest"
+    else
+        rm -f "$dest.tmp"
+        cp "$src" "$dest"
+    fi
+    echo "  Exported $src → $dest"
+done
+
 # Log export to EXPORTS.md
 echo "✓ Logging export"
 if [ ! -f EXPORTS.md ]; then
@@ -248,6 +289,8 @@ echo "  - $SCRIPT_DIR/$TMUX_TARGET"
 echo "  - $SCRIPT_DIR/bin/tgo"
 echo "  - $SCRIPT_DIR/bin/tmux-start"
 fi
+echo "  - $SCRIPT_DIR/agents/claude/settings.json"
+echo "  - $SCRIPT_DIR/agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/EXPORTS.md (updated)"
 echo ""
 echo "Next steps:"

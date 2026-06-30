@@ -1,0 +1,109 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(diff:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(jq:*)",
+      "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(sort:*)",
+      "Bash(tail:*)",
+      "Bash(tree:*)",
+      "Bash(uniq:*)",
+      "Bash(wc:*)",
+      "Bash(which:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "ls $HOME/dev/personal",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "jq '{systemMessage: (\"Session ID: \" + .session_id), hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"Session ID: \" + .session_id)}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/mert/dev/personal/cc-statusline/cc-statusline.js"
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
+  },
+  "alwaysThinkingEnabled": true,
+  "awaySummaryEnabled": false,
+  "skipAutoPermissionPrompt": true,
+  "tui": "fullscreen",
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  }
+}

@@ -6,6 +6,12 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 cd "$SCRIPT_DIR"
 
+# Claude Code config dirs — override via env if your layout differs.
+# Not derived from $CLAUDE_CONFIG_DIR on purpose: that var is session-contextual
+# (the claudep alias flips it), so it can't be trusted to name the work dir.
+CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
+CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -509,6 +515,52 @@ else
         else
             print "${YELLOW}! Skipped tmux configuration${NC}"
         fi
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 12: Claude Code Settings (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 12: Claude Code Settings ==="
+
+# "<repo subdir>:<target config dir>"
+AGENTS_DIR="agents"
+CLAUDE_PAIRS=(
+    "$AGENTS_DIR/claude:${CLAUDE_DIR}"
+    "$AGENTS_DIR/claude-personal:${CLAUDE_PERSONAL_DIR}"
+)
+
+# Collect the pairs we actually have settings for
+AVAILABLE_CLAUDE=()
+for pair in "${CLAUDE_PAIRS[@]}"; do
+    [ -f "${pair%%:*}/settings.json" ] && AVAILABLE_CLAUDE+=("$pair")
+done
+
+if [[ ${#AVAILABLE_CLAUDE[@]} -eq 0 ]]; then
+    print "${YELLOW}! No Claude settings found in repo, skipping${NC}"
+else
+    print "${BLUE}Available Claude settings:${NC}"
+    for pair in "${AVAILABLE_CLAUDE[@]}"; do
+        echo "  - ${pair%%:*}/settings.json → ${pair##*:}/settings.json"
+    done
+
+    if ask_yes_no "Copy Claude settings? (existing files will be backed up)"; then
+        for pair in "${AVAILABLE_CLAUDE[@]}"; do
+            src="${pair%%:*}/settings.json"
+            target_dir="${pair##*:}"
+            target="$target_dir/settings.json"
+
+            mkdir -p "$target_dir"
+            if [ -f "$target" ]; then
+                cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
+                print "${YELLOW}→ Backed up existing $target${NC}"
+            fi
+            cp "$src" "$target"
+            print "${GREEN}✓ Copied $src → $target${NC}"
+        done
+    else
+        print "${YELLOW}! Skipped Claude settings${NC}"
     fi
 fi
 echo ""

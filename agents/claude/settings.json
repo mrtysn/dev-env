@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(cat:*)",
+      "Bash(diff:*)",
+      "Bash(echo:*)",
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(head:*)",
+      "Bash(jq:*)",
+      "Bash(ls:*)",
+      "Bash(rg:*)",
+      "Bash(sort:*)",
+      "Bash(tail:*)",
+      "Bash(tree:*)",
+      "Bash(uniq:*)",
+      "Bash(wc:*)",
+      "Bash(which:*)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "jq '{systemMessage: (\"Session ID: \" + .session_id), hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"Session ID: \" + .session_id)}}'",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude/hooks/peon-ping/peon.sh",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/mert/dev/personal/cc-statusline/cc-statusline.js"
+  },
+  "enabledPlugins": {
+    "swift-lsp@claude-plugins-official": true
+  },
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
+  "effortLevel": "high",
+  "tui": "fullscreen",
+  "autoMemoryEnabled": true,
+  "autoDreamEnabled": false,
+  "preferredNotifChannel": "iterm2_with_bell",
+  "skipAutoPermissionPrompt": true
+}
