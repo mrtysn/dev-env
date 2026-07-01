@@ -200,7 +200,7 @@ for profile in profiles:
 
     try:
         with open(filepath, 'w') as f:
-            json.dump(dynamic_profile, f, indent=2)
+            json.dump(dynamic_profile, f, indent=2, sort_keys=True)
         print(f"  - {name} -> {filename}")
         exported += 1
     except Exception as e:

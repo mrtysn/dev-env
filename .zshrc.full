@@ -265,6 +265,14 @@ if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
   _CLAUDE_DIR="$HOME/.claude"
   _CLAUDE_PERSONAL_DIR="$HOME/.claude-personal"
 
+  # Claude-in-Chrome: reroute the browser Claude opens to a per-install Chrome profile.
+  # A PATH shim intercepts `open -a "Google Chrome" https://clau.de/chrome/...` and adds
+  # --profile-directory (mapping lives in the shim; override via CLAUDE_CHROME_PROFILE).
+  _CLAUDE_OPEN_SHIM_DIR="$HOME/.local/share/claude-open-shim"
+  claude() {
+    PATH="$_CLAUDE_OPEN_SHIM_DIR:$PATH" command claude "$@"
+  }
+
   # Codex compatibility for shared Claude-oriented hook configs
   codex() {
     CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" command codex "$@"

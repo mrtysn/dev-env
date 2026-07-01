@@ -1,26 +1,26 @@
 {
   "Profiles": [
     {
+      "Command": "/bin/bash --login",
+      "Custom Command": "Browser",
+      "Default Bookmark": "No",
       "Guid": "23083A2A-C321-43BD-9FE5-69E8FAE0D77E",
-      "Vertical Spacing": 1.0,
-      "Scrollback Lines": 1000,
-      "Normal Font": "FiraCodeNFM-Reg 12",
-      "Name": "Web Browser",
-      "Prompt Before Closing 2": false,
+      "Horizontal Spacing": 1.0,
+      "Icon": 1,
+      "Instant Replay": true,
       "Jobs to Ignore": [
         "rlogin",
         "ssh",
         "slogin",
         "telnet"
       ],
-      "Tags": [],
+      "Name": "Web Browser",
       "Non Ascii Font": "Monaco 12",
-      "Custom Command": "Browser",
-      "Horizontal Spacing": 1.0,
-      "Default Bookmark": "No",
-      "Icon": 1,
-      "Instant Replay": true,
-      "Command": "/bin/bash --login"
+      "Normal Font": "FiraCodeNFM-Reg 12",
+      "Prompt Before Closing 2": false,
+      "Scrollback Lines": 1000,
+      "Tags": [],
+      "Vertical Spacing": 1.0
     }
   ]
 }
