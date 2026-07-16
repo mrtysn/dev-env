@@ -21,7 +21,7 @@ echo ""
 echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
-echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles, and Claude Code settings to this repository."
+echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles, Phoenix + Karabiner configs, and Claude Code settings to this repository."
 echo ""
 echo "Files in this repo that will be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.full"
@@ -29,6 +29,8 @@ echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/brew-packages.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
+echo "  - $SCRIPT_DIR/.phoenix.js"
+echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
@@ -228,6 +230,26 @@ if [ ! -f iterm-profiles/font-only.json ]; then
 EOF
 fi
 
+# Export window & keyboard configs (Phoenix window manager, Karabiner keymaps)
+# Both are portable, non-secret text — safe for this public repo.
+echo "✓ Exporting window & keyboard configs"
+
+if [ -f ~/.phoenix.js ]; then
+    cp ~/.phoenix.js .phoenix.js
+    echo "  Exported ~/.phoenix.js"
+else
+    echo "  ~/.phoenix.js not found, skipping"
+fi
+
+# Karabiner: only karabiner.json — never assets/ or automatic_backups/ (churny local state).
+if [ -f ~/.config/karabiner/karabiner.json ]; then
+    mkdir -p karabiner
+    cp ~/.config/karabiner/karabiner.json karabiner/karabiner.json
+    echo "  Exported ~/.config/karabiner/karabiner.json"
+else
+    echo "  ~/.config/karabiner/karabiner.json not found, skipping"
+fi
+
 # Export Claude Code settings (both config dirs)
 # Only settings.json is synced. *.local.json (machine-local) and memory/ (private)
 # are deliberately never read here.
@@ -284,6 +306,8 @@ echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/brew-packages.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
+[ -f .phoenix.js ] && echo "  - $SCRIPT_DIR/.phoenix.js"
+[ -f karabiner/karabiner.json ] && echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 if [[ -n "${TMUX_TARGET:-}" ]]; then
 echo "  - $SCRIPT_DIR/$TMUX_TARGET"
 echo "  - $SCRIPT_DIR/bin/tgo"

@@ -566,6 +566,48 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 13: Window & Keyboard Configs (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 13: Window & Keyboard Configs ==="
+
+HAS_WK=false
+[ -f .phoenix.js ] && HAS_WK=true
+[ -f karabiner/karabiner.json ] && HAS_WK=true
+
+if [ "$HAS_WK" = false ]; then
+    print "${YELLOW}! No Phoenix/Karabiner configs in repo, skipping${NC}"
+else
+    print "${BLUE}Available configs:${NC}"
+    [ -f .phoenix.js ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
+    [ -f karabiner/karabiner.json ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
+
+    if ask_yes_no "Copy window & keyboard configs? (existing files will be backed up)"; then
+        if [ -f .phoenix.js ]; then
+            if [ -f ~/.phoenix.js ]; then
+                cp ~/.phoenix.js ~/.phoenix.js.backup-$(date +%Y%m%d-%H%M%S)
+                print "${YELLOW}→ Backed up existing ~/.phoenix.js${NC}"
+            fi
+            cp .phoenix.js ~/.phoenix.js
+            print "${GREEN}✓ Copied ~/.phoenix.js${NC}"
+        fi
+
+        if [ -f karabiner/karabiner.json ]; then
+            mkdir -p ~/.config/karabiner
+            if [ -f ~/.config/karabiner/karabiner.json ]; then
+                cp ~/.config/karabiner/karabiner.json ~/.config/karabiner/karabiner.json.backup-$(date +%Y%m%d-%H%M%S)
+                print "${YELLOW}→ Backed up existing ~/.config/karabiner/karabiner.json${NC}"
+            fi
+            cp karabiner/karabiner.json ~/.config/karabiner/karabiner.json
+            print "${GREEN}✓ Copied ~/.config/karabiner/karabiner.json${NC}"
+            print "${BLUE}  Restart Karabiner-Elements to apply${NC}"
+        fi
+    else
+        print "${YELLOW}! Skipped window & keyboard configs${NC}"
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Import Complete ==="
