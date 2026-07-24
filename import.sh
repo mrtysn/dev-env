@@ -326,9 +326,9 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 9: iTerm2 Profiles (optional)
+# Step 9: iTerm2 Profiles & Settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 9: iTerm2 Profiles ==="
+echo "=== Step 9: iTerm2 Profiles & Settings ==="
 ITERM_DYNAMIC_PROFILES_DIR="$HOME/Library/Application Support/iTerm2/DynamicProfiles"
 PROFILES_DIR="$SCRIPT_DIR/iterm-profiles"
 
@@ -395,6 +395,100 @@ else
                 print "${YELLOW}! Skipped iTerm2 profiles${NC}"
                 ;;
         esac
+    fi
+
+    # ── App-level settings ─────────────────────────────────────────────────────
+    # Profiles only cover per-profile state. Theme, tab bar geometry, the Minimal
+    # tuning knobs, global keymaps and pointer actions are top-level plist keys.
+    ITERM_SETTINGS="$SCRIPT_DIR/iterm-settings.json"
+
+    if [ ! -f "$ITERM_SETTINGS" ]; then
+        print "${YELLOW}! iterm-settings.json not found, skipping app-level settings${NC}"
+    elif ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
+        # ps, not pgrep: pgrep can miss the process under some sandboxed shells,
+        # and a false "not running" here means silently discarded settings.
+        # iTerm rewrites its plist from memory on quit, so anything written now is
+        # silently discarded. Refusing beats writing values that vanish.
+        print "${RED}✗ iTerm2 is running — app-level settings NOT applied${NC}"
+        print "${BLUE}  Quit iTerm2 completely, then re-run this script to apply them${NC}"
+    else
+        echo ""
+        if ask_yes_no "Apply iTerm2 app-level settings (theme, tab bar, keymaps, pointer actions)?"; then
+            print "${YELLOW}→ Applying iTerm2 app-level settings...${NC}"
+            if python3 - "$ITERM_SETTINGS" <<'PYTHON_EOF'
+import base64
+import json
+import os
+import plistlib
+import sys
+
+settings_file = sys.argv[1]
+plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
+
+
+def restore(obj):
+    """Inverse of export.sh's convert_for_json."""
+    if isinstance(obj, dict):
+        if obj.get("_type") == "data" and "value" in obj:
+            return base64.b64decode(obj["value"])
+        return {k: restore(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [restore(item) for item in obj]
+    return obj
+
+
+try:
+    with open(settings_file) as f:
+        settings = restore(json.load(f).get("settings", {}))
+except Exception as e:
+    print(f"  Could not read {settings_file}: {e}", file=sys.stderr)
+    sys.exit(1)
+
+if not settings:
+    print("  No settings found in the export, nothing to apply")
+    sys.exit(0)
+
+# Merge, don't replace: keys absent from the export (profiles, machine-local state)
+# must survive untouched.
+try:
+    with open(plist_path, "rb") as f:
+        plist = plistlib.load(f)
+except FileNotFoundError:
+    plist = {}
+except Exception as e:
+    print(f"  Could not read existing plist: {e}", file=sys.stderr)
+    sys.exit(1)
+
+changed = [k for k, v in settings.items() if plist.get(k) != v]
+plist.update(settings)
+
+try:
+    tmp = plist_path + ".tmp"
+    with open(tmp, "wb") as f:
+        plistlib.dump(plist, f)
+    os.replace(tmp, plist_path)
+except Exception as e:
+    print(f"  Failed to write plist: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  Applied {len(settings)} settings ({len(changed)} changed)")
+for k in changed[:10]:
+    print(f"    - {k}")
+if len(changed) > 10:
+    print(f"    ... and {len(changed) - 10} more")
+PYTHON_EOF
+            then
+                # cfprefsd caches the domain; without this it can rewrite the old
+                # values over the ones just written.
+                killall cfprefsd 2>/dev/null || true
+                print "${GREEN}✓ iTerm2 app-level settings applied${NC}"
+                print "${BLUE}  Launch iTerm2 to see them${NC}"
+            else
+                print "${RED}✗ Failed to apply iTerm2 app-level settings${NC}"
+            fi
+        else
+            print "${YELLOW}! Skipped iTerm2 app-level settings${NC}"
+        fi
     fi
 fi
 echo ""

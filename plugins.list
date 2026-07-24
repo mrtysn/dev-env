@@ -1,10 +1,10 @@
-autoswitch_virtualenv
-zsh-autosuggestions
+alias-tips
 auto-notify
-fast-syntax-highlighting
+autoswitch_virtualenv
 autoupdate
 cd-ls
+fast-syntax-highlighting
+fzf-tab
 git-it-on
 ls
-fzf-tab
-alias-tips
+zsh-autosuggestions

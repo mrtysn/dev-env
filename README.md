@@ -125,7 +125,7 @@ What it does:
 6. Sets up Homebrew command-not-found
 7. Configures FZF integration
 8. Backs up existing configs and copies repo configs to home directory
-9. Installs iTerm2 profiles (full profiles or font-only)
+9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
 12. Backs up and copies Claude Code `settings.json` into `~/.claude` and `~/.claude-personal`
@@ -429,7 +429,40 @@ asdf global dotnet latest
   - `hotkey-window.json` - Full Hotkey Window profile
   - `web-browser.json` - Full Web Browser profile
   - `font-only.json` - Minimal profile (just sets FiraCode Nerd Font)
+- `iterm-settings.json` - iTerm2 **app-level** preferences (see below)
 - `.gitignore` - Git ignore rules
+
+## iTerm2 app-level settings
+
+Profiles alone cannot reproduce the setup. Theme, tab bar position and width, the
+Minimal-theme tuning knobs, global keymaps, pointer actions and custom colour presets are
+**top-level** plist keys that live outside any profile. `iterm-settings.json` captures them.
+
+**Keys are copied verbatim from the live plist and must never be hand-typed.** iTerm reads
+CamelCase names (`MinimalDeslectedColoredTabAlpha`) while its internal symbols are
+lowercase-first (`minimalDeslectedColoredTabAlpha`). Writing the lowercase spelling via
+`defaults write` creates a separate key that nothing ever reads — it looks like it worked
+and changes nothing.
+
+**iTerm2 must be quit before importing.** It rewrites its plist from memory on quit, so
+settings written while it is running are silently discarded. `import.sh` checks for a running
+iTerm2 and refuses rather than writing values that would vanish.
+
+What is excluded, by pattern:
+
+| Pattern | Why |
+|---|---|
+| `NoSync*` | iTerm's own marker for machine-local state |
+| `NSWindow Frame *`, `NSSplitView *`, `NSToolbar *` | window and panel geometry |
+| `SU[A-Z]*` | Sparkle updater state |
+| `NSNavLastRootDirectory`, `NSNavPanelExpandedSize*` | file-panel geometry and last path |
+| `NeverWarnAboutShortLivedSessions_*` | per-profile-GUID dismissals |
+| `findMode_iTerm`, `kCPK*` | transient UI state |
+| `New Bookmarks` | profiles, exported separately |
+
+**This repository is public.** The export also runs a secrets gate: any key or string value
+matching a credential pattern is withheld from the export and named in the output for manual
+review. Read `iterm-settings.json` before committing.
 
 ## Credits
 

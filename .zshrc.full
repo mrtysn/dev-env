@@ -251,15 +251,15 @@ alias dv="cd $HOME/dev"
 
 # ─── Aliases: Machine-Specific (mert-cypher-m3max) ──────────────────────────────
 if [[ "$(hostname -s)" == "mert-cypher-m3max" ]]; then
-  # Tab colors (Flat UI Spanish palette) - "R G B" format
-  _TAB_BLUE="52 172 224"      # #34ace0 Summer Sky - cbc
-  _TAB_NAVY="30 80 140"       # #1e508c - awcd
-  _TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claudep
-  _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cad
-  _TAB_TEAL="33 140 116"      # #218c74 Palm Springs Splash - mow
-  _TAB_RED="179 57 57"        # #b33939 - redis
-  _TAB_GREEN="51 217 178"     # #33d9b2 Aurora Green - bm
-  _TAB_ORANGE="255 121 63"    # #ff793f Synthetic Pumpkin - cs
+  # Tab colors (Flat UI Spanish palette, dimmed x0.40 for the Minimal theme) - "R G B" format
+  _TAB_BLUE="21 69 90"        # #15455a Summer Sky - cbc
+  _TAB_NAVY="12 32 56"        # #0c2038 - awcd
+  _TAB_PURPLE="28 28 54"      # #1c1c36 Lucky Point - claudep
+  _TAB_YELLOW="102 71 26"     # #66471a Mandarin Sorbet - cad
+  _TAB_TEAL="13 56 46"        # #0d382e Palm Springs Splash - mow
+  _TAB_RED="72 23 23"         # #481717 - redis
+  _TAB_GREEN="20 87 71"       # #145747 Aurora Green - bm
+  _TAB_ORANGE="102 48 25"     # #663019 Synthetic Pumpkin - cs
 
   # Claude config dirs
   _CLAUDE_DIR="$HOME/.claude"

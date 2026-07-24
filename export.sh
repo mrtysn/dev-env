@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Export current terminal configuration to this repository
 
-set -e
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 cd "$SCRIPT_DIR"
@@ -16,19 +16,37 @@ DATE=$(date +"%Y-%m-%d %H:%M")
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
 
+# ── Bookkeeping ────────────────────────────────────────────────────────────────
+# The closing summary is driven by what was actually written, not by a
+# hand-maintained list that drifts from reality.
+EXPORTED=()
+WARNINGS=()
+FAILURES=()
+
+note()    { EXPORTED+=("$1") }
+warn()    { WARNINGS+=("$1"); echo "  ! $1" }
+fail()    { FAILURES+=("$1"); echo "  ✗ $1" }
+
+# Copy via a temp file so an interrupted run can't leave a tracked file truncated.
+copy_atomic() {
+    cp "$1" "$2.tmp" && mv "$2.tmp" "$2"
+}
+
 echo "=== Exporting dev environment configuration ==="
 echo ""
 echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
-echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles, Phoenix + Karabiner configs, and Claude Code settings to this repository."
+echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles and app-level"
+echo "settings, Phoenix + Karabiner configs, and Claude Code settings to this repository."
 echo ""
-echo "Files in this repo that will be overwritten:"
+echo "Files in this repo that may be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.full"
 echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
-echo "  - $SCRIPT_DIR/brew-packages.list"
+echo "  - $SCRIPT_DIR/brew-packages.list  (static list, rewritten — not scanned)"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
+echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
@@ -45,43 +63,55 @@ if [[ ! $REPLY =~ ^[Yy]$ ]]; then
 fi
 echo ""
 
+# ── Validate sources BEFORE destroying anything ────────────────────────────────
+# The cleanup below removes the repo's only copy of .zshrc.full. Validating first
+# means a missing source aborts with the repo intact.
+echo "✓ Validating sources"
+MISSING=()
+[ -f ~/.zshrc ]    || MISSING+=("~/.zshrc")
+[ -f ~/.p10k.zsh ] || MISSING+=("~/.p10k.zsh")
+
+if (( ${#MISSING[@]} > 0 )); then
+    echo ""
+    echo "✗ Required source files not found:"
+    for m in "${MISSING[@]}"; do echo "    $m"; done
+    echo ""
+    echo "Aborting — nothing in the repo was modified."
+    exit 1
+fi
+echo ""
+
 # Clean up old split files (no longer used)
 echo "✓ Cleaning up old config files"
-rm -f .zshrc.full .zshrc.base .zshrc.personal
+rm -f .zshrc.base .zshrc.personal
 echo ""
 
 # Export .zshrc
-if [ -f ~/.zshrc ]; then
-    echo "✓ Exporting ~/.zshrc"
-    cp ~/.zshrc .zshrc.full
-else
-    echo "✗ ~/.zshrc not found"
-    exit 1
-fi
+echo "✓ Exporting ~/.zshrc"
+copy_atomic ~/.zshrc .zshrc.full
+note ".zshrc.full"
 
 # Export .p10k.zsh
-if [ -f ~/.p10k.zsh ]; then
-    echo "✓ Exporting ~/.p10k.zsh"
-    cp ~/.p10k.zsh .p10k.zsh
-else
-    echo "✗ ~/.p10k.zsh not found"
-    exit 1
-fi
+echo "✓ Exporting ~/.p10k.zsh"
+copy_atomic ~/.p10k.zsh .p10k.zsh
+note ".p10k.zsh"
 
 # Export custom plugin list
 echo "✓ Scanning custom plugins"
 if [ -d ~/.oh-my-zsh/custom/plugins ]; then
-    find ~/.oh-my-zsh/custom/plugins -maxdepth 1 -type d -not -name "plugins" -not -name "example" | \
-        xargs -I {} basename {} > plugins.list.tmp
+    # (N/) = nullglob + directories only; (:t) takes the basename — no forks, no temp file.
+    plugin_dirs=(~/.oh-my-zsh/custom/plugins/*(N/))
+    plugin_names=(${plugin_dirs:t})
+    plugin_names=(${plugin_names:#example})
 
-    grep -v '^$' plugins.list.tmp > plugins.list || touch plugins.list
-    rm plugins.list.tmp
-
-    echo "  Found $(wc -l < plugins.list | tr -d ' ') custom plugins"
+    print -l -- ${plugin_names:-} > plugins.list.tmp
+    mv plugins.list.tmp plugins.list
+    echo "  Found ${#plugin_names[@]} custom plugins"
 else
     echo "  No custom plugins directory found"
-    touch plugins.list
+    : > plugins.list
 fi
+note "plugins.list"
 
 # Write brew package dependencies (static list, not scanned from system)
 # These are packages required by the dev environment:
@@ -91,8 +121,8 @@ fi
 #   coreutils     - GNU utilities (gnubin in PATH)
 #   tree          - directory tree (used by ls plugin)
 #   tmux          - terminal multiplexer
-echo "✓ Writing brew package dependencies"
-cat > brew-packages.list << 'EOF'
+echo "✓ Writing brew package dependencies (static list, not scanned)"
+cat > brew-packages.list.tmp << 'EOF'
 powerlevel10k
 fzf
 asdf
@@ -100,74 +130,108 @@ coreutils
 tree
 tmux
 EOF
+mv brew-packages.list.tmp brew-packages.list
+note "brew-packages.list (static)"
 
 # Export tmux config
 echo "✓ Exporting tmux configuration"
-MACHINE_HOSTNAME=$(hostname -s)
 TMUX_TARGET=""
 
-if [[ "$MACHINE_HOSTNAME" == "mert-cypher-m3max" ]]; then
-    TMUX_TARGET="tmux/c1.conf"
-    echo "  Detected: C1 (Office)"
-elif [[ "$MACHINE_HOSTNAME" == "mrtysn-mbp-m2max" ]]; then
-    TMUX_TARGET="tmux/c2.conf"
-    echo "  Detected: C2 (Home)"
-else
-    echo "  Unknown hostname: $MACHINE_HOSTNAME, skipping tmux config export"
-fi
+case "$HOSTNAME" in
+    mert-cypher-m3max) TMUX_TARGET="tmux/c1.conf"; echo "  Detected: C1 (Office)" ;;
+    mrtysn-mbp-m2max)  TMUX_TARGET="tmux/c2.conf"; echo "  Detected: C2 (Home)"   ;;
+    *) warn "Unknown hostname: $HOSTNAME, skipping tmux config export" ;;
+esac
 
 if [[ -n "$TMUX_TARGET" ]]; then
     mkdir -p tmux bin
 
     if [ -f ~/.tmux.conf ]; then
         # Resolve symlink to get actual content
-        cp -L ~/.tmux.conf "$TMUX_TARGET"
+        cp -L ~/.tmux.conf "$TMUX_TARGET.tmp" && mv "$TMUX_TARGET.tmp" "$TMUX_TARGET"
         echo "  Exported ~/.tmux.conf → $TMUX_TARGET"
+        note "$TMUX_TARGET"
     else
-        echo "  ~/.tmux.conf not found, skipping"
+        warn "~/.tmux.conf not found, skipping"
     fi
 
-    if [ -f ~/bin/tgo ]; then
-        cp ~/bin/tgo bin/tgo
-        chmod +x bin/tgo
-        echo "  Exported ~/bin/tgo"
-    else
-        echo "  ~/bin/tgo not found, skipping"
-    fi
-
-    if [ -f ~/bin/tmux-start ]; then
-        cp ~/bin/tmux-start bin/tmux-start
-        chmod +x bin/tmux-start
-        echo "  Exported ~/bin/tmux-start"
-    else
-        echo "  ~/bin/tmux-start not found, skipping"
-    fi
+    for tool in tgo tmux-start; do
+        if [ -f ~/bin/$tool ]; then
+            copy_atomic ~/bin/$tool "bin/$tool"
+            chmod +x "bin/$tool"
+            echo "  Exported ~/bin/$tool"
+            note "bin/$tool"
+        else
+            warn "~/bin/$tool not found, skipping"
+        fi
+    done
 fi
 
-# Export iTerm2 profiles
-echo "✓ Exporting iTerm2 profiles"
+# ── iTerm2: profiles AND app-level settings ────────────────────────────────────
+# Profiles alone are not enough to reproduce the setup: theme, tab bar geometry,
+# the Minimal-theme tuning knobs, global keymaps and pointer actions all live as
+# TOP-LEVEL plist keys outside any profile.
+#
+# Keys are copied verbatim from the live plist and never hand-typed: iTerm reads
+# CamelCase names (MinimalDeslectedColoredTabAlpha) while its internal symbols are
+# lowercase-first, so a hand-written key list silently produces keys nothing reads.
+#
+# This repo is PUBLIC. The export applies a denylist for machine-local state and a
+# secrets gate that withholds (and reports) anything credential-shaped.
+echo "✓ Exporting iTerm2 profiles and settings"
 mkdir -p iterm-profiles
 
 ITERM_PLIST="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
 
 if [ ! -f "$ITERM_PLIST" ]; then
-    echo "  iTerm2 not installed, skipping"
+    warn "iTerm2 not installed, skipping profiles and settings"
 elif ! defaults read com.googlecode.iterm2 &>/dev/null; then
-    echo "  iTerm2 preferences not readable, skipping"
-else
-    python3 << 'PYTHON_EOF' || echo "  Failed to export iTerm2 profiles"
-import plistlib
+    warn "iTerm2 preferences not readable, skipping profiles and settings"
+elif python3 << 'PYTHON_EOF'
+import base64
 import json
 import os
+import plistlib
+import re
 import sys
 
 plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
-output_dir = "iterm-profiles"
+profiles_dir = "iterm-profiles"
+settings_path = "iterm-settings.json"
+
+# Machine-local / volatile state that must never reach the repo.
+# Spaces are written as [ ] — a trailing "\ " before a newline escapes the newline
+# in re.VERBOSE, which silently disables the pattern.
+DENY = re.compile(r"""^(
+      NoSync
+    | NSWindow[ ]Frame[ ]
+    | NSSplitView[ ]
+    | NSToolbar[ ]
+    | SU[A-Z]
+    | NSNavLastRootDirectory$
+    | NSNavPanelExpandedSize
+    | NeverWarnAboutShortLivedSessions_
+    | findMode_iTerm$
+    | kCPK
+    | iTerm\ Version$
+    | New\ Bookmarks$
+    | Bookmarks$
+)""", re.VERBOSE)
+
+# The repo is public. Anything credential-shaped is withheld and reported.
+# "token" is only credential-shaped when qualified — a bare match also hits
+# AiMaxTokens / AiResponseMaxTokens, which are integer limits, not secrets.
+SECRET = re.compile(
+    r"secret|password|passphrase|credential|api[-_]?key"
+    r"|(access|refresh|auth|bearer|session|id)[-_]?token"
+    r"|oauth|bearer",
+    re.I,
+)
+
 
 def convert_for_json(obj):
     if isinstance(obj, bytes):
-        import base64
-        return {"_type": "data", "value": base64.b64encode(obj).decode('ascii')}
+        return {"_type": "data", "value": base64.b64encode(obj).decode("ascii")}
     elif isinstance(obj, dict):
         return {k: convert_for_json(v) for k, v in obj.items()}
     elif isinstance(obj, list):
@@ -175,47 +239,107 @@ def convert_for_json(obj):
     else:
         return obj
 
+
+def looks_secret(key, value):
+    if SECRET.search(key):
+        return True
+    if isinstance(value, str) and SECRET.search(value):
+        return True
+    return False
+
+
 def name_to_filename(name):
     return name.lower().replace(" ", "-") + ".json"
 
+
+def write_json_atomic(path, payload):
+    tmp = path + ".tmp"
+    with open(tmp, "w") as f:
+        json.dump(payload, f, indent=2, sort_keys=True)
+    os.replace(tmp, path)
+
+
 try:
-    with open(plist_path, 'rb') as f:
+    with open(plist_path, "rb") as f:
         data = plistlib.load(f)
 except Exception as e:
     print(f"  Could not read iTerm2 plist: {e}", file=sys.stderr)
     sys.exit(1)
 
+failed = False
+
+# ── profiles ───────────────────────────────────────────────────────────────────
 profiles = data.get("New Bookmarks", [])
 if not profiles:
     print("  No profiles found in iTerm2")
-    sys.exit(0)
+else:
+    exported = 0
+    seen = {}
+    for profile in profiles:
+        name = profile.get("Name", "Unknown")
+        filename = name_to_filename(name)
 
-exported = 0
-for profile in profiles:
-    name = profile.get("Name", "Unknown")
-    filename = name_to_filename(name)
-    filepath = os.path.join(output_dir, filename)
+        # Distinct profile names can collapse to one filename (lowercase + hyphenate).
+        # Silently overwriting would lose a profile, so refuse and report.
+        if filename in seen:
+            print(f"  ! Filename collision: '{name}' and '{seen[filename]}' both map to "
+                  f"{filename} — skipping '{name}'", file=sys.stderr)
+            failed = True
+            continue
+        seen[filename] = name
 
-    dynamic_profile = {
-        "Profiles": [convert_for_json(profile)]
-    }
+        try:
+            write_json_atomic(os.path.join(profiles_dir, filename),
+                              {"Profiles": [convert_for_json(profile)]})
+            print(f"  - {name} -> {filename}")
+            exported += 1
+        except Exception as e:
+            print(f"  Failed to write {filename}: {e}", file=sys.stderr)
+            failed = True
+    print(f"  Exported {exported} profiles")
 
-    try:
-        with open(filepath, 'w') as f:
-            json.dump(dynamic_profile, f, indent=2, sort_keys=True)
-        print(f"  - {name} -> {filename}")
-        exported += 1
-    except Exception as e:
-        print(f"  Failed to write {filename}: {e}", file=sys.stderr)
+# ── app-level settings ─────────────────────────────────────────────────────────
+settings, withheld, dropped = {}, [], 0
+for key, value in data.items():
+    if DENY.search(key):
+        dropped += 1
+        continue
+    if looks_secret(key, value):
+        withheld.append(key)
+        continue
+    settings[key] = convert_for_json(value)
 
-print(f"  Exported {exported} profiles")
+try:
+    write_json_atomic(settings_path, {
+        "_comment": (
+            "iTerm2 app-level preferences (top-level plist keys, excluding profiles). "
+            "Keys are copied verbatim — iTerm reads CamelCase names, so casing matters. "
+            "Applied by import.sh while iTerm2 is NOT running."
+        ),
+        "settings": settings,
+    })
+    print(f"  Exported {len(settings)} app-level settings ({dropped} machine-local keys dropped)")
+except Exception as e:
+    print(f"  Failed to write {settings_path}: {e}", file=sys.stderr)
+    failed = True
+
+if withheld:
+    print(f"  ! WITHHELD {len(withheld)} credential-shaped keys (repo is public): "
+          + ", ".join(withheld), file=sys.stderr)
+
+sys.exit(1 if failed else 0)
 PYTHON_EOF
+then
+    note "iterm-profiles/*.json"
+    note "iterm-settings.json"
+else
+    fail "iTerm2 export failed — profiles and settings may be stale or incomplete"
 fi
 
 # Create font-only profile if it doesn't exist
 if [ ! -f iterm-profiles/font-only.json ]; then
     echo "✓ Creating font-only profile template"
-    cat > iterm-profiles/font-only.json << 'EOF'
+    cat > iterm-profiles/font-only.json.tmp << 'EOF'
 {
   "Profiles": [
     {
@@ -228,6 +352,8 @@ if [ ! -f iterm-profiles/font-only.json ]; then
   ]
 }
 EOF
+    mv iterm-profiles/font-only.json.tmp iterm-profiles/font-only.json
+    note "iterm-profiles/font-only.json"
 fi
 
 # Export window & keyboard configs (Phoenix window manager, Karabiner keymaps)
@@ -235,19 +361,21 @@ fi
 echo "✓ Exporting window & keyboard configs"
 
 if [ -f ~/.phoenix.js ]; then
-    cp ~/.phoenix.js .phoenix.js
+    copy_atomic ~/.phoenix.js .phoenix.js
     echo "  Exported ~/.phoenix.js"
+    note ".phoenix.js"
 else
-    echo "  ~/.phoenix.js not found, skipping"
+    warn "~/.phoenix.js not found, skipping"
 fi
 
 # Karabiner: only karabiner.json — never assets/ or automatic_backups/ (churny local state).
 if [ -f ~/.config/karabiner/karabiner.json ]; then
     mkdir -p karabiner
-    cp ~/.config/karabiner/karabiner.json karabiner/karabiner.json
+    copy_atomic ~/.config/karabiner/karabiner.json karabiner/karabiner.json
     echo "  Exported ~/.config/karabiner/karabiner.json"
+    note "karabiner/karabiner.json"
 else
-    echo "  ~/.config/karabiner/karabiner.json not found, skipping"
+    warn "~/.config/karabiner/karabiner.json not found, skipping"
 fi
 
 # Export Claude Code settings (both config dirs)
@@ -270,18 +398,21 @@ for pair in "${CLAUDE_PAIRS[@]}"; do
     dest="$repo_sub/settings.json"
 
     if [ ! -f "$src" ]; then
-        echo "  $src not found, skipping"
+        warn "$src not found, skipping"
         continue
     fi
 
     mkdir -p "$repo_sub"
     if command -v jq >/dev/null 2>&1 && jq "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
         mv "$dest.tmp" "$dest"
+        echo "  Exported $src → $dest"
     else
         rm -f "$dest.tmp"
-        cp "$src" "$dest"
+        copy_atomic "$src" "$dest"
+        # The raw copy keeps .feedbackSurveyState, which the filter exists to remove.
+        warn "jq unavailable or filter failed — copied $src verbatim (churny state NOT stripped)"
     fi
-    echo "  Exported $src → $dest"
+    note "$dest"
 done
 
 # Log export to EXPORTS.md
@@ -296,27 +427,30 @@ EOF
 fi
 
 echo "| $DATE | $HOSTNAME | $USERNAME |" >> EXPORTS.md
+note "EXPORTS.md (appended)"
 
 echo ""
 echo "=== Export complete ==="
 echo ""
 echo "Files exported:"
-echo "  - $SCRIPT_DIR/.zshrc.full"
-echo "  - $SCRIPT_DIR/.p10k.zsh"
-echo "  - $SCRIPT_DIR/plugins.list"
-echo "  - $SCRIPT_DIR/brew-packages.list"
-echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
-[ -f .phoenix.js ] && echo "  - $SCRIPT_DIR/.phoenix.js"
-[ -f karabiner/karabiner.json ] && echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
-if [[ -n "${TMUX_TARGET:-}" ]]; then
-echo "  - $SCRIPT_DIR/$TMUX_TARGET"
-echo "  - $SCRIPT_DIR/bin/tgo"
-echo "  - $SCRIPT_DIR/bin/tmux-start"
+for f in "${EXPORTED[@]}"; do echo "  - $SCRIPT_DIR/$f"; done
+
+if (( ${#WARNINGS[@]} > 0 )); then
+    echo ""
+    echo "Warnings (${#WARNINGS[@]}):"
+    for w in "${WARNINGS[@]}"; do echo "  ! $w"; done
 fi
-echo "  - $SCRIPT_DIR/agents/claude/settings.json"
-echo "  - $SCRIPT_DIR/agents/claude-personal/settings.json"
-echo "  - $SCRIPT_DIR/EXPORTS.md (updated)"
+
+if (( ${#FAILURES[@]} > 0 )); then
+    echo ""
+    echo "Failures (${#FAILURES[@]}):"
+    for f in "${FAILURES[@]}"; do echo "  ✗ $f"; done
+fi
+
 echo ""
 echo "Next steps:"
 echo "  1. Review the exported files: git diff"
-echo "  2. Commit and push changes: git add . && git commit && git push"
+echo "  2. This repo is PUBLIC — read iterm-settings.json before committing"
+echo "  3. Commit and push changes: git add . && git commit && git push"
+
+(( ${#FAILURES[@]} == 0 ))

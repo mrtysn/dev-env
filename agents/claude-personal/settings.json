@@ -28,6 +28,18 @@
   },
   "model": "opus[1m]",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/mert/.claude-personal/hooks/subagent-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
