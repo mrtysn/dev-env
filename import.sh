@@ -247,9 +247,18 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 8: Configuration Files ==="
 
+# Detect this machine → zsh split label (c1 = Office, c2 = Home).
+# LocalHostName, not `hostname -s`: the latter can resolve to a DHCP name (e.g. "192")
+# on some LANs, which would install the wrong machine's aliases.
+ZSH_LABEL=""
+case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+    mert-cypher-m3max) ZSH_LABEL="c1" ;;
+    mrtysn-mbp-m2max)  ZSH_LABEL="c2" ;;
+esac
+
 # Check what config files exist in repo
 HAS_CONFIG=false
-[ -f .zshrc.base ] && [ -f .zshrc.personal ] && HAS_CONFIG=true
+[ -f .zshrc.base ] && HAS_CONFIG=true
 [ -f .zshrc.full ] && HAS_CONFIG=true
 [ -f .zshrc ] && HAS_CONFIG=true
 
@@ -258,8 +267,12 @@ if [ "$HAS_CONFIG" = false ]; then
 else
     # Show what will be copied
     print "${BLUE}Available configs:${NC}"
-    [ -f .zshrc.full ] && echo "  - .zshrc.full"
-    [ -f .zshrc.base ] && echo "  - .zshrc.base"
+    if [ -f .zshrc.base ]; then
+        echo "  - .zshrc.base  (shared)"
+        [ -n "$ZSH_LABEL" ] && [ -f .zshrc.$ZSH_LABEL ] && echo "  - .zshrc.$ZSH_LABEL   (this machine only)"
+        echo "  - .zshrc.loader → ~/.zshrc"
+    fi
+    [ -f .zshrc.full ] && echo "  - .zshrc.full  (legacy monolith)"
     [ -f .p10k.zsh ] && echo "  - .p10k.zsh"
 
     if ask_yes_no "Copy configuration files? (existing files will be backed up)"; then
@@ -269,39 +282,45 @@ else
             BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
             print "${YELLOW}→ Backing up existing configs to $BACKUP_DIR${NC}"
             mkdir -p "$BACKUP_DIR"
-            [ -f ~/.zshrc ] && cp ~/.zshrc "$BACKUP_DIR/.zshrc"
-            [ -f ~/.zshrc.base ] && cp ~/.zshrc.base "$BACKUP_DIR/.zshrc.base"
-            [ -f ~/.zshrc.personal ] && cp ~/.zshrc.personal "$BACKUP_DIR/.zshrc.personal"
-            [ -f ~/.p10k.zsh ] && cp ~/.p10k.zsh "$BACKUP_DIR/.p10k.zsh"
+            for f in .zshrc .zshrc.base .zshrc.c1 .zshrc.c2 .zshrc.personal .p10k.zsh; do
+                [ -f ~/$f ] && cp ~/$f "$BACKUP_DIR/$f"
+            done
             print "${GREEN}✓ Existing configs backed up${NC}"
         fi
 
         # Determine which config files to use
-        if [ -f .zshrc.base ] && [ -f .zshrc.personal ]; then
-            # Split config mode
-            print "${YELLOW}→ Copying .zshrc.base and .zshrc.personal${NC}"
+        if [ -f .zshrc.base ]; then
+            # Split layout: shared base + this machine's file + loader.
+            # The OTHER machine's .zshrc.<label> is deliberately never touched.
+            print "${YELLOW}→ Installing split zsh config${NC}"
             cp .zshrc.base ~/.zshrc.base
+            print "${GREEN}✓ Copied ~/.zshrc.base${NC}"
 
-            # Only copy personal if it doesn't exist (user might have their own)
-            if [ ! -f ~/.zshrc.personal ]; then
-                cp .zshrc.personal ~/.zshrc.personal
-                print "${GREEN}✓ Created ~/.zshrc.personal from template${NC}"
+            if [ -n "$ZSH_LABEL" ] && [ -f .zshrc.$ZSH_LABEL ]; then
+                cp .zshrc.$ZSH_LABEL ~/.zshrc.$ZSH_LABEL
+                print "${GREEN}✓ Copied ~/.zshrc.$ZSH_LABEL (this machine)${NC}"
+            elif [ -z "$ZSH_LABEL" ]; then
+                print "${YELLOW}! Unknown machine — installed base only, no machine-specific file${NC}"
             else
-                print "${YELLOW}! Skipping ~/.zshrc.personal (already exists)${NC}"
+                print "${YELLOW}! No .zshrc.$ZSH_LABEL in repo — base installed without machine file${NC}"
             fi
 
-            # Create main .zshrc that sources both
-            cat > ~/.zshrc << 'EOF'
-# Source base configuration
-[ -f ~/.zshrc.base ] && source ~/.zshrc.base
-
-# Source personal configuration
-[ -f ~/.zshrc.personal ] && source ~/.zshrc.personal
+            # Install the loader as ~/.zshrc (prefer the repo copy; fall back to inline)
+            if [ -f .zshrc.loader ]; then
+                cp .zshrc.loader ~/.zshrc
+            else
+                cat > ~/.zshrc << 'EOF'
+[[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
+case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+  mert-cypher-m3max) [[ -f ~/.zshrc.c1 ]] && source ~/.zshrc.c1 ;;
+  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c2 ]] && source ~/.zshrc.c2 ;;
+esac
 EOF
-            print "${GREEN}✓ Created ~/.zshrc (sources base + personal)${NC}"
+            fi
+            print "${GREEN}✓ Installed ~/.zshrc loader${NC}"
 
         elif [ -f .zshrc.full ]; then
-            # Full config mode
+            # Legacy monolith
             print "${YELLOW}→ Copying .zshrc.full${NC}"
             cp .zshrc.full ~/.zshrc
             print "${GREEN}✓ Copied .zshrc${NC}"
@@ -711,7 +730,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Restart your terminal or run: source ~/.zshrc"
 echo "  2. Powerlevel10k config wizard will run on first start (if not configured)"
-echo "  3. Customize ~/.zshrc.personal with your own aliases and settings"
+echo "  3. Machine-specific aliases live in ~/.zshrc.c1 (Office) / ~/.zshrc.c2 (Home); shared config in ~/.zshrc.base"
 echo ""
 if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
     echo "Your old configs are backed up at: $BACKUP_DIR"

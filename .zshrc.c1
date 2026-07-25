@@ -1,0 +1,132 @@
+# ─── C1 · Office (mert-cypher-m3max) ────────────────────────────────────────────
+# Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
+# helpers (iterm_tab_color, iterm_tab_title) are already defined for the aliases below.
+# Exported back to the repo only when export.sh runs on THIS machine.
+
+# jump to nth most recent aw worktree
+# usage: awcd [n|list]
+awcd() {
+  case "$1" in
+    list) aw list-numbered ;;
+    *)
+      if aw go "$1" && [[ -f /tmp/aw_go && -O /tmp/aw_go && ! -L /tmp/aw_go ]] && source /tmp/aw_go; then
+        [[ -n "$_TAB_NAVY" ]] && iterm_tab_color ${=_TAB_NAVY}
+      fi
+      ;;
+  esac
+}
+
+function tmux_opencode() {
+  local base="$1" d="$2" fmt list out key line choice
+  fmt=$'#{session_name}\t#{?session_attached,●, }\t#{session_windows}\t#{t:session_activity}'
+  while true; do
+    list=$(tmux ls -F "$fmt" 2>/dev/null | awk -F'\t' -v b="$base" '
+      $1==b || index($1,b"-")==1 {
+        split($4, t, /[ ]+/)                                 # Tue Jun 23 14:42:31 2026
+        printf "%s\t%-12s %s %sw  %s %s %s\n", $1, $1, $2, $3, t[2], t[3], substr(t[4],1,5)
+      }')
+    out=$( { [[ -n "$list" ]] && print -r -- "$list"; print -r -- $'＋ new session\t＋ new session'; } \
+           | fzf --delimiter=$'\t' --with-nth=2 --expect=ctrl-x --prompt="$base ▶ " \
+                 --height=70% --reverse --header='↵ attach/create   ^X kill   esc cancel' \
+                 --preview 'tmux capture-pane -ep -t {1} 2>/dev/null || echo "↳ spawns a fresh opencode session"' \
+                 --preview-window='right,55%,wrap' )
+    [[ -z "$out" ]] && return                          # Esc = abort
+    key="${out%%$'\n'*}"                               # line 1 = pressed key ('' for Enter)
+    line="${out#*$'\n'}"                               # line 2 = selected row
+    choice="${line%%$'\t'*}"                           # first field = session name
+    if [[ "$key" == ctrl-x ]]; then
+      [[ "$choice" != '＋ new session' ]] && tmux kill-session -t "$choice" 2>/dev/null
+      continue                                         # reopen picker, list refreshed
+    fi
+    break
+  done
+  if [[ "$choice" == '＋ new session' ]]; then
+    local name="$base" n=2 w
+    while tmux has-session -t "$name" 2>/dev/null; do name="$base-$n"; ((n++)); done
+    w=$(tmux new-session -d -s "$name" -c "$d" -n '🦙 opencode' -P -F '#{window_id}')
+    tmux set-window-option -t "$w" automatic-rename off
+    tmux set-window-option -t "$w" allow-rename off
+    tmux send-keys -t "$w" 'opencode' C-m
+    choice="$name"
+  fi
+  if [[ -n "$TMUX" ]]; then tmux switch-client -t "$choice"; else tmux attach -t "$choice"; fi
+}
+
+# Tab colors (Flat UI Spanish palette, dimmed x0.40 for the Minimal theme) - "R G B" format
+_TAB_BLUE="21 69 90"        # #15455a Summer Sky - cbc
+_TAB_NAVY="12 32 56"        # #0c2038 - awcd
+_TAB_PURPLE="28 28 54"      # #1c1c36 Lucky Point - claudep
+_TAB_YELLOW="102 71 26"     # #66471a Mandarin Sorbet - cad
+_TAB_TEAL="13 56 46"        # #0d382e Palm Springs Splash - mow
+_TAB_RED="72 23 23"         # #481717 - redis
+_TAB_GREEN="20 87 71"       # #145747 Aurora Green - bm
+_TAB_ORANGE="102 48 25"     # #663019 Synthetic Pumpkin - cs
+
+# Claude config dirs
+_CLAUDE_DIR="$HOME/.claude"
+_CLAUDE_PERSONAL_DIR="$HOME/.claude-personal"
+
+# Claude-in-Chrome: reroute the browser Claude opens to a per-install Chrome profile.
+# A PATH shim intercepts `open -a "Google Chrome" https://clau.de/chrome/...` and adds
+# --profile-directory (mapping lives in the shim; override via CLAUDE_CHROME_PROFILE).
+_CLAUDE_OPEN_SHIM_DIR="$HOME/.local/share/claude-open-shim"
+claude() {
+  PATH="$_CLAUDE_OPEN_SHIM_DIR:$PATH" command claude "$@"
+}
+
+# Codex compatibility for shared Claude-oriented hook configs
+codex() {
+  CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" command codex "$@"
+}
+
+# ── Project alias generators ──────────────────────────────────────────────
+# _proj NAME COLOR DIR  ->  NAME (cd) · NAMEc (claude) · NAMEo (opencode) · NAMEt (tmux)
+_proj() {
+  alias "$1=iterm_tab_color $2 && cd $3"
+  alias "${1}c=iterm_tab_color $2 && cd $3 && claude"
+  alias "${1}o=iterm_tab_color $2 && cd $3 && opencode"
+  alias "${1}t=tmux_opencode $1 $3"
+}
+# _combo NAME COLOR DIR ADD-DIRS...  ->  cd $DIR && claude --add-dir <each>
+_combo() {
+  local n=$1 c=$2 d=$3; shift 3; local a=""
+  for x in "$@"; do a+=" --add-dir $x"; done
+  alias "$n=iterm_tab_color $c && cd $d && claude$a"
+}
+
+# Projects (add a repo = one line)
+_proj cbc "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"
+_proj cad "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard"
+_proj mow "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"
+_proj bm  "$_TAB_GREEN"  "$HOME/dev/backend-multi"
+_proj cs  "$_TAB_ORANGE" "$HOME/dev/cannon-smash"
+
+# Cross-repo combos (open one repo with others added to the session)
+_combo cbccad    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard"
+_combo cadcbc    "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/cypher-backend-core"
+_combo mowcbc    "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"       "$HOME/dev/cypher-backend-core"
+_combo cbcmow    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/merge-of-wonders"
+_combo cbccadmow "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/merge-of-wonders"
+_combo bmcbc     "$_TAB_GREEN"  "$HOME/dev/backend-multi"          "$HOME/dev/cypher-backend-core"
+_combo csbm      "$_TAB_ORANGE" "$HOME/dev/cannon-smash"           "$HOME/dev/backend-multi"
+
+# Personal / non-uniform shortcuts (different claude config dir)
+alias oj="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj"
+alias ojc="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal/godot/oj && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
+
+# Deployment shortcuts (pre-types the command, ready to edit/run)
+alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/cypher-backend-core && print -z './deployment_manager.sh -e '"
+alias caddeploy="iterm_tab_color $_TAB_YELLOW && iterm_tab_title '🚀 cad deploy' && cd \$HOME/dev/cypher-admin-dashboard && print -z './deployment_script_admin_dashboard.sh --'"
+
+# Service shortcuts
+alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-server' && redis-server"
+
+# tmux session listing
+alias tls="tmux ls 2>/dev/null || echo 'no live tmux sessions'"
+alias tlw="tmux list-windows -a -F '#{session_name}  #{window_index}:#{window_name}#{?window_active, *,}' 2>/dev/null || echo 'no live tmux sessions'"
+
+# Peon-ping mute/unmute (all config dirs)
+alias peon-ping-mute="touch \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
+alias peon-ping-unmute="rm -f \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"

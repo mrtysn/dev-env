@@ -1,0 +1,23 @@
+# ─── C2 · Home (mrtysn-mbp-m2max) ───────────────────────────────────────────────
+# Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
+# helpers (iterm_tab_color, iterm_tab_title) are already defined for the aliases below.
+# Exported back to the repo only when export.sh runs on THIS machine.
+
+# Project shortcuts
+alias oj="cd $HOME/dev/oj"
+alias mertyasdotin="cd $HOME/dev/mertyas.in"
+alias ig-ext="cd $HOME/dev/instagram-extension"
+alias mycv="cd $HOME/dev/cv"
+
+# Tab colors (Flat UI Spanish palette) - "R G B" format
+_TAB_GREEN="51 181 126"     # #33B57E - oj (game dev)
+_TAB_CORAL="235 111 96"     # #EB6F60 - mertyas.in
+_TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claude
+_TAB_BLUE="52 172 224"      # #34ace0 Summer Sky - instagram-extension
+_TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cv
+
+# Claude shortcuts
+alias ojc="iterm_tab_color $_TAB_GREEN && cd \$HOME/dev/oj && claude"
+alias mertyasdotinc="iterm_tab_color $_TAB_CORAL && cd \$HOME/dev/mertyas.in && claude"
+alias ig-extc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/instagram-extension && claude"
+alias mycvc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cv && claude"
