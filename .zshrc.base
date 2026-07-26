@@ -22,6 +22,9 @@ zstyle ':omz:update' frequency 13
 
 COMPLETION_WAITING_DOTS="true"
 
+# Uncomment to disable marking untracked files as dirty (faster for large repos)
+# DISABLE_UNTRACKED_FILES_DIRTY="true"
+
 # "mm/dd/yyyy"|"dd.mm.yyyy"|"yyyy-mm-dd" or strftime format
 HIST_STAMPS="yyyy-mm-dd"
 
@@ -31,9 +34,10 @@ if [[ -z "$CLAUDECODE" ]]; then
   plugins=(
     fzf-tab gitfast ls cd-ls copypath copybuffer command-not-found
     autoupdate macos zsh-autosuggestions fast-syntax-highlighting asdf
-    alias-tips git-it-on safe-paste catimg isodate colored-man-pages
+    alias-tips git-it-on catimg isodate colored-man-pages
     dircycle auto-notify autoswitch_virtualenv
   )
+  # temporarily removed: safe-paste
   # replaced: git with gitfast
 else
   # Essential plugins for Claude Code
@@ -43,9 +47,8 @@ fi
 ZSH_THEME=""  # using homebrew p10k, not OMZ theme
 
 # ─── Environment (needed by PATH) ───────────────────────────────────────────────
-export PNPM_HOME="$HOME/Library/pnpm"
-export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
-export ANDROID_HOME="$HOME/Library/Android/sdk"
+export PNPM_HOME="$HOME/Library/pnpm"              # pnpm
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # android
 export OLLAMA_ORIGINS="*"
 
 # Perl local::lib
@@ -65,39 +68,45 @@ typeset -U PATH path
 DOTNET_ROOT=""
 if command -v asdf >/dev/null 2>&1; then
   dotnet_path="$(asdf which dotnet 2>/dev/null)" || dotnet_path=""
-  [[ -n "$dotnet_path" ]] && DOTNET_ROOT="${dotnet_path:h}"   # :h = dirname in zsh
+  [[ -n "$dotnet_path" ]] && export DOTNET_ROOT="${dotnet_path:h}"   # :h = dirname in zsh
 fi
 
+# Only include optional paths if they're non-empty
 path=(
-  "/opt/homebrew/opt/coreutils/libexec/gnubin"                # gnu coreutils
+  "/opt/homebrew/opt/coreutils/libexec/gnubin"                # gnubin
   "$HOME/.asdf/shims"                                         # asdf
   "$HOME/.dotnet/tools"                                       # dotnet tools
-  ${JAVA_HOME:+"$JAVA_HOME/bin"}                              # java
   ${GOBIN:+"$GOBIN"}                                          # go
   ${PNPM_HOME:+"$PNPM_HOME"}                                  # pnpm
-  ${ANDROID_HOME:+"$ANDROID_HOME/platform-tools"}             # android
-  ${DOTNET_ROOT:+"$DOTNET_ROOT"}                              # dotnet
-  "$HOME/perl5/bin"                                           # perl
-  "$HOME/.rd/bin"                                             # rancher desktop
   "$HOME/.cache/lm-studio/bin"                                # lm studio cli
+  ${ANDROID_HOME:+"$ANDROID_HOME/platform-tools"}             # android
+  "$HOME/perl5/bin"                                           # perl
+  ${DOTNET_ROOT:+"$DOTNET_ROOT"}                              # dotnet
+  "$HOME/bin"
   "$HOME/.local/bin"
   "/usr/local/bin"
   $path
 )
+
+# Regenerate asdf shims (set ASDF_RESHIM_ON_START=1 to enable, for A/B testing)
+if command -v asdf >/dev/null 2>&1; then
+  [[ -n "$ASDF_RESHIM_ON_START" ]] && asdf reshim
+fi
 
 # ─── Source Oh My Zsh ───────────────────────────────────────────────────────────
 # compinit is inside this script
 source "$ZSH/oh-my-zsh.sh"
 
 # ─── Environment (post-OMZ) ─────────────────────────────────────────────────────
-# Preferred editor
+unalias _ 2>/dev/null  # OMZ sets _='sudo'; prefer explicit sudo
+# Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
 else
   export EDITOR='code --wait'
 fi
 
-# History
+# history size fix
 export HISTSIZE=99999
 export SAVEHIST=$HISTSIZE
 
@@ -108,16 +117,10 @@ source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ -f "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
 
-# Homebrew command-not-found
-HOMEBREW_COMMAND_NOT_FOUND_HANDLER="$(brew --repository)/Library/Homebrew/command-not-found/handler.sh"
-if [ -f "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER" ]; then
-  source "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER";
-fi
-
 # https://github.com/junegunn/fzf?tab=readme-ov-file#setting-up-shell-integration
 command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 
-# keep at bottom of tool init - https://github.com/romkatv/powerlevel10k/issues/1554
+# keep at bottom - https://github.com/romkatv/powerlevel10k/issues/1554
 unset ZSH_AUTOSUGGEST_USE_ASYNC
 
 # ─── Functions ──────────────────────────────────────────────────────────────────
@@ -131,7 +134,7 @@ function get_wifi_networks() {
   echo "$wifi_networks" | sed -e 's/^ *//'
 }
 
-# send macos notification if prompted for password
+# send macos notification if prompted for assword
 function notify_on_password_prompt() {
   local cmd="${1//\"/\\\"}"
   if [[ "$cmd" =~ "assword" ]]; then
@@ -147,6 +150,9 @@ function notify_on_password_prompt() {
 #   zshrc_bench 30 3         # 30 runs, 3 warmup
 #   zshrc_bench -v 20 2      # verbose per-run output
 #   zshrc_bench 20 2 ~/.zshrc.new   # explicit file
+# A/B test asdf reshim:
+#   zshrc_bench 20 2
+#   ASDF_RESHIM_ON_START=1 zshrc_bench 20 2
 function zshrc_bench() {
   emulate -L zsh
   setopt localoptions no_aliases pipefail
@@ -238,20 +244,11 @@ alias gitlog="git log --graph --format=format:'%C(bold blue)%h%C(reset) - %C(bol
 alias gitito="gitit branch master"
 
 # ─── Aliases: Utilities ─────────────────────────────────────────────────────────
-alias history="history 1"
+alias history="history 1"           # history size fix
 alias python='python3'
 alias bu='brew update && brew upgrade'
-# bua = "bu, all": bu + the other safe auto-updaters (npm globals, Mac App Store).
-# Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
-bua() {
-  echo "==> brew"    && brew update && brew upgrade || return 1
-  echo "==> npm -g"  && npm update -g && asdf reshim nodejs
-  command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
-}
 alias zshconfig="subl $HOME/.zshrc"
 alias wifi-list='get_wifi_networks'
-alias chrome="open -a 'Google Chrome'"
-alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 
 # show all files in a tree structure (works with ls zsh plugin)
 alias lta="lt -a"
@@ -259,8 +256,8 @@ alias lta="lt -a"
 # show all files whose names begin with '.' except . and ..
 alias lsa="ls -A"
 
-# https://github.com/sissbruecker/linkding
-alias linkding-start='docker run --name linkding -p 9090:9090 -v /Users/mrtysn/dev/linkding:/etc/linkding/data -d sissbruecker/linkding:latest'
+# tailscale cli
+alias tailscale="/Applications/Tailscale.app/Contents/MacOS/Tailscale"
 
 # ─── iTerm2 Helpers ──────────────────────────────────────────────────────────
 # Set iTerm2 tab color (RGB 0-255)
@@ -286,9 +283,6 @@ function iterm_tab_color_reset() {
   echo -e "\033]6;1;bg;*;default\007" 2>/dev/null
   return 0
 }
-
-# ─── User Scripts ───────────────────────────────────────────────────────────────
-export PATH="$HOME/bin:$PATH"
 
 # ─── Hooks ──────────────────────────────────────────────────────────────────────
 autoload -Uz add-zsh-hook

@@ -1,9 +1,30 @@
 # ─── C2 · Home (mrtysn-mbp-m2max) ───────────────────────────────────────────────
 # Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
-# helpers (iterm_tab_color, iterm_tab_title) are already defined for the aliases below.
+# helpers (iterm_tab_color, iterm_tab_title) and PATH are already set up.
 # Exported back to the repo only when export.sh runs on THIS machine.
 
-# Project shortcuts
+# ── M2-local environment (not present on the Office machine) ──
+export JAVA_HOME="/opt/homebrew/opt/openjdk@17"
+path=("$JAVA_HOME/bin" "$HOME/.rd/bin" $path)   # java, rancher desktop (deduped by base's typeset -U)
+
+# Homebrew command-not-found handler
+HOMEBREW_COMMAND_NOT_FOUND_HANDLER="$(brew --repository)/Library/Homebrew/command-not-found/handler.sh"
+[ -f "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER" ] && source "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER"
+
+# ── M2-local aliases / functions ──
+alias chrome="open -a 'Google Chrome'"
+# https://github.com/sissbruecker/linkding
+alias linkding-start='docker run --name linkding -p 9090:9090 -v /Users/mrtysn/dev/linkding:/etc/linkding/data -d sissbruecker/linkding:latest'
+
+# update-all = "bu, all": brew + npm globals + Mac App Store.
+# Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
+update-all() {
+  echo "==> brew"    && brew update && brew upgrade || return 1
+  echo "==> npm -g"  && npm update -g && asdf reshim nodejs
+  command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
+}
+
+# ── Project shortcuts ──
 alias oj="cd $HOME/dev/oj"
 alias mertyasdotin="cd $HOME/dev/mertyas.in"
 alias ig-ext="cd $HOME/dev/instagram-extension"
