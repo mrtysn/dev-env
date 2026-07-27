@@ -118,7 +118,7 @@ unalias _ 2>/dev/null  # OMZ sets _='sudo'; prefer explicit sudo
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
 else
-  export EDITOR='code --wait'
+  export EDITOR='subl --wait'
 fi
 
 # history size fix

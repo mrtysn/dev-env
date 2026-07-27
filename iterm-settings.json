@@ -917,7 +917,7 @@
     "HideTabNumber": false,
     "HotkeyMigratedFromSingleToMulti": true,
     "IRMemory": 4,
-    "LeftTabBarWidth": 290.0,
+    "LeftTabBarWidth": 190.0,
     "LoadPrefsFromCustomFolder": false,
     "MinimalDeslectedColoredTabAlpha": 0.25,
     "MinimalSelectedTabUnderlineProminence": 0.0,
