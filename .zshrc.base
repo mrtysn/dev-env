@@ -1,5 +1,14 @@
 # echo "($(date +"%Y-%m-%d, %H:%M:%S")) Loading .zshrc"
 
+# ─── SSH Keychain Unlock ────────────────────────────────────────────────────────
+# SSH sessions can't read the login keychain while locked (Claude Code shows
+# "Not logged in"). Prompt to unlock once; the probe succeeds when already
+# unlocked, so no prompt then. Must stay above the instant-prompt block: it
+# requires console input.
+if [[ -n "$SSH_CONNECTION" ]] && ! security find-generic-password -s "Claude Code-credentials" >/dev/null 2>&1; then
+  security unlock-keychain ~/Library/Keychains/login.keychain-db
+fi
+
 # ─── Instant Prompt ─────────────────────────────────────────────────────────────
 # Must stay at the top. Any code requiring console input goes ABOVE this block.
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
