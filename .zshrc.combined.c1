@@ -312,6 +312,10 @@ awcd() {
   esac
 }
 
+# fzf picker over a project's opencode tmux sessions, with a live screen preview.
+# Row: name · attached-dot · window count · last activity. Preview = the session's screen.
+# Enter: attach/create   Ctrl-X: kill highlighted session   Esc: cancel.
+# Usage: tmux_opencode <base-name> <project-dir>
 function tmux_opencode() {
   local base="$1" d="$2" fmt list out key line choice
   fmt=$'#{session_name}\t#{?session_attached,●, }\t#{session_windows}\t#{t:session_activity}'
