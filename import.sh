@@ -721,6 +721,50 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 14: lazygit + repo-tabs Configuration (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 14: lazygit + repo-tabs Configuration ==="
+
+LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
+HAS_LG=false
+[ -f lazygit/config.yml ] && HAS_LG=true
+[ -d repo-tabs ] && HAS_LG=true
+
+if [ "$HAS_LG" = false ]; then
+    print "${YELLOW}! No lazygit/repo-tabs configs in repo, skipping${NC}"
+else
+    print "${BLUE}Available configs:${NC}"
+    [ -f lazygit/config.yml ] && echo "  - lazygit/config.yml + themes → $LAZYGIT_DIR/"
+    [ -d repo-tabs ] && echo "  - repo-tabs/theme-* → ~/.config/repo-tabs/ (group themes for repo-tabs lazy)"
+
+    if ask_yes_no "Copy lazygit & repo-tabs configs? (existing files will be backed up)"; then
+        if [ -f lazygit/config.yml ]; then
+            mkdir -p "$LAZYGIT_DIR/themes"
+            if [ -f "$LAZYGIT_DIR/config.yml" ]; then
+                cp "$LAZYGIT_DIR/config.yml" "$LAZYGIT_DIR/config.yml.backup-$(date +%Y%m%d-%H%M%S)"
+                print "${YELLOW}→ Backed up existing lazygit config.yml${NC}"
+            fi
+            cp lazygit/config.yml "$LAZYGIT_DIR/config.yml"
+            for t in lazygit/themes/*.yml(N); do
+                cp "$t" "$LAZYGIT_DIR/themes/${t:t}"
+            done
+            print "${GREEN}✓ Copied lazygit config + themes${NC}"
+        fi
+        if [ -d repo-tabs ]; then
+            mkdir -p ~/.config/repo-tabs
+            for g in repo-tabs/theme-*(N); do
+                cp "$g" ~/.config/repo-tabs/"${g:t}"
+            done
+            print "${GREEN}✓ Copied repo-tabs group themes${NC}"
+            print "${BLUE}  repos.txt is machine-local — seed it with 'repo-tabs focus' on first run${NC}"
+        fi
+    else
+        print "${YELLOW}! Skipped lazygit & repo-tabs configs${NC}"
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Import Complete ==="

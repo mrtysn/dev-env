@@ -52,6 +52,7 @@ echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
+echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -452,6 +453,30 @@ for pair in "${CLAUDE_PAIRS[@]}"; do
         warn "jq unavailable or filter failed — copied $src verbatim (churny state NOT stripped)"
     fi
     note "$dest"
+done
+
+# Export lazygit + repo-tabs config (git TUI workflow).
+# ~/.config/repo-tabs/repos.txt (work repo paths — this repo is PUBLIC) and
+# sessions.json (runtime state) are deliberately never read here.
+echo "✓ Exporting lazygit + repo-tabs configuration"
+LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
+if [ -f "$LAZYGIT_DIR/config.yml" ]; then
+    mkdir -p lazygit/themes
+    copy_atomic "$LAZYGIT_DIR/config.yml" lazygit/config.yml
+    note "lazygit/config.yml"
+    for t in "$LAZYGIT_DIR"/themes/*.yml(N); do
+        copy_atomic "$t" "lazygit/themes/${t:t}"
+        note "lazygit/themes/${t:t}"
+    done
+else
+    warn "$LAZYGIT_DIR/config.yml not found, skipping lazygit"
+fi
+for g in work personal; do
+    if [ -f ~/.config/repo-tabs/theme-$g ]; then
+        mkdir -p repo-tabs
+        copy_atomic ~/.config/repo-tabs/theme-$g repo-tabs/theme-$g
+        note "repo-tabs/theme-$g"
+    fi
 done
 
 # Log export to EXPORTS.md

@@ -1,0 +1,41 @@
+disableStartupPopups: true
+git:
+  autoFetch: false
+os:
+  editPreset: sublime
+gui:
+  sidePanelWidth: 0.45
+# --- theme (managed by lg-theme) ---
+# theme: synthwave-84
+# terminal-bg: #241b2f
+# Synthwave '84 for lazygit — hand-mapped from the VS Code / Warp palettes
+# (robb0wen/synthwave-vscode, warpdotdev/themes synthwave_84.yaml)
+  theme:
+    activeBorderColor:
+      - '#f92aad'
+      - bold
+    inactiveBorderColor:
+      - '#848bbd'
+    searchingActiveBorderColor:
+      - '#fede5d'
+    optionsTextColor:
+      - '#34d3fb'
+    selectedLineBgColor:
+      - '#34294f'
+    inactiveViewSelectedLineBgColor:
+      - '#2a2139'
+    cherryPickedCommitFgColor:
+      - '#36f9f6'
+    cherryPickedCommitBgColor:
+      - '#463465'
+    markedBaseCommitFgColor:
+      - '#241b2f'
+    markedBaseCommitBgColor:
+      - '#fede5d'
+    unstagedChangesColor:
+      - '#fe4450'
+    defaultFgColor:
+      - '#f2ebe0'
+
+  authorColors:
+    '*': '#72f1b8'
