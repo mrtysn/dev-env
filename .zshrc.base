@@ -87,8 +87,7 @@ path=(
   "$HOME/.asdf/shims"                                         # asdf
   "$HOME/.dotnet/tools"                                       # dotnet tools
   ${GOBIN:+"$GOBIN"}                                          # go
-  ${PNPM_HOME:+"$PNPM_HOME"}                                  # pnpm ≤10 global bins
-  ${PNPM_HOME:+"$PNPM_HOME/bin"}                              # pnpm 11+ global bins
+  ${PNPM_HOME:+"$PNPM_HOME"}                                  # pnpm
   "$HOME/.cache/lm-studio/bin"                                # lm studio cli
   ${ANDROID_HOME:+"$ANDROID_HOME/platform-tools"}             # android
   "$HOME/perl5/bin"                                           # perl
