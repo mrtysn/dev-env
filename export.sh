@@ -175,6 +175,17 @@ EOF
 mv brew-packages.list.tmp brew-packages.list
 note "brew-packages.list (static)"
 
+# Drift report: top-level brew installs (leaves) not named in the static list.
+# Report-only by design — the list stays hand-curated; this just makes silent
+# drift loud so a new real dependency can't be forgotten (see: lazygit, 2026-07).
+if command -v brew >/dev/null 2>&1; then
+    echo "✓ Checking brew drift (leaves vs static list)"
+    BREW_DRIFT=$(comm -23 <(brew leaves 2>/dev/null | sort) <(sort brew-packages.list) | tr '\n' ' ')
+    if [[ -n "${BREW_DRIFT// }" ]]; then
+        warn "brew leaves not in brew-packages.list (intentional?): $BREW_DRIFT"
+    fi
+fi
+
 # Export tmux config
 echo "✓ Exporting tmux configuration"
 TMUX_TARGET=""
