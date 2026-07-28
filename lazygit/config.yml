@@ -5,6 +5,7 @@ os:
   editPreset: sublime
 gui:
   sidePanelWidth: 0.45
+  showNumstatInFilesView: true
 # --- theme (managed by lg-theme) ---
 # theme: synthwave-84
 # terminal-bg: #241b2f
