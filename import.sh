@@ -546,8 +546,9 @@ echo "=== Step 11: Tmux Configuration ==="
 if ! command_exists tmux; then
     print "${YELLOW}! tmux not installed, skipping (install with: brew install tmux)${NC}"
 else
-    # Detect machine
-    MACHINE_HOSTNAME=$(hostname -s)
+    # Detect machine — LocalHostName, not `hostname -s`: the latter can resolve
+    # to a DHCP name (e.g. "192") on some LANs and misroute the per-machine conf.
+    MACHINE_HOSTNAME=$(scutil --get LocalHostName 2>/dev/null || hostname -s)
     TMUX_CONF=""
 
     if [[ "$MACHINE_HOSTNAME" == "mert-cypher-m3max" ]]; then
