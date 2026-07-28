@@ -317,7 +317,7 @@ function iterm_tab_color_reset() {
 autoload -Uz add-zsh-hook
 add-zsh-hook preexec notify_on_password_prompt
 
-# ─── C1 · Office (mert-cypher-m3max) ────────────────────────────────────────────
+# ─── C01 · Office (mert-cypher-m3max) ────────────────────────────────────────────
 # Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
 # helpers (iterm_tab_color, iterm_tab_title) are already defined for the aliases below.
 # Exported back to the repo only when export.sh runs on THIS machine.
