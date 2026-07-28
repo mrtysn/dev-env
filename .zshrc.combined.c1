@@ -135,6 +135,10 @@ source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
 # https://github.com/junegunn/fzf?tab=readme-ov-file#setting-up-shell-integration
 command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 
+# Homebrew command-not-found handler
+HOMEBREW_COMMAND_NOT_FOUND_HANDLER="$(brew --repository)/Library/Homebrew/command-not-found/handler.sh"
+[ -f "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER" ] && source "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER"
+
 # keep at bottom - https://github.com/romkatv/powerlevel10k/issues/1554
 unset ZSH_AUTOSUGGEST_USE_ASYNC
 
@@ -246,6 +250,14 @@ function zshrc_bench() {
   echo "min=$min  median=$median  avg=$avg  p95=$p95  max=$max"
 }
 
+# update-all = "bu, all": brew + npm globals + Mac App Store.
+# Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
+update-all() {
+  echo "==> brew"    && brew update && brew upgrade || return 1
+  echo "==> npm -g"  && npm update -g && asdf reshim nodejs
+  command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
+}
+
 # ─── Aliases: Navigation ────────────────────────────────────────────────────────
 alias dl="cd $HOME/Downloads"
 alias dt="cd $HOME/Desktop"
@@ -262,6 +274,7 @@ alias gitito="gitit branch master"
 alias history="history 1"           # history size fix
 alias python='python3'
 alias bu='brew update && brew upgrade'
+alias chrome="open -a 'Google Chrome'"
 alias zshconfig="subl $HOME/.zshrc"
 alias wifi-list='get_wifi_networks'
 
