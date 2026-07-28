@@ -16,7 +16,7 @@ DATE=$(date +"%Y-%m-%d %H:%M")
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
 
-# Machine → label (c1/c2) mapping: single source of truth.
+# Machine → label (c01/c02) mapping: single source of truth.
 source "$SCRIPT_DIR/machine-label.sh"
 
 # ── Bookkeeping ────────────────────────────────────────────────────────────────
@@ -44,18 +44,18 @@ echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles 
 echo "settings, Phoenix + Karabiner configs, and Claude Code settings to this repository."
 echo ""
 echo "Files in this repo that may be overwritten:"
-echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.c1|c2"
+echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.c01|c2"
 echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
-echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
+echo "  - $SCRIPT_DIR/tmux/c01.conf or c02.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
-echo "  - $SCRIPT_DIR/asdf/tool-versions.c1|c2 (this machine's only)"
+echo "  - $SCRIPT_DIR/asdf/tool-versions.c01|c2 (this machine's only)"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -150,7 +150,7 @@ else
 fi
 note "plugins.list"
 
-# Brew dependencies live in Brewfile (shared) + Brewfile.c1/c2 (per-machine) —
+# Brew dependencies live in Brewfile (shared) + Brewfile.c01/c2 (per-machine) —
 # hand-curated tracked files, edited directly, never written by this script and
 # never generated via `brew bundle dump`. Export only reports drift against them:
 # report-only by design, so silent drift stays loud without auto-adding noise

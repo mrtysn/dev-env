@@ -2,7 +2,7 @@
 # Thin entrypoint. Sources the shared base, then this machine's config.
 # Managed by the dev-env repo (import.sh / export.sh).
 #   • Shared changes        → edit ~/.zshrc.base
-#   • Machine-specific ones → edit ~/.zshrc.c1 (Office) or ~/.zshrc.c2 (Home)
+#   • Machine-specific ones → edit ~/.zshrc.c01 (Office) or ~/.zshrc.c02 (Home)
 # Keep p10k's instant-prompt block (top of ~/.zshrc.base) first: nothing above it
 # may write to the console.
 
@@ -11,6 +11,6 @@
 # Machine detection via LocalHostName — `hostname -s` is unreliable on some LANs
 # (it can resolve to a DHCP name like "192"). Falls back to hostname -s if unset.
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mert-cypher-m3max) [[ -f ~/.zshrc.c1 ]] && source ~/.zshrc.c1 ;;  # C1 · Office
-  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c2 ]] && source ~/.zshrc.c2 ;;  # C2 · Home
+  mert-cypher-m3max) [[ -f ~/.zshrc.c01 ]] && source ~/.zshrc.c01 ;;  # C01 · Office
+  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;  # C02 · Home
 esac

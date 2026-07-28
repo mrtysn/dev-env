@@ -1,4 +1,4 @@
-# ─── C2 · Home (mrtysn-mbp-m2max) ───────────────────────────────────────────────
+# ─── C02 · Home (mrtysn-mbp-m2max) ───────────────────────────────────────────────
 # Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
 # helpers (iterm_tab_color, iterm_tab_title) and PATH are already set up.
 # Exported back to the repo only when export.sh runs on THIS machine.

@@ -118,8 +118,8 @@ Sets up your terminal from this repo configuration.
 
 What it does:
 1. Installs Homebrew (if not present)
-2. Installs brew dependencies via `brew bundle` (shared `Brewfile` + this machine's `Brewfile.c1|c2`; includes FiraCode Nerd Font)
-3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.c1|c2`
+2. Installs brew dependencies via `brew bundle` (shared `Brewfile` + this machine's `Brewfile.c01|c2`; includes FiraCode Nerd Font)
+3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.c01|c2`
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
@@ -424,8 +424,8 @@ asdf global dotnet latest
 - `.p10k.zsh` - Powerlevel10k theme config
 - `plugins.list` - List of custom plugins to install
 - `Brewfile` - Shared brew dependencies (formulae + casks), hand-curated — never `brew bundle dump`ed
-- `Brewfile.c1` / `Brewfile.c2` - Machine-specific brew dependencies
-- `asdf/tool-versions.c1` / `.c2` - Per-machine runtime pins (each machine exports/imports only its own)
+- `Brewfile.c01` / `Brewfile.c02` - Machine-specific brew dependencies
+- `asdf/tool-versions.c01` / `.c02` - Per-machine runtime pins (each machine exports/imports only its own)
 - `iterm-profiles/` - iTerm2 dynamic profile configurations
   - `default.json` - Full Default profile
   - `hotkey-window.json` - Full Hotkey Window profile
@@ -486,4 +486,4 @@ Referenced by the environment but excluded from this (public) repo — set up ma
 - `~/.tmux-sessions.conf` — read by `bin/tmux-start`; contains work repo paths
 - `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
 - Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
-- `~/.local/share/claude-open-shim/` — Chrome profile shim used by `claude()` in `.zshrc.c1`
+- `~/.local/share/claude-open-shim/` — Chrome profile shim used by `claude()` in `.zshrc.c01`
