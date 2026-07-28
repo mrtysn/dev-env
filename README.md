@@ -119,7 +119,7 @@ Sets up your terminal from this repo configuration.
 What it does:
 1. Installs Homebrew (if not present)
 2. Installs brew dependencies via `brew bundle` (shared `Brewfile` + this machine's `Brewfile.c1|c2`; includes FiraCode Nerd Font)
-3. Installs asdf plugins and runtimes from `asdf/tool-versions`
+3. asdf runtimes: per-device by design — pin locally with `asdf set -u`
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
@@ -425,7 +425,6 @@ asdf global dotnet latest
 - `plugins.list` - List of custom plugins to install
 - `Brewfile` - Shared brew dependencies (formulae + casks), hand-curated — never `brew bundle dump`ed
 - `Brewfile.c1` / `Brewfile.c2` - Machine-specific brew dependencies
-- `asdf/tool-versions` - Synced runtime pins (imported to `~/.tool-versions`)
 - `iterm-profiles/` - iTerm2 dynamic profile configurations
   - `default.json` - Full Default profile
   - `hotkey-window.json` - Full Hotkey Window profile
@@ -480,6 +479,7 @@ Feel free to use, modify, and share.
 
 Referenced by the environment but excluded from this (public) repo — set up manually on a new machine:
 
+- `~/.tool-versions` (asdf runtime pins) — per-device on purpose; machines pin different versions
 - `claude` CLI — native installer, not brew-managed
 - `~/.gitconfig` + `~/.gitconfig-personal` — git identity / includeIf split
 - `~/.ssh/config` — hosts `c1`/`c2` used by `bin/tgo` (security material)

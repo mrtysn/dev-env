@@ -44,7 +44,6 @@ echo "Files in this repo that may be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.c1|c2"
 echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
-echo "  - $SCRIPT_DIR/asdf/tool-versions"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
@@ -174,17 +173,6 @@ if command -v brew >/dev/null 2>&1; then
     if [[ -n "${CASK_DRIFT// }" ]]; then
         warn "casks not in ${BREWFILES[*]} (intentional?): $CASK_DRIFT"
     fi
-fi
-
-# Export asdf runtime pins (stored un-dotted in asdf/ so the repo itself is
-# never treated as an asdf-versioned directory).
-echo "✓ Exporting asdf tool-versions"
-if [ -f ~/.tool-versions ]; then
-    mkdir -p asdf
-    copy_atomic ~/.tool-versions asdf/tool-versions
-    note "asdf/tool-versions"
-else
-    warn "~/.tool-versions not found, skipping"
 fi
 
 # Export tmux config

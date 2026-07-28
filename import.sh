@@ -101,32 +101,9 @@ echo ""
 # Step 3: Nerd Font (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 3: asdf Runtimes ==="
-# Runtime pins from asdf/tool-versions (synced copy of ~/.tool-versions).
-# Font install moved into the shared Brewfile (Step 2).
-if [ -f asdf/tool-versions ] && command -v asdf >/dev/null 2>&1; then
-    print "${BLUE}Runtimes:${NC} $(tr '\n' ' ' < asdf/tool-versions)"
-    if ask_yes_no "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
-        if [ -f ~/.tool-versions ]; then
-            cp ~/.tool-versions ~/.tool-versions.backup-$(date +%Y%m%d-%H%M%S)
-            print "${YELLOW}→ Backed up existing ~/.tool-versions${NC}"
-        fi
-        cp asdf/tool-versions ~/.tool-versions
-        while read -r tool _version; do
-            [[ -z "$tool" || "$tool" == \#* ]] && continue
-            if asdf plugin list 2>/dev/null | grep -qx "$tool"; then
-                print "${GREEN}✓ asdf plugin $tool already added${NC}"
-            else
-                print "${YELLOW}→ Adding asdf plugin $tool...${NC}"
-                asdf plugin add "$tool" || print "${RED}✗ plugin $tool failed${NC}"
-            fi
-        done < asdf/tool-versions
-        (cd ~ && asdf install) || print "${RED}✗ some runtimes failed to install${NC}"
-    else
-        print "${YELLOW}! Skipped asdf runtimes${NC}"
-    fi
-else
-    print "${YELLOW}! No asdf/tool-versions in repo (or asdf missing — run Step 2 first), skipping${NC}"
-fi
+# Deliberately not synced: ~/.tool-versions is per-device (machines pin
+# different runtime versions on purpose). Manage locally with `asdf set -u`.
+print "${BLUE}asdf runtime pins are per-device — nothing to import${NC}"
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
