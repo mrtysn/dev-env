@@ -2,10 +2,11 @@
 
 # ─── SSH Keychain Unlock ────────────────────────────────────────────────────────
 # SSH sessions can't read the login keychain while locked (Claude Code shows
-# "Not logged in"). Prompt to unlock once; the probe succeeds when already
-# unlocked, so no prompt then. Must stay above the instant-prompt block: it
-# requires console input.
-if [[ -n "$SSH_CONNECTION" ]] && ! security find-generic-password -s "Claude Code-credentials" >/dev/null 2>&1; then
+# "Not logged in"). Prompt to unlock once; the -w secret read fails while
+# locked (metadata reads succeed even then), so no prompt when already
+# unlocked. Must stay above the instant-prompt block: it requires console
+# input.
+if [[ -n "$SSH_CONNECTION" ]] && ! security find-generic-password -s "Claude Code-credentials" -w >/dev/null 2>&1; then
   security unlock-keychain ~/Library/Keychains/login.keychain-db
 fi
 
