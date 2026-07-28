@@ -52,6 +52,7 @@ echo "  - $SCRIPT_DIR/tmux/c1.conf or c2.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
+echo "  - $SCRIPT_DIR/asdf/tool-versions.c1|c2 (this machine's only)"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -173,6 +174,17 @@ if command -v brew >/dev/null 2>&1; then
     if [[ -n "${CASK_DRIFT// }" ]]; then
         warn "casks not in ${BREWFILES[*]} (intentional?): $CASK_DRIFT"
     fi
+fi
+
+# Export asdf runtime pins — per-machine file, one-sided write (same convention
+# as .zshrc.<label>): each machine backs up only its own pins.
+echo "✓ Exporting asdf tool-versions ($ZSH_LABEL)"
+if [[ -n "$ZSH_LABEL" ]] && [ -f ~/.tool-versions ]; then
+    mkdir -p asdf
+    copy_atomic ~/.tool-versions "asdf/tool-versions.$ZSH_LABEL"
+    note "asdf/tool-versions.$ZSH_LABEL"
+else
+    warn "no ~/.tool-versions or unknown machine label — asdf pins not exported"
 fi
 
 # Export tmux config
