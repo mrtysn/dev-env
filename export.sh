@@ -161,6 +161,7 @@ note "plugins.list"
 #   coreutils     - GNU utilities (gnubin in PATH)
 #   tree          - directory tree (used by ls plugin)
 #   tmux          - terminal multiplexer
+#   lazygit       - git TUI (default mode of repo-tabs; config synced in lazygit/)
 echo "✓ Writing brew package dependencies (static list, not scanned)"
 cat > brew-packages.list.tmp << 'EOF'
 powerlevel10k
@@ -169,6 +170,7 @@ asdf
 coreutils
 tree
 tmux
+lazygit
 EOF
 mv brew-packages.list.tmp brew-packages.list
 note "brew-packages.list (static)"
