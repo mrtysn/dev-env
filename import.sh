@@ -71,77 +71,61 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Brew Packages (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 2: Brew Packages ==="
-if [ -f brew-packages.list ]; then
-    print "${BLUE}Packages: $(tr '\n' ' ' < brew-packages.list)${NC}"
-    if ask_yes_no "Install brew packages?"; then
-        while IFS= read -r package; do
-            # Skip empty lines and comments
-            [[ -z "$package" || "$package" =~ ^# ]] && continue
+echo "=== Step 2: Brew Bundle ==="
+# Shared Brewfile + this machine's Brewfile.c1/c2 — brew bundle is natively
+# idempotent (skips installed, reports per-item).
+BREW_LABEL=""
+case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+    mert-cypher-m3max) BREW_LABEL="c1" ;;
+    mrtysn-mbp-m2max)  BREW_LABEL="c2" ;;
+esac
 
-            if brew list "$package" &>/dev/null; then
-                print "${GREEN}✓ $package already installed${NC}"
-            else
-                print "${YELLOW}→ Installing $package...${NC}"
-                if brew install "$package"; then
-                    print "${GREEN}✓ $package installed${NC}"
-                else
-                    print "${RED}✗ $package failed to install${NC}"
-                fi
-            fi
-        done < brew-packages.list
+if [ -f Brewfile ]; then
+    print "${BLUE}Shared Brewfile:${NC} $(grep -cE '^(brew|cask|mas) ' Brewfile) entries"
+    [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && \
+        print "${BLUE}Machine Brewfile.$BREW_LABEL:${NC} $(grep -cE '^(brew|cask|mas) ' Brewfile.$BREW_LABEL) entries"
+    if ask_yes_no "Install brew dependencies (brew bundle)?"; then
+        brew bundle --file=Brewfile || print "${RED}✗ some shared Brewfile entries failed${NC}"
+        if [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]]; then
+            brew bundle --file="Brewfile.$BREW_LABEL" || print "${RED}✗ some Brewfile.$BREW_LABEL entries failed${NC}"
+        fi
     else
-        print "${YELLOW}! Skipped brew packages${NC}"
+        print "${YELLOW}! Skipped brew bundle${NC}"
     fi
 else
-    print "${RED}✗ brew-packages.list not found${NC}"
-fi
-
-if [ -f brew-casks.list ]; then
-    print "${BLUE}Casks: $(tr '\n' ' ' < brew-casks.list)${NC}"
-    if ask_yes_no "Install brew casks?"; then
-        while IFS= read -r cask; do
-            [[ -z "$cask" || "$cask" =~ ^# ]] && continue
-
-            if brew list --cask "$cask" &>/dev/null; then
-                print "${GREEN}✓ $cask already installed${NC}"
-            else
-                print "${YELLOW}→ Installing $cask...${NC}"
-                if brew install --cask "$cask"; then
-                    print "${GREEN}✓ $cask installed${NC}"
-                else
-                    print "${RED}✗ $cask failed to install${NC}"
-                fi
-            fi
-        done < brew-casks.list
-    else
-        print "${YELLOW}! Skipped brew casks${NC}"
-    fi
+    print "${RED}✗ Brewfile not found${NC}"
 fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 3: Nerd Font (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 3: Nerd Font ==="
-NERD_FONT="font-fira-code-nerd-font"
-
-# Check if font is installed (look for the font file)
-if ls ~/Library/Fonts/*FiraCode*Nerd* &>/dev/null || ls /Library/Fonts/*FiraCode*Nerd* &>/dev/null; then
-    print "${GREEN}✓ FiraCode Nerd Font already installed${NC}"
-else
-    print "${BLUE}This config uses FiraCode Nerd Font for terminal icons and ligatures${NC}"
-    if ask_yes_no "Install FiraCode Nerd Font?"; then
-        print "${YELLOW}→ Installing FiraCode Nerd Font...${NC}"
-        if brew install --cask "$NERD_FONT"; then
-            print "${GREEN}✓ FiraCode Nerd Font installed${NC}"
-        else
-            print "${RED}✗ Font installation failed${NC}"
+echo "=== Step 3: asdf Runtimes ==="
+# Runtime pins from asdf/tool-versions (synced copy of ~/.tool-versions).
+# Font install moved into the shared Brewfile (Step 2).
+if [ -f asdf/tool-versions ] && command -v asdf >/dev/null 2>&1; then
+    print "${BLUE}Runtimes:${NC} $(tr '\n' ' ' < asdf/tool-versions)"
+    if ask_yes_no "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
+        if [ -f ~/.tool-versions ]; then
+            cp ~/.tool-versions ~/.tool-versions.backup-$(date +%Y%m%d-%H%M%S)
+            print "${YELLOW}→ Backed up existing ~/.tool-versions${NC}"
         fi
+        cp asdf/tool-versions ~/.tool-versions
+        while read -r tool _version; do
+            [[ -z "$tool" || "$tool" == \#* ]] && continue
+            if asdf plugin list 2>/dev/null | grep -qx "$tool"; then
+                print "${GREEN}✓ asdf plugin $tool already added${NC}"
+            else
+                print "${YELLOW}→ Adding asdf plugin $tool...${NC}"
+                asdf plugin add "$tool" || print "${RED}✗ plugin $tool failed${NC}"
+            fi
+        done < asdf/tool-versions
+        (cd ~ && asdf install) || print "${RED}✗ some runtimes failed to install${NC}"
     else
-        print "${YELLOW}! Skipped font installation${NC}"
-        print "${YELLOW}  Note: Terminal icons may not display correctly without a Nerd Font${NC}"
+        print "${YELLOW}! Skipped asdf runtimes${NC}"
     fi
+else
+    print "${YELLOW}! No asdf/tool-versions in repo (or asdf missing — run Step 2 first), skipping${NC}"
 fi
 echo ""
 

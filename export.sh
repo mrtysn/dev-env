@@ -44,7 +44,7 @@ echo "Files in this repo that may be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.c1|c2"
 echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
-echo "  - $SCRIPT_DIR/brew-packages.list, brew-casks.list  (static lists, rewritten — not scanned)"
+echo "  - $SCRIPT_DIR/asdf/tool-versions"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
@@ -153,62 +153,38 @@ else
 fi
 note "plugins.list"
 
-# Write brew package dependencies (static list, not scanned from system)
-# These are packages required by the dev environment:
-#   powerlevel10k - prompt theme (sourced in zshrc)
-#   fzf           - fuzzy finder (fzf --zsh integration + fzf-tab plugin)
-#   asdf          - version manager (paths, commands, plugin)
-#   coreutils     - GNU utilities (gnubin in PATH)
-#   tree          - directory tree (used by ls plugin)
-#   tmux          - terminal multiplexer
-#   lazygit       - git TUI (default mode of repo-tabs; config synced in lazygit/)
-#   git-lfs       - large-file support (Unity work repos require it)
-#   mas           - Mac App Store CLI (used by update-all in .zshrc.base)
-echo "✓ Writing brew package dependencies (static list, not scanned)"
-cat > brew-packages.list.tmp << 'EOF'
-powerlevel10k
-fzf
-asdf
-coreutils
-tree
-tmux
-lazygit
-git-lfs
-mas
-EOF
-mv brew-packages.list.tmp brew-packages.list
-note "brew-packages.list (static)"
-
-# Cask dependencies — GUI apps whose configs this repo syncs or references:
-#   iterm2                   - terminal (settings + profiles synced)
-#   sublime-text             - $EDITOR 'subl --wait' and lazygit editPreset
-#   karabiner-elements       - keymaps (karabiner/karabiner.json synced)
-#   phoenix                  - window manager (.phoenix.js synced)
-#   font-fira-code-nerd-font - terminal font assumed by the p10k config
-echo "✓ Writing brew cask dependencies (static list, not scanned)"
-cat > brew-casks.list.tmp << 'EOF'
-iterm2
-sublime-text
-karabiner-elements
-phoenix
-font-fira-code-nerd-font
-EOF
-mv brew-casks.list.tmp brew-casks.list
-note "brew-casks.list (static)"
-
-# Drift report: top-level brew installs (leaves) not named in the static list.
-# Report-only by design — the list stays hand-curated; this just makes silent
-# drift loud so a new real dependency can't be forgotten (see: lazygit, 2026-07).
+# Brew dependencies live in Brewfile (shared) + Brewfile.c1/c2 (per-machine) —
+# hand-curated tracked files, edited directly, never written by this script and
+# never generated via `brew bundle dump`. Export only reports drift against them:
+# report-only by design, so silent drift stays loud without auto-adding noise
+# (see: lazygit, 2026-07).
 if command -v brew >/dev/null 2>&1; then
-    echo "✓ Checking brew drift (leaves/casks vs static lists)"
-    BREW_DRIFT=$(comm -23 <(brew leaves 2>/dev/null | sort) <(sort brew-packages.list) | tr '\n' ' ')
+    echo "✓ Checking brew drift (leaves/casks vs Brewfiles)"
+    BREWFILES=(Brewfile)
+    [[ -n "$ZSH_LABEL" && -f "Brewfile.$ZSH_LABEL" ]] && BREWFILES+=("Brewfile.$ZSH_LABEL")
+    # Compare top-level installs only — `brew bundle cleanup` would also list
+    # every transitive dep, which drowns the signal. || true: comm/grep exit
+    # codes would otherwise kill the export under set -e/pipefail.
+    WANTED=$(grep -hE '^(brew|cask|mas) ' "${BREWFILES[@]}" | awk -F'"' '{print $2}' | sort -u || true)
+    BREW_DRIFT=$(comm -23 <(brew leaves 2>/dev/null | sort) <(echo "$WANTED") | tr '\n' ' ' || true)
     if [[ -n "${BREW_DRIFT// }" ]]; then
-        warn "brew leaves not in brew-packages.list (intentional?): $BREW_DRIFT"
+        warn "formulae not in ${BREWFILES[*]} (intentional?): $BREW_DRIFT"
     fi
-    CASK_DRIFT=$(comm -23 <(brew list --cask 2>/dev/null | sort) <(sort brew-casks.list) | tr '\n' ' ')
+    CASK_DRIFT=$(comm -23 <(brew list --cask 2>/dev/null | sort) <(echo "$WANTED") | tr '\n' ' ' || true)
     if [[ -n "${CASK_DRIFT// }" ]]; then
-        warn "casks not in brew-casks.list (intentional?): $CASK_DRIFT"
+        warn "casks not in ${BREWFILES[*]} (intentional?): $CASK_DRIFT"
     fi
+fi
+
+# Export asdf runtime pins (stored un-dotted in asdf/ so the repo itself is
+# never treated as an asdf-versioned directory).
+echo "✓ Exporting asdf tool-versions"
+if [ -f ~/.tool-versions ]; then
+    mkdir -p asdf
+    copy_atomic ~/.tool-versions asdf/tool-versions
+    note "asdf/tool-versions"
+else
+    warn "~/.tool-versions not found, skipping"
 fi
 
 # Export tmux config

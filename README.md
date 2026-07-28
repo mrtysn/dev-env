@@ -118,8 +118,8 @@ Sets up your terminal from this repo configuration.
 
 What it does:
 1. Installs Homebrew (if not present)
-2. Installs required brew packages
-3. Installs FiraCode Nerd Font (for terminal icons)
+2. Installs brew dependencies via `brew bundle` (shared `Brewfile` + this machine's `Brewfile.c1|c2`; includes FiraCode Nerd Font)
+3. Installs asdf plugins and runtimes from `asdf/tool-versions`
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
@@ -423,7 +423,9 @@ asdf global dotnet latest
 - `.zshrc.personal` - Personal configuration (customize freely)
 - `.p10k.zsh` - Powerlevel10k theme config
 - `plugins.list` - List of custom plugins to install
-- `brew-packages.list` - List of required brew packages
+- `Brewfile` - Shared brew dependencies (formulae + casks), hand-curated — never `brew bundle dump`ed
+- `Brewfile.c1` / `Brewfile.c2` - Machine-specific brew dependencies
+- `asdf/tool-versions` - Synced runtime pins (imported to `~/.tool-versions`)
 - `iterm-profiles/` - iTerm2 dynamic profile configurations
   - `default.json` - Full Default profile
   - `hotkey-window.json` - Full Hotkey Window profile
@@ -473,3 +475,15 @@ review. Read `iterm-settings.json` before committing.
 ## License
 
 Feel free to use, modify, and share.
+
+## Deliberately Not Synced
+
+Referenced by the environment but excluded from this (public) repo — set up manually on a new machine:
+
+- `claude` CLI — native installer, not brew-managed
+- `~/.gitconfig` + `~/.gitconfig-personal` — git identity / includeIf split
+- `~/.ssh/config` — hosts `c1`/`c2` used by `bin/tgo` (security material)
+- `~/.tmux-sessions.conf` — read by `bin/tmux-start`; contains work repo paths
+- `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
+- Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
+- `~/.local/share/claude-open-shim/` — Chrome profile shim used by `claude()` in `.zshrc.c1`

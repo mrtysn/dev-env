@@ -1,0 +1,6 @@
+python 3.13.0t
+dotnet 8.0.403
+nodejs 23.1.0
+pnpm 10.27.0
+golang 1.23.6
+global pnpm 10.27.0

@@ -1,0 +1,2 @@
+# C2 · Home (mrtysn-mbp-m2max) — machine-specific dependencies.
+brew "openjdk@17" # JAVA_HOME in .zshrc.c2
