@@ -5,3 +5,5 @@ coreutils
 tree
 tmux
 lazygit
+git-lfs
+mas

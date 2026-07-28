@@ -96,6 +96,28 @@ if [ -f brew-packages.list ]; then
 else
     print "${RED}✗ brew-packages.list not found${NC}"
 fi
+
+if [ -f brew-casks.list ]; then
+    print "${BLUE}Casks: $(tr '\n' ' ' < brew-casks.list)${NC}"
+    if ask_yes_no "Install brew casks?"; then
+        while IFS= read -r cask; do
+            [[ -z "$cask" || "$cask" =~ ^# ]] && continue
+
+            if brew list --cask "$cask" &>/dev/null; then
+                print "${GREEN}✓ $cask already installed${NC}"
+            else
+                print "${YELLOW}→ Installing $cask...${NC}"
+                if brew install --cask "$cask"; then
+                    print "${GREEN}✓ $cask installed${NC}"
+                else
+                    print "${RED}✗ $cask failed to install${NC}"
+                fi
+            fi
+        done < brew-casks.list
+    else
+        print "${YELLOW}! Skipped brew casks${NC}"
+    fi
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
