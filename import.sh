@@ -4,6 +4,9 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
+
+# Machine → label (c1/c2) mapping: single source of truth.
+source "$SCRIPT_DIR/machine-label.sh"
 cd "$SCRIPT_DIR"
 
 # Claude Code config dirs — override via env if your layout differs.
@@ -74,11 +77,7 @@ echo ""
 echo "=== Step 2: Brew Bundle ==="
 # Shared Brewfile + this machine's Brewfile.c1/c2 — brew bundle is natively
 # idempotent (skips installed, reports per-item).
-BREW_LABEL=""
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-    mert-cypher-m3max) BREW_LABEL="c1" ;;
-    mrtysn-mbp-m2max)  BREW_LABEL="c2" ;;
-esac
+BREW_LABEL="$MACHINE_LABEL"  # from machine-label.sh
 
 if [ -f Brewfile ]; then
     print "${BLUE}Shared Brewfile:${NC} $(grep -cE '^(brew|cask|mas) ' Brewfile) entries"
@@ -253,14 +252,8 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 8: Configuration Files ==="
 
-# Detect this machine → zsh split label (c1 = Office, c2 = Home).
-# LocalHostName, not `hostname -s`: the latter can resolve to a DHCP name (e.g. "192")
-# on some LANs, which would install the wrong machine's aliases.
-ZSH_LABEL=""
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-    mert-cypher-m3max) ZSH_LABEL="c1" ;;
-    mrtysn-mbp-m2max)  ZSH_LABEL="c2" ;;
-esac
+# Zsh split label comes from the shared mapping (machine-label.sh).
+ZSH_LABEL="$MACHINE_LABEL"
 
 # Check what config files exist in repo
 HAS_CONFIG=false
@@ -315,6 +308,8 @@ else
             if [ -f .zshrc.loader ]; then
                 cp .zshrc.loader ~/.zshrc
             else
+                # NOTE: duplicates the machine-label.sh mapping by design —
+                # see that file's header (shell startup can't depend on the repo).
                 cat > ~/.zshrc << 'EOF'
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
@@ -546,19 +541,13 @@ echo "=== Step 11: Tmux Configuration ==="
 if ! command_exists tmux; then
     print "${YELLOW}! tmux not installed, skipping (install with: brew install tmux)${NC}"
 else
-    # Detect machine — LocalHostName, not `hostname -s`: the latter can resolve
-    # to a DHCP name (e.g. "192") on some LANs and misroute the per-machine conf.
-    MACHINE_HOSTNAME=$(scutil --get LocalHostName 2>/dev/null || hostname -s)
+    # Machine label from the shared mapping (machine-label.sh).
     TMUX_CONF=""
 
-    if [[ "$MACHINE_HOSTNAME" == "mert-cypher-m3max" ]]; then
-        TMUX_CONF="tmux/c1.conf"
-        MACHINE_LABEL="C1 (Office)"
-    elif [[ "$MACHINE_HOSTNAME" == "mrtysn-mbp-m2max" ]]; then
-        TMUX_CONF="tmux/c2.conf"
-        MACHINE_LABEL="C2 (Home)"
+    if [[ -n "$MACHINE_LABEL" ]]; then
+        TMUX_CONF="tmux/$MACHINE_LABEL.conf"
     else
-        print "${BLUE}Unknown hostname: $MACHINE_HOSTNAME${NC}"
+        print "${BLUE}Unknown machine (see machine-label.sh)${NC}"
         echo "  1) C1 — Office Mac (Ctrl-a prefix, blue status bar)"
         echo "  2) C2 — Home Mac (Ctrl-s prefix, green status bar)"
         echo "  3) Skip"
@@ -568,11 +557,11 @@ else
         case "$tmux_choice" in
             1)
                 TMUX_CONF="tmux/c1.conf"
-                MACHINE_LABEL="C1 (Office)"
+                MACHINE_NAME="C1 (Office)"
                 ;;
             2)
                 TMUX_CONF="tmux/c2.conf"
-                MACHINE_LABEL="C2 (Home)"
+                MACHINE_NAME="C2 (Home)"
                 ;;
             *)
                 print "${YELLOW}! Skipped tmux configuration${NC}"
@@ -581,7 +570,7 @@ else
     fi
 
     if [[ -n "$TMUX_CONF" ]]; then
-        print "${BLUE}Detected: $MACHINE_LABEL${NC}"
+        print "${BLUE}Detected: $MACHINE_NAME${NC}"
 
         if ask_yes_no "Setup tmux configuration?"; then
             # Symlink tmux config

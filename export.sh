@@ -16,6 +16,9 @@ DATE=$(date +"%Y-%m-%d %H:%M")
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
 
+# Machine → label (c1/c2) mapping: single source of truth.
+source "$SCRIPT_DIR/machine-label.sh"
+
 # ── Bookkeeping ────────────────────────────────────────────────────────────────
 # The closing summary is driven by what was actually written, not by a
 # hand-maintained list that drifts from reality.
@@ -82,14 +85,8 @@ if (( ${#MISSING[@]} > 0 )); then
 fi
 echo ""
 
-# Detect this machine → zsh split label (c1 = Office, c2 = Home).
-# LocalHostName, not `hostname -s`: the latter can resolve to a DHCP name (e.g. "192")
-# on some LANs, which would misroute the per-machine file.
-ZSH_LABEL=""
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-    mert-cypher-m3max) ZSH_LABEL="c1" ;;
-    mrtysn-mbp-m2max)  ZSH_LABEL="c2" ;;
-esac
+# Zsh split label comes from the shared mapping (machine-label.sh).
+ZSH_LABEL="$MACHINE_LABEL"
 
 # Export zsh config — split layout: shared base + per-machine file + loader.
 # Only THIS machine's .zshrc.<label> is written; the other machine's file is left
@@ -191,11 +188,12 @@ fi
 echo "✓ Exporting tmux configuration"
 TMUX_TARGET=""
 
-case "$HOSTNAME" in
-    mert-cypher-m3max) TMUX_TARGET="tmux/c1.conf"; echo "  Detected: C1 (Office)" ;;
-    mrtysn-mbp-m2max)  TMUX_TARGET="tmux/c2.conf"; echo "  Detected: C2 (Home)"   ;;
-    *) warn "Unknown hostname: $HOSTNAME, skipping tmux config export" ;;
-esac
+if [[ -n "$MACHINE_LABEL" ]]; then
+    TMUX_TARGET="tmux/$MACHINE_LABEL.conf"
+    echo "  Detected: $MACHINE_NAME"
+else
+    warn "Unknown machine (see machine-label.sh), skipping tmux config export"
+fi
 
 if [[ -n "$TMUX_TARGET" ]]; then
     mkdir -p tmux bin
