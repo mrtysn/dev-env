@@ -135,7 +135,7 @@ What it does:
 9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
-12. Backs up and copies Claude Code `settings.json` into `~/.claude` and `~/.claude-personal`
+12. Backs up and copies Claude Code `settings.json` into each config dir, asked one at a time — a dir that already exists defaults to yes, an absent one defaults to no, so a machine that runs a single Claude config is never given a second one
 
 The script is idempotent - it checks what's already installed and skips those steps.
 

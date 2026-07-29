@@ -649,28 +649,36 @@ done
 if [[ ${#AVAILABLE_CLAUDE[@]} -eq 0 ]]; then
     print "${YELLOW}! No Claude settings found in repo, skipping${NC}"
 else
-    print "${BLUE}Available Claude settings:${NC}"
+    # Asked per directory, not once for all: a config dir this machine does not
+    # have is one it does not use, so creating it defaults to no. Machines differ
+    # in how many Claude configs they run, and an absent dir is that answer.
     for pair in "${AVAILABLE_CLAUDE[@]}"; do
-        echo "  - ${pair%%:*}/settings.json → ${pair##*:}/settings.json"
+        src="${pair%%:*}/settings.json"
+        target_dir="${pair##*:}"
+        target="$target_dir/settings.json"
+        shown="${target_dir/#$HOME/~}"
+
+        if [ -d "$target_dir" ]; then
+            claude_prompt="Update $shown/settings.json from $src? (backed up first)"
+            claude_default="y"
+        else
+            claude_prompt="$shown does not exist — create it and copy $src there?"
+            claude_default="n"
+        fi
+
+        if ! ask_yes_no "$claude_prompt" "$claude_default"; then
+            print "${YELLOW}! Skipped $shown${NC}"
+            continue
+        fi
+
+        mkdir -p "$target_dir"
+        if [ -f "$target" ]; then
+            cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
+            print "${YELLOW}→ Backed up existing $target${NC}"
+        fi
+        cp "$src" "$target"
+        print "${GREEN}✓ Copied $src → $target${NC}"
     done
-
-    if ask_yes_no "Copy Claude settings? (existing files will be backed up)"; then
-        for pair in "${AVAILABLE_CLAUDE[@]}"; do
-            src="${pair%%:*}/settings.json"
-            target_dir="${pair##*:}"
-            target="$target_dir/settings.json"
-
-            mkdir -p "$target_dir"
-            if [ -f "$target" ]; then
-                cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
-                print "${YELLOW}→ Backed up existing $target${NC}"
-            fi
-            cp "$src" "$target"
-            print "${GREEN}✓ Copied $src → $target${NC}"
-        done
-    else
-        print "${YELLOW}! Skipped Claude settings${NC}"
-    fi
 fi
 echo ""
 
