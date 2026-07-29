@@ -269,6 +269,7 @@ alias gitito="gitit branch master"
 alias history="history 1"           # history size fix
 alias python='python3'
 alias bu='brew update && brew upgrade'
+alias uall='update-all'
 alias chrome="open -a 'Google Chrome'"
 alias zshconfig="subl $HOME/.zshrc"
 alias wifi-list='get_wifi_networks'
