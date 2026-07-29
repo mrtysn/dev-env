@@ -255,42 +255,53 @@ function zshrc_bench() {
 _pnpm-migrate-globals() {
   command -v node >/dev/null || return 0
   local pnpm_home="${PNPM_HOME:-$HOME/Library/pnpm}"
-  local cur_root cur_manifest old_manifest m
+  local cur_root old_root r
   cur_root="$(pnpm root -g 2>/dev/null)" || return 0
   [[ "$cur_root" == */node_modules ]] && cur_root="${cur_root%/node_modules}"
-  cur_manifest="$cur_root/package.json"
 
-  # Current root already populated → nothing to migrate
-  [[ -f "$cur_manifest" ]] && node -e 'const d=require(process.argv[1]).dependencies||{}; process.exit(Object.keys(d).length?0:1)' "$cur_manifest" 2>/dev/null && return 0
+  # Manifests live at <root>/package.json (pnpm ≤10) or <root>/<hash>/package.json (≥11)
+  local -a cur_manifests old_manifests
+  cur_manifests=("$cur_root"/package.json(N) "$cur_root"/*/package.json(N))
+  (( ${#cur_manifests} )) && return 0   # current root already populated
 
-  # Newest other root with a manifest
-  for m in "$pnpm_home"/global/*/package.json(N.om); do
-    [[ "$m" == "$cur_manifest" ]] && continue
-    old_manifest="$m"
-    break
+  # Newest other root that has manifests
+  for r in "$pnpm_home"/global/*(N/om); do
+    [[ "$r" == "$cur_root" ]] && continue
+    old_manifests=("$r"/package.json(N) "$r"/*/package.json(N))
+    (( ${#old_manifests} )) && { old_root="$r"; break }
   done
-  [[ -z "$old_manifest" ]] && return 0
+  [[ -z "$old_root" ]] && return 0
 
   local -a pkgs allow allow_flags
-  pkgs=(${(f)"$(node -p 'Object.keys(require(process.argv[1]).dependencies||{}).join("\n")' "$old_manifest" 2>/dev/null)"})
+  pkgs=(${(f)"$(node -p '[...new Set(process.argv.slice(1).flatMap(p=>Object.keys(require(p).dependencies||{})))].join("\n")' $old_manifests 2>/dev/null)"})
   (( ${#pkgs} )) || return 0
-  allow=(${(f)"$(node -p '((require(process.argv[1]).pnpm||{}).onlyBuiltDependencies||[]).join("\n")' "$old_manifest" 2>/dev/null)"})
+
+  # Build approvals: pnpm ≤10 keeps them in package.json, ≥11 in pnpm-workspace.yaml
+  allow=(${(f)"$(node -p '[...new Set(process.argv.slice(1).flatMap(p=>(require(p).pnpm||{}).onlyBuiltDependencies||[]))].join("\n")' $old_manifests 2>/dev/null)"})
+  if [[ -f "$old_root/pnpm-workspace.yaml" ]]; then
+    allow+=(${(f)"$(awk '/^allowBuilds:/{f=1;next} f&&/^[^ ]/{f=0} f&&/^  [^ ]+: true/{sub(/:.*/,"");sub(/^  /,"");print}' "$old_root/pnpm-workspace.yaml")"})
+  fi
+  allow=(${(u)allow})
   local a; for a in $allow; do allow_flags+=("--allow-build=$a"); done
 
-  echo "==> pnpm: migrating global packages from ${old_manifest:h:t} to $(pnpm --version): $pkgs"
+  echo "==> pnpm: migrating global packages from ${old_root:t} to $(pnpm --version): $pkgs"
   pnpm add -g $allow_flags $pkgs || { echo "pnpm global migration failed; old root left untouched"; return 1 }
 
-  # --allow-build is one-shot; persist approvals or `pnpm update -g` prompts interactively
+  # --allow-build is one-shot; persist approvals or the next `pnpm update -g` prompts interactively
   if (( ${#allow} )); then
-    node -e 'const fs=require("fs"),p=process.argv[1];const j=JSON.parse(fs.readFileSync(p));j.pnpm=j.pnpm||{};j.pnpm.onlyBuiltDependencies=[...new Set([...(j.pnpm.onlyBuiltDependencies||[]),...process.argv.slice(2)])].sort();fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")' "$cur_manifest" $allow
+    local ws="$cur_root/pnpm-workspace.yaml"
+    grep -q '^allowBuilds:' "$ws" 2>/dev/null || print "allowBuilds:" >> "$ws"
+    for a in $allow; do
+      grep -q "^  $a: true" "$ws" || print "  $a: true" >> "$ws"
+    done
   fi
 
   # Remove wrapper scripts pointing into the old root, then the root itself
   local f
   for f in "$pnpm_home"/*(N.); do
-    grep -q "global/${old_manifest:h:t}/" "$f" 2>/dev/null && rm -f "$f"
+    grep -q "global/${old_root:t}/" "$f" 2>/dev/null && rm -f "$f"
   done
-  rm -rf "${old_manifest:h}"
+  rm -rf "$old_root"
 }
 
 # update-all = "bu, all": brew + pnpm globals + Mac App Store.
