@@ -483,6 +483,23 @@ review. Read `iterm-settings.json` before committing.
 
 Feel free to use, modify, and share.
 
+## Known Gaps
+
+- **C02 has never run `export.sh`.** Every row in `EXPORTS.md` is
+  `mert-cypher-m3max`. The per-machine c02 files (`.zshrc.c02`, `Brewfile.c02`,
+  `asdf/tool-versions.c02`, `tmux/c02.conf`) are therefore maintained by hand
+  from c01, and nothing verifies they match that machine except a manual diff.
+  One `./export.sh` run on c02 would make it self-reporting.
+- **peon-ping is installed but unmanaged.** A brew formula on c01, a standalone
+  copy under `~/.claude/hooks/peon-ping/` on c02, and named in no Brewfile — a
+  fresh machine gets neither, though the synced `settings.json` wires hooks to
+  it on every session event.
+- **Why c01 runs two Claude config dirs is undocumented.** `~/.claude` and
+  `~/.claude-personal`, selected by the `claudep` / `ojc` / `claudepany` aliases
+  in `.zshrc.c01`; c02 runs one. If the split separates identities it belongs in
+  writing here. If it is vestigial, collapsing to a single dir on both machines
+  removes the whole class of "which settings file is live" confusion.
+
 ## Deliberately Not Synced
 
 Referenced by the environment but excluded from this (public) repo — set up manually on a new machine:
