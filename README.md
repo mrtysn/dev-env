@@ -103,6 +103,13 @@ What it exports:
 - List of required brew packages
 - Claude Code `settings.json` for both config dirs (`agents/claude/`, `agents/claude-personal/`); machine-local `*.local.json` and memory are never exported
 
+Paths inside those `settings.json` files must resolve at runtime — `import.sh`
+copies them verbatim, so a hardcoded `/Users/<name>/...` silently breaks the
+other machine. Hooks living under the config dir use
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}`; repos that sit at a different depth per
+machine are probed, e.g.
+`for d in "$HOME/dev/personal/cc-statusline" "$HOME/dev/cc-statusline"; do ...`.
+
 After export, you should:
 1. Review the changes
 2. Split personal customizations into `.zshrc.personal` if needed

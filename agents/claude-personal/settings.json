@@ -34,7 +34,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/subagent-guard.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh",
             "timeout": 5
           }
         ]
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
             "timeout": 10
           },
           {
@@ -58,6 +58,11 @@
             "type": "command",
             "command": "jq '{systemMessage: (\"Session ID: \" + .session_id), hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"Session ID: \" + .session_id)}}'",
             "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/focus-policy.sh\" ] && exec \"$d/hooks/focus-policy.sh\"; done",
+            "timeout": 5
           }
         ]
       }
@@ -68,7 +73,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
             "timeout": 10
           }
         ]
@@ -80,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
             "timeout": 10
           }
         ]
@@ -92,7 +97,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
             "timeout": 10
           }
         ]
@@ -104,7 +109,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/mert/.claude-personal/hooks/peon-ping/peon.sh",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
             "timeout": 10
           }
         ]
@@ -113,7 +118,7 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "/Users/mert/dev/personal/cc-statusline/cc-statusline.js"
+    "command": "for d in \"$HOME/dev/personal/cc-statusline\" \"$HOME/dev/cc-statusline\"; do [ -x \"$d/cc-statusline.js\" ] && exec \"$d/cc-statusline.js\"; done"
   },
   "enabledPlugins": {
     "swift-lsp@claude-plugins-official": true
