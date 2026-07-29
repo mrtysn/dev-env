@@ -114,8 +114,5 @@
   "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "iterm2_with_bell",
   "switchModelsOnFlag": false,
-  "skipAutoPermissionPrompt": true,
-  "feedbackSurveyState": {
-    "lastShownTime": 1754087580406
-  }
+  "skipAutoPermissionPrompt": true
 }
