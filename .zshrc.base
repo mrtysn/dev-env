@@ -280,6 +280,11 @@ _pnpm-migrate-globals() {
   echo "==> pnpm: migrating global packages from ${old_manifest:h:t} to $(pnpm --version): $pkgs"
   pnpm add -g $allow_flags $pkgs || { echo "pnpm global migration failed; old root left untouched"; return 1 }
 
+  # --allow-build is one-shot; persist approvals or `pnpm update -g` prompts interactively
+  if (( ${#allow} )); then
+    node -e 'const fs=require("fs"),p=process.argv[1];const j=JSON.parse(fs.readFileSync(p));j.pnpm=j.pnpm||{};j.pnpm.onlyBuiltDependencies=[...new Set([...(j.pnpm.onlyBuiltDependencies||[]),...process.argv.slice(2)])].sort();fs.writeFileSync(p,JSON.stringify(j,null,2)+"\n")' "$cur_manifest" $allow
+  fi
+
   # Remove wrapper scripts pointing into the old root, then the root itself
   local f
   for f in "$pnpm_home"/*(N.); do
