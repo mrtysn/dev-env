@@ -29,3 +29,23 @@ alias ojc="iterm_tab_color $_TAB_GREEN && cd \$HOME/dev/oj && claude"
 alias mertyasdotinc="iterm_tab_color $_TAB_CORAL && cd \$HOME/dev/mertyas.in && claude"
 alias ig-extc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/instagram-extension && claude"
 alias mycvc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cv && claude"
+
+# ── Adopted from c01 ──
+_CLAUDE_DIR="$HOME/.claude"
+
+# Claude-in-Chrome open-shim: placeholder — the shim dir is not set up on this
+# machine yet (see c01). Prepending a nonexistent dir to PATH is harmless; once
+# the shim is installed at this path it starts working with no config change.
+_CLAUDE_OPEN_SHIM_DIR="$HOME/.local/share/claude-open-shim"
+claude() {
+  PATH="$_CLAUDE_OPEN_SHIM_DIR:$PATH" command claude "$@"
+}
+
+# Codex compatibility for shared Claude-oriented hook configs
+codex() {
+  CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" command codex "$@"
+}
+
+# Peon-ping mute/unmute (c01 also touches ~/.openpeon; not installed here)
+alias peon-ping-mute="touch $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
+alias peon-ping-unmute="rm -f $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
