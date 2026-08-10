@@ -682,12 +682,16 @@ fi
 # The guard hooks in settings.json resolve their checkout from a machine-local
 # paths.local.sh and exit 2 when they cannot, so a config dir without that file
 # refuses every Bash tool call.
-if [ -f "${CLAUDE_DIR}/settings.json" ] && grep -q 'AGENTS_SHARED_DIR' "${CLAUDE_DIR}/settings.json"; then
-    if ! CLAUDE_DIR="${CLAUDE_DIR}" "$SCRIPT_DIR/agents/claude/write-paths-local.sh"; then
-        print "${YELLOW}! No paths.local.sh written — Claude Code will refuse Bash tool calls until one exists${NC}"
-        print "${YELLOW}  Fix with: agents/claude/write-paths-local.sh --path <agents-shared checkout>${NC}"
+# Every config dir whose settings reference it needs its own copy.
+for claude_cfg in "${CLAUDE_DIR}" "${CLAUDE_PERSONAL_DIR}"; do
+    [ -f "$claude_cfg/settings.json" ] || continue
+    grep -q 'AGENTS_SHARED_DIR' "$claude_cfg/settings.json" || continue
+
+    if ! CLAUDE_DIR="$claude_cfg" "$SCRIPT_DIR/agents/claude/write-paths-local.sh"; then
+        print "${YELLOW}! No paths.local.sh in ${claude_cfg/#$HOME/~} — Claude Code will refuse Bash tool calls there until one exists${NC}"
+        print "${YELLOW}  Fix with: CLAUDE_DIR=${claude_cfg/#$HOME/~} agents/claude/write-paths-local.sh --path <agents-shared checkout>${NC}"
     fi
-fi
+done
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
