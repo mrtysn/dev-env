@@ -1,16 +1,14 @@
 #!/bin/zsh
 # DESC: Write the machine-local paths.local.sh that Claude's guard hooks read
 #
-# The PreToolUse guards in settings.json exit 2 — refusing the tool call — when
-# they cannot resolve AGENTS_SHARED_DIR. That is deliberate: a safety hook which
-# silently is not there is worse than one that fails loudly. The consequence is
-# that a machine which imported settings.json without this file refuses every
-# Bash tool call, so import.sh writes it as part of the same step.
+# The PreToolUse guards in settings.json source AGENTS_SHARED_DIR from
+# ${CLAUDE_DIR:-$HOME/.claude}/paths.local.sh and exit 2 when it is unset, so a
+# config dir without that file refuses every Bash tool call.
 #
-# The path is never guessed from a hardcoded layout. It is derived, in order,
-# from an explicit --path, an exported AGENTS_SHARED_DIR, an existing rules
-# symlink in the config dir, or a sibling checkout beside this repo — and any
-# candidate must actually contain the hooks before it is accepted.
+# The checkout is derived, in order, from an explicit --path, an exported
+# AGENTS_SHARED_DIR, a rules symlink in the config dir, or a sibling checkout
+# beside this repo. A candidate must contain the hooks to be accepted; with none
+# found, the script asks.
 
 set -euo pipefail
 

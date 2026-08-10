@@ -268,10 +268,10 @@ const rider = () => {
     focusApp('com.jetbrains.rider');
 }
 
-// Toggle between the two Rider apps (cypher-backend-core and cypher-admin-dashboard)
+// Toggle between the two Rider apps (backend-core and admin-dashboard)
 // First press opens Rider-cbc, second press opens Rider-cad, third press back to cbc, etc
 // Rider-cbc and Rider-cad have been created as Automator launcher apps that open
-// cypher-backend-core and cypher-admin-dashboard projects respectively in Rider
+// backend-core and admin-dashboard projects respectively in Rider
 const toggleRider = () => {
     const lastRider = Storage.get(keyLastRider) || 'Rider-cad';
 

@@ -500,7 +500,7 @@ Feel free to use, modify, and share.
 ## Known Gaps
 
 - **C02 has never run `export.sh`.** Every row in `EXPORTS.md` is
-  `mert-cypher-m3max`. The per-machine c02 files (`.zshrc.c02`, `Brewfile.c02`,
+  `c01`. The per-machine c02 files (`.zshrc.c02`, `Brewfile.c02`,
   `asdf/tool-versions.c02`, `tmux/c02.conf`) are therefore maintained by hand
   from c01, and nothing verifies they match that machine except a manual diff.
   One `./export.sh` run on c02 would make it self-reporting.

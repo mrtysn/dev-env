@@ -11,6 +11,5 @@
 # Machine detection via LocalHostName — `hostname -s` is unreliable on some LANs
 # (it can resolve to a DHCP name like "192"). Falls back to hostname -s if unset.
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mert-cypher-m3max) [[ -f ~/.zshrc.c01 ]] && source ~/.zshrc.c01 ;;  # C01 · Office
   mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;  # C02 · Home
 esac

@@ -317,7 +317,7 @@ function iterm_tab_color_reset() {
 autoload -Uz add-zsh-hook
 add-zsh-hook preexec notify_on_password_prompt
 
-# ─── C01 · Office (mert-cypher-m3max) ────────────────────────────────────────────
+# ─── C01 · Office ────────────────────────────────────────────
 # Machine-specific zsh config. Sourced by ~/.zshrc AFTER ~/.zshrc.base, so base
 # helpers (iterm_tab_color, iterm_tab_title) are already defined for the aliases below.
 # Exported back to the repo only when export.sh runs on THIS machine.
@@ -418,19 +418,19 @@ _combo() {
 }
 
 # Projects (add a repo = one line)
-_proj cbc "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"
-_proj cad "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard"
+_proj cbc "$_TAB_BLUE"   "$HOME/dev/backend-core"
+_proj cad "$_TAB_YELLOW" "$HOME/dev/admin-dashboard"
 _proj mow "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"
 _proj bm  "$_TAB_GREEN"  "$HOME/dev/backend-multi"
 _proj cs  "$_TAB_ORANGE" "$HOME/dev/cannon-smash"
 
 # Cross-repo combos (open one repo with others added to the session)
-_combo cbccad    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard"
-_combo cadcbc    "$_TAB_YELLOW" "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/cypher-backend-core"
-_combo mowcbc    "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"       "$HOME/dev/cypher-backend-core"
-_combo cbcmow    "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/merge-of-wonders"
-_combo cbccadmow "$_TAB_BLUE"   "$HOME/dev/cypher-backend-core"    "$HOME/dev/cypher-admin-dashboard" "$HOME/dev/merge-of-wonders"
-_combo bmcbc     "$_TAB_GREEN"  "$HOME/dev/backend-multi"          "$HOME/dev/cypher-backend-core"
+_combo cbccad    "$_TAB_BLUE"   "$HOME/dev/backend-core"    "$HOME/dev/admin-dashboard"
+_combo cadcbc    "$_TAB_YELLOW" "$HOME/dev/admin-dashboard" "$HOME/dev/backend-core"
+_combo mowcbc    "$_TAB_TEAL"   "$HOME/dev/merge-of-wonders"       "$HOME/dev/backend-core"
+_combo cbcmow    "$_TAB_BLUE"   "$HOME/dev/backend-core"    "$HOME/dev/merge-of-wonders"
+_combo cbccadmow "$_TAB_BLUE"   "$HOME/dev/backend-core"    "$HOME/dev/admin-dashboard" "$HOME/dev/merge-of-wonders"
+_combo bmcbc     "$_TAB_GREEN"  "$HOME/dev/backend-multi"          "$HOME/dev/backend-core"
 _combo csbm      "$_TAB_ORANGE" "$HOME/dev/cannon-smash"           "$HOME/dev/backend-multi"
 
 # Personal / non-uniform shortcuts (different claude config dir)
@@ -440,8 +440,8 @@ alias claudep="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev/personal && CLAUDE_
 alias claudepany="iterm_tab_color $_TAB_PURPLE && CLAUDE_CONFIG_DIR=$_CLAUDE_PERSONAL_DIR claude"
 
 # Deployment shortcuts (pre-types the command, ready to edit/run)
-alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/cypher-backend-core && print -z './deployment_manager.sh -e '"
-alias caddeploy="iterm_tab_color $_TAB_YELLOW && iterm_tab_title '🚀 cad deploy' && cd \$HOME/dev/cypher-admin-dashboard && print -z './deployment_script_admin_dashboard.sh --'"
+alias cbcdeploy="iterm_tab_color $_TAB_BLUE && iterm_tab_title '🚀 cbc deploy' && cd \$HOME/dev/backend-core && print -z './deployment_manager.sh -e '"
+alias caddeploy="iterm_tab_color $_TAB_YELLOW && iterm_tab_title '🚀 cad deploy' && cd \$HOME/dev/admin-dashboard && print -z './deployment_script_admin_dashboard.sh --'"
 
 # Service shortcuts
 alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-server' && redis-server"

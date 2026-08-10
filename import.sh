@@ -313,7 +313,6 @@ else
                 cat > ~/.zshrc << 'EOF'
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mert-cypher-m3max) [[ -f ~/.zshrc.c01 ]] && source ~/.zshrc.c01 ;;
   mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
 esac
 EOF
@@ -681,9 +680,8 @@ else
 fi
 
 # The guard hooks in settings.json resolve their checkout from a machine-local
-# paths.local.sh and exit 2 when they cannot, so a machine that took the settings
-# without that file refuses every Bash tool call. Write it as part of the same
-# step instead of leaving it to be discovered the hard way.
+# paths.local.sh and exit 2 when they cannot, so a config dir without that file
+# refuses every Bash tool call.
 if [ -f "${CLAUDE_DIR}/settings.json" ] && grep -q 'AGENTS_SHARED_DIR' "${CLAUDE_DIR}/settings.json"; then
     if ! CLAUDE_DIR="${CLAUDE_DIR}" "$SCRIPT_DIR/agents/claude/write-paths-local.sh"; then
         print "${YELLOW}! No paths.local.sh written — Claude Code will refuse Bash tool calls until one exists${NC}"

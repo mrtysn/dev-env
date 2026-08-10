@@ -1,10 +1,9 @@
 #!/bin/zsh
 # DESC: Check that the Bash PreToolUse hook commands in a Claude settings.json resolve on this machine
 #
-# Run after import.sh on a new machine. The guards are configured to exit 2 when
-# they cannot find their checkout, so an unconfigured machine refuses every Bash
-# tool call — this tells you that before Claude does. Reads the commands out of
-# settings.json rather than restating them, so it cannot drift from the config.
+# The guards exit 2 when they cannot find their checkout, so an unconfigured
+# config dir refuses every Bash tool call. Commands are read out of settings.json
+# rather than restated here, so this cannot drift from the config it checks.
 
 set -euo pipefail
 

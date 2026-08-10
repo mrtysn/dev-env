@@ -1,16 +1,11 @@
 # Machine-local paths for hook commands in settings.json.
 #
-# import.sh writes this file during step 12, and write-paths-local.sh in this
-# directory does it on demand — both derive the checkout rather than guessing a
-# layout. This example is the documented shape, for reading or for filling in by
-# hand. Do not commit the filled-in copy:
-# ~/.claude is not a repo, and export.sh reads only settings.json, so the value
-# stays local by construction.
+# Written by import.sh step 12, or on demand by write-paths-local.sh in this
+# directory. This example is the shape; the filled-in copy stays out of git —
+# ~/.claude is not a repo and export.sh reads only settings.json.
 #
-# Hook commands source this file and refuse to run — exit 2, blocking the tool
-# call — when a path it should define is missing. That is deliberate: the hooks
-# it points at are safety guards, and a guard that silently is not there is
-# worse than one that fails loudly.
+# Hook commands source this file and exit 2 — blocking the tool call — when a
+# path it should define is missing.
 
 # Checkout of the agents-shared repo, which holds hooks/ and claude/rules/.
 # Whatever this machine actually uses, e.g. $HOME/dev/agents-shared or
