@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DESC: Create tmux sessions from ~/.tmux-sessions.conf, skipping any that already exist
 # tmux-start — create tmux sessions from ~/.tmux-sessions.conf
 #
 # Each line: session-name:/path/to/directory

@@ -1,4 +1,5 @@
 #!/bin/bash
+# DESC: SSH to a Tailscale machine by name
 # tssh - SSH to a Tailscale machine by name
 # Usage: tssh <machine-name> [user]
 

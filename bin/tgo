@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# DESC: Attach or create tmux sessions, local or over SSH to another machine
 # tgo — attach or create tmux sessions, local or remote
 #
 # Usage:

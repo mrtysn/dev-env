@@ -1,0 +1,110 @@
+#!/bin/zsh
+# DESC: List the hand-invoked tools on this machine — everything in ~/.local/bin and ~/bin carrying a DESC line
+#
+# A tool is anything executable in one of the scanned directories that declares
+# itself with a `# DESC: <one-liner>` in its first 20 lines. Compiled binaries
+# cannot carry a comment, so they declare themselves with a sidecar file named
+# <binary>.desc, whose first line is the description.
+#
+# Undeclared executables are ignored, which is what keeps the listing to tools
+# you wrote and out of everything a package manager happens to drop alongside
+# them.
+#
+# Usage:
+#   toolbelt                # list every declared tool
+#   toolbelt --paths        # also show where each one resolves to
+#   toolbelt --dir DIR      # scan DIR instead of the defaults; repeatable
+#   toolbelt --help
+#
+# Exit status is 1 if no tools were found at all.
+
+set -euo pipefail
+
+DESC_SCAN_LINES=20
+SELF="${0:A}"   # $0 inside a function is the function's name, so capture it here
+typeset -a DIRS
+show_paths=0
+
+usage() {
+  sed -n '3,19p' "$SELF" | sed 's/^#\{1\} \{0,1\}//'
+  exit 0
+}
+
+while (( $# )); do
+  case "$1" in
+    --paths|-p) show_paths=1; shift ;;
+    --dir|-d)   [[ -n "${2-}" ]] || { print -u2 "toolbelt: --dir needs a directory"; exit 64; }
+                DIRS+=("$2"); shift 2 ;;
+    --help|-h)  usage ;;
+    *)          print -u2 "toolbelt: unknown option '$1'"; exit 64 ;;
+  esac
+done
+
+(( ${#DIRS} )) || DIRS=("$HOME/.local/bin" "$HOME/bin")
+
+# Describe how a file is run, for the second column.
+tool_type() {
+  local target="$1" shebang
+  read -r shebang < "$target" 2>/dev/null || true
+  case "$shebang" in
+    '#!'*zsh*)          print zsh ;;
+    '#!'*bash*)         print bash ;;
+    '#!'*/sh|'#!'*' sh') print sh ;;
+    '#!'*python*)       print python ;;
+    '#!'*ruby*)         print ruby ;;
+    '#!'*node*)         print node ;;
+    '#!'*perl*)         print perl ;;
+    '#!'*)              print "${${shebang##*/}%% *}" ;;
+    *)                  print binary ;;
+  esac
+}
+
+# A script declares itself inline; a binary declares itself in a sidecar file.
+tool_desc() {
+  local target="$1" line
+  line=$(head -n $DESC_SCAN_LINES -- "$target" 2>/dev/null \
+         | grep -a -m1 -E '^#[[:space:]]*DESC:' \
+         | sed -E 's/^#[[:space:]]*DESC:[[:space:]]*//' || true)
+  if [[ -n "$line" ]]; then
+    print -r -- "$line"
+    return 0
+  fi
+  local sidecar="${target}.desc"
+  [[ -r "$sidecar" ]] && head -n1 -- "$sidecar"
+  return 0
+}
+
+typeset -a names types descs paths
+for dir in "${DIRS[@]}"; do
+  [[ -d "$dir" ]] || continue
+  for tool in "$dir"/*(N-.*); do
+    target="${tool:A}"
+    desc=$(tool_desc "$target")
+    [[ -n "$desc" ]] || continue
+    names+=("${tool:t}")
+    types+=("$(tool_type "$target")")
+    descs+=("$desc")
+    paths+=("$target")
+  done
+done
+
+if (( ! ${#names} )); then
+  print -u2 "toolbelt: no declared tools in ${(j:, :)DIRS}"
+  exit 1
+fi
+
+# Column widths, so the descriptions line up whatever the names are.
+name_w=0 type_w=0
+for n in "${names[@]}"; do (( ${#n} > name_w )) && name_w=${#n}; done
+for t in "${types[@]}"; do (( ${#t} > type_w )) && type_w=${#t}; done
+
+typeset -a rows
+blank=""
+for i in {1..${#names}}; do
+  if (( show_paths )); then
+    rows+=("${(r:$name_w:)names[i]}  ${(r:$type_w:)types[i]}  ${descs[i]}"$'\n'"${(r:$name_w:)blank}  ${(r:$type_w:)blank}  ↳ ${paths[i]}")
+  else
+    rows+=("${(r:$name_w:)names[i]}  ${(r:$type_w:)types[i]}  ${descs[i]}")
+  fi
+done
+print -rl -- "${(@o)rows}"
