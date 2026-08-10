@@ -32,16 +32,19 @@ for dir in "$ROOT"/*(N/); do
     git -C "$dir" fetch -q --all 2>/dev/null || true
     branch="$(git -C "$dir" branch --show-current)"
 
-    if ! upstream="$(git -C "$dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
-        printf '%-24s %-10s %6s %6s  %s\n' "$name" "$branch" - - "no upstream"
-        continue
+    # A missing upstream is itself a finding, and such a repo still needs its dirt
+    # reported — skipping it here once hid a repo whose entire source was untracked.
+    if upstream="$(git -C "$dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null)"; then
+        counts="$(git -C "$dir" rev-list --left-right --count "${branch}...${upstream}" 2>/dev/null)"
+        ahead="${counts%%	*}"
+        behind="${counts##*	}"
+        no_upstream=0
+    else
+        ahead=- ; behind=- ; no_upstream=1
     fi
 
-    counts="$(git -C "$dir" rev-list --left-right --count "${branch}...${upstream}" 2>/dev/null)"
-    ahead="${counts%%	*}"
-    behind="${counts##*	}"
-
     dirt=()
+    (( no_upstream )) && dirt+=("NO REMOTE")
     git -C "$dir" diff --quiet 2>/dev/null            || dirt+=(dirty)
     git -C "$dir" diff --cached --quiet 2>/dev/null   || dirt+=(staged)
     [[ -n "$(git -C "$dir" ls-files --others --exclude-standard | head -1)" ]] && dirt+=(untracked)
@@ -51,7 +54,7 @@ for dir in "$ROOT"/*(N/); do
 
     # NB: plain assignment, not (( problems++ )) — post-increment evaluates to the
     # old value, so the first bump returns 0 and set -e kills the loop.
-    if (( behind > 0 || ahead > 0 )) || [[ "${dirt[1]}" != clean ]]; then
+    if (( no_upstream )) || (( behind > 0 || ahead > 0 )) || [[ "${dirt[1]}" != clean ]]; then
         problems=$(( problems + 1 ))
     fi
 done

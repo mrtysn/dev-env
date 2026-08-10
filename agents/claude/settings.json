@@ -27,8 +27,30 @@
       "Bash(which:*)"
     ]
   },
-  "model": "claude-fable-5[1m]",
+  "model": "opus[1m]",
   "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/block-tree-discard.sh\" ] && exec \"$d/hooks/block-tree-discard.sh\"; done",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Task|Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
     "SessionStart": [
       {
         "matcher": "",
@@ -114,5 +136,6 @@
   "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "iterm2_with_bell",
   "switchModelsOnFlag": false,
+  "agentPushNotifEnabled": true,
   "skipAutoPermissionPrompt": true
 }
