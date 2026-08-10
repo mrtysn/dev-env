@@ -115,9 +115,14 @@ repo is absent. It is **not** fine for a safety hook: probing leaves a machine
 with a different layout unguarded and unwarned. So the `PreToolUse` guards read
 their checkout path from `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh`
 (machine-local, never exported) and exit 2 — blocking the tool call — when it is
-missing. Copy `agents/claude/paths.local.sh.example` there on a new machine and
-fill in the real path; until you do, Bash tool calls are refused rather than
-silently unprotected.
+missing.
+
+`import.sh` writes that file for you as part of step 12, deriving the checkout
+from an existing rules symlink or a sibling of this repo and asking if it finds
+neither — it never guesses a layout. To write or repair it by hand, run
+`agents/claude/write-paths-local.sh` (`--path DIR` to name the checkout, `--yes`
+for non-interactive); `agents/claude/verify-hook-paths.sh` confirms every hook
+resolves. `agents/claude/paths.local.sh.example` documents the shape.
 
 After export, you should:
 1. Review the changes
@@ -144,7 +149,7 @@ What it does:
 9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
-12. Backs up and copies Claude Code `settings.json` into each config dir, asked one at a time — a dir that already exists defaults to yes, an absent one defaults to no, so a machine that runs a single Claude config is never given a second one
+12. Backs up and copies Claude Code `settings.json` into each config dir, asked one at a time — a dir that already exists defaults to yes, an absent one defaults to no, so a machine that runs a single Claude config is never given a second one. Then writes `paths.local.sh` for that config dir via `agents/claude/write-paths-local.sh`, because the guard hooks refuse every Bash tool call until it exists
 
 The script is idempotent - it checks what's already installed and skips those steps.
 

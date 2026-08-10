@@ -1,7 +1,9 @@
 # Machine-local paths for hook commands in settings.json.
 #
-# Copy to ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh and fill in the
-# real checkout location for this machine. Do not commit the filled-in copy:
+# import.sh writes this file during step 12, and write-paths-local.sh in this
+# directory does it on demand — both derive the checkout rather than guessing a
+# layout. This example is the documented shape, for reading or for filling in by
+# hand. Do not commit the filled-in copy:
 # ~/.claude is not a repo, and export.sh reads only settings.json, so the value
 # stays local by construction.
 #
