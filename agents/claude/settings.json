@@ -35,12 +35,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/block-tree-discard.sh\" ] && exec \"$d/hooks/block-tree-discard.sh\"; done",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\"; echo \"block-tree-discard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10
           },
           {
             "type": "command",
-            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/require-absolute-rm.sh\" ] && exec \"$d/hooks/require-absolute-rm.sh\"; done",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-absolute-rm.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-absolute-rm.sh\"; echo \"require-absolute-rm.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10
           }
         ]

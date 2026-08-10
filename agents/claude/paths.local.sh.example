@@ -1,0 +1,16 @@
+# Machine-local paths for hook commands in settings.json.
+#
+# Copy to ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh and fill in the
+# real checkout location for this machine. Do not commit the filled-in copy:
+# ~/.claude is not a repo, and export.sh reads only settings.json, so the value
+# stays local by construction.
+#
+# Hook commands source this file and refuse to run — exit 2, blocking the tool
+# call — when a path it should define is missing. That is deliberate: the hooks
+# it points at are safety guards, and a guard that silently is not there is
+# worse than one that fails loudly.
+
+# Checkout of the agents-shared repo, which holds hooks/ and claude/rules/.
+# Whatever this machine actually uses, e.g. $HOME/dev/agents-shared or
+# $HOME/src/agents-shared or $HOME/work/tools/agents-shared.
+AGENTS_SHARED_DIR="$HOME/path/to/agents-shared"

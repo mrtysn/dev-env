@@ -110,6 +110,15 @@ other machine. Hooks living under the config dir use
 machine are probed, e.g.
 `for d in "$HOME/dev/personal/cc-statusline" "$HOME/dev/cc-statusline"; do ...`.
 
+Probing is fine for cosmetic tooling, which may quietly do nothing when the
+repo is absent. It is **not** fine for a safety hook: probing leaves a machine
+with a different layout unguarded and unwarned. So the `PreToolUse` guards read
+their checkout path from `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh`
+(machine-local, never exported) and exit 2 — blocking the tool call — when it is
+missing. Copy `agents/claude/paths.local.sh.example` there on a new machine and
+fill in the real path; until you do, Bash tool calls are refused rather than
+silently unprotected.
+
 After export, you should:
 1. Review the changes
 2. Split personal customizations into `.zshrc.personal` if needed
