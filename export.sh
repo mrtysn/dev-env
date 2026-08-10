@@ -207,7 +207,12 @@ if [[ -n "$TMUX_TARGET" ]]; then
         warn "~/.tmux.conf not found, skipping"
     fi
 
-    for tool in tgo tmux-start; do
+    # The tool list is derived, not hand-maintained: the union of what the repo
+    # already tracks and what lives in ~/bin. Dropping a script into either place
+    # is enough — no edit here, and nothing silently stops syncing when renamed.
+    typeset -aU tools
+    tools=( bin/*(N:t) ~/bin/*(N:t) )
+    for tool in $tools; do
         if [ -f ~/bin/$tool ]; then
             copy_atomic ~/bin/$tool "bin/$tool"
             chmod +x "bin/$tool"

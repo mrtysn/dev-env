@@ -1,0 +1,29 @@
+#!/bin/bash
+# tssh - SSH to a Tailscale machine by name
+# Usage: tssh <machine-name> [user]
+
+if [ -z "$1" ]; then
+  echo "Usage: tssh <machine-name> [user]"
+  echo ""
+  echo "Available machines:"
+  tailscale status | awk '{
+    status = ($NF == "-") ? "online" : $NF
+    printf "  %-25s %s  (%s)\n", $2, $1, status
+  }'
+  exit 0
+fi
+
+HOST="$1"
+IP=$(tailscale status | grep "$HOST" | awk '{print $1}')
+
+if [ -z "$IP" ]; then
+  echo "Machine '$HOST' not found or offline"
+  tailscale status
+  exit 1
+fi
+
+if [ -n "$2" ]; then
+  ssh "$2@$IP"
+else
+  ssh "$IP"
+fi

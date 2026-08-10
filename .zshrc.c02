@@ -16,6 +16,7 @@ alias oj="cd $HOME/dev/oj"
 alias mertyasdotin="cd $HOME/dev/mertyas.in"
 alias ig-ext="cd $HOME/dev/instagram-extension"
 alias mycv="cd $HOME/dev/cv"
+alias notes="cd $HOME/dev/notes"
 
 # Tab colors (Flat UI Spanish palette) - "R G B" format
 _TAB_GREEN="51 181 126"     # #33B57E - oj (game dev)
@@ -23,12 +24,19 @@ _TAB_CORAL="235 111 96"     # #EB6F60 - mertyas.in
 _TAB_PURPLE="71 71 135"     # #474787 Lucky Point - claude
 _TAB_BLUE="52 172 224"      # #34ace0 Summer Sky - instagram-extension
 _TAB_YELLOW="255 177 66"    # #ffb142 Mandarin Sorbet - cv
+_TAB_TEAL="34 166 179"      # #22a6b3 Greenland Green - notes
 
 # Claude shortcuts
+# Launch from the repo root, not from ~/dev: a repo-root launch loads that repo's
+# CLAUDE.md and .claude/settings.local.json, enables the git-aware tooling, and gets
+# its own auto-memory bucket. `devc` is for cross-repo/meta work only.
 alias ojc="iterm_tab_color $_TAB_GREEN && cd \$HOME/dev/oj && claude"
 alias mertyasdotinc="iterm_tab_color $_TAB_CORAL && cd \$HOME/dev/mertyas.in && claude"
 alias ig-extc="iterm_tab_color $_TAB_BLUE && cd \$HOME/dev/instagram-extension && claude"
 alias mycvc="iterm_tab_color $_TAB_YELLOW && cd \$HOME/dev/cv && claude"
+alias notesc="iterm_tab_color $_TAB_TEAL && cd \$HOME/dev/notes && claude"
+alias devc="iterm_tab_color $_TAB_PURPLE && cd \$HOME/dev && claude"
+alias c="claude"
 
 # ── Adopted from c01 ──
 _CLAUDE_DIR="$HOME/.claude"

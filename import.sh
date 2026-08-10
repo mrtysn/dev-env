@@ -586,15 +586,14 @@ else
                 print "${GREEN}✓ Symlinked ~/.tmux.conf → $TMUX_CONF${NC}"
             fi
 
-            # Copy bin scripts
+            # Copy bin scripts. The list is derived from what the repo tracks, so a
+            # new tool needs no edit here — matching export.sh.
             mkdir -p ~/bin
-            cp "$SCRIPT_DIR/bin/tgo" ~/bin/tgo
-            chmod +x ~/bin/tgo
-            print "${GREEN}✓ Copied tgo to ~/bin/${NC}"
-
-            cp "$SCRIPT_DIR/bin/tmux-start" ~/bin/tmux-start
-            chmod +x ~/bin/tmux-start
-            print "${GREEN}✓ Copied tmux-start to ~/bin/${NC}"
+            for tool in "$SCRIPT_DIR"/bin/*(N:t); do
+                cp "$SCRIPT_DIR/bin/$tool" ~/bin/$tool
+                chmod +x ~/bin/$tool
+                print "${GREEN}✓ Copied $tool to ~/bin/${NC}"
+            done
 
             # Copy sessions config example (only if not present)
             if [ ! -f ~/.tmux-sessions.conf ]; then
