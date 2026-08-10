@@ -37,6 +37,11 @@
             "type": "command",
             "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/block-tree-discard.sh\" ] && exec \"$d/hooks/block-tree-discard.sh\"; done",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/require-absolute-rm.sh\" ] && exec \"$d/hooks/require-absolute-rm.sh\"; done",
+            "timeout": 10
           }
         ]
       },
