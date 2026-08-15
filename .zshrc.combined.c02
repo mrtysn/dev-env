@@ -390,7 +390,7 @@ path=("$JAVA_HOME/bin" "$HOME/.rd/bin" $path)   # java, rancher desktop (deduped
 
 # ── M2-local aliases / functions ──
 # https://github.com/sissbruecker/linkding
-alias linkding-start='docker run --name linkding -p 9090:9090 -v /Users/mrtysn/dev/linkding:/etc/linkding/data -d sissbruecker/linkding:latest'
+alias linkding-start='docker run --name linkding -p 9090:9090 -v "$HOME/dev/linkding:/etc/linkding/data" -d sissbruecker/linkding:latest'
 
 # ── Project shortcuts ──
 alias oj="cd $HOME/dev/oj"
