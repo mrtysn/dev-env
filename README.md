@@ -220,8 +220,10 @@ $(brew --prefix)/opt/fzf/install --key-bindings --completion --no-update-rc --no
 mv ~/.zshrc ~/.zshrc.backup 2>/dev/null
 mv ~/.p10k.zsh ~/.p10k.zsh.backup 2>/dev/null
 
-# Copy configs from this repo
-cp .zshrc.base ~/.zshrc.base
+# Link the shared base so the repo stays the single source of truth;
+# copy only if this clone is temporary
+ln -sf "$PWD/.zshrc.base" ~/.zshrc.base
+# cp .zshrc.base ~/.zshrc.base   # alternative to the symlink above
 cp .zshrc.personal ~/.zshrc.personal
 cp .p10k.zsh ~/.p10k.zsh
 
