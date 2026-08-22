@@ -309,7 +309,7 @@ _pnpm-migrate-globals() {
 update-all() {
   echo "==> brew"    && brew update && brew upgrade || return 1
   if command -v pnpm >/dev/null; then
-    echo "==> pnpm -g" && _pnpm-migrate-globals && pnpm update -g
+    echo "==> pnpm -g" && _pnpm-migrate-globals && pnpm update -g && pnpm install -g  # install -g regenerates bin shims; update -g leaves them stale when a peer-dep suffix changes
   fi
   command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
 }
