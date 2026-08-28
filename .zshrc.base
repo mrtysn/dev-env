@@ -121,6 +121,12 @@ fi
 export HISTSIZE=99999
 export SAVEHIST=$HISTSIZE
 
+# ─── agents-shared ──────────────────────────────────────────────────────────────
+# $AGENTS_SHARED and $DEV_ROOT, written by agents-shared/scripts/init-global.sh from
+# the checkout's own location. Skills invoke scripts through these instead of a baked
+# path. The file is absent until that script has run on this machine.
+[[ -r "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh" ]] && source "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh"
+
 # ─── Tool Initialization ────────────────────────────────────────────────────────
 # Powerlevel10k theme
 source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
