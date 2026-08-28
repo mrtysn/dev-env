@@ -52,7 +52,7 @@ echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/c01.conf or c02.conf (based on hostname)"
-echo "  - $SCRIPT_DIR/bin/tgo, bin/tmux-start"
+echo "  - $SCRIPT_DIR/bin/* (only for tools present in ~/bin as real files, not symlinks)"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
 echo "  - $SCRIPT_DIR/asdf/tool-versions.c01|c02 (this machine's only)"
@@ -210,10 +210,17 @@ if [[ -n "$TMUX_TARGET" ]]; then
     # The tool list is derived, not hand-maintained: the union of what the repo
     # already tracks and what lives in ~/bin. Dropping a script into either place
     # is enough — no edit here, and nothing silently stops syncing when renamed.
+    #
+    # Symlinks in ~/bin are skipped. import.sh links this repo's own tools there,
+    # so copying one back would rewrite the file it points at; and a link into
+    # another repo (registered by /new-tool) would have that repo's source copied
+    # into this one, which is public. Only real files are adopted.
     typeset -aU tools
     tools=( bin/*(N:t) ~/bin/*(N:t) )
     for tool in $tools; do
-        if [ -f ~/bin/$tool ]; then
+        if [ -L ~/bin/$tool ]; then
+            continue
+        elif [ -f ~/bin/$tool ]; then
             copy_atomic ~/bin/$tool "bin/$tool"
             chmod +x "bin/$tool"
             echo "  Exported ~/bin/$tool"

@@ -585,15 +585,6 @@ else
                 print "${GREEN}✓ Symlinked ~/.tmux.conf → $TMUX_CONF${NC}"
             fi
 
-            # Copy bin scripts. The list is derived from what the repo tracks, so a
-            # new tool needs no edit here — matching export.sh.
-            mkdir -p ~/bin
-            for tool in "$SCRIPT_DIR"/bin/*(N:t); do
-                cp "$SCRIPT_DIR/bin/$tool" ~/bin/$tool
-                chmod +x ~/bin/$tool
-                print "${GREEN}✓ Copied $tool to ~/bin/${NC}"
-            done
-
             # Copy sessions config example (only if not present)
             if [ ! -f ~/.tmux-sessions.conf ]; then
                 cp "$SCRIPT_DIR/tmux/tmux-sessions.conf.example" ~/.tmux-sessions.conf
@@ -627,9 +618,38 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 12: Claude Code Settings (optional)
+# Step 12: Toolbelt (~/bin)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 12: Claude Code Settings ==="
+echo "=== Step 12: Toolbelt ==="
+
+# Symlinks, not copies: ~/bin/<tool> IS the repo file, so an edit on either side is
+# the same edit and the two cannot drift. The list is derived from what the repo
+# tracks, so a new tool needs no edit here — matching export.sh.
+#
+# ~/bin holds hand-written tools; ~/.local/bin is left to package managers, which
+# contend over it (uv and pipx both default there and refuse to overwrite each
+# other's names). A tool already under bin/ is installed here, not by /new-tool.
+mkdir -p ~/bin
+for tool in "$SCRIPT_DIR"/bin/*(N:t); do
+    tool_src="$SCRIPT_DIR/bin/$tool"
+    # A regular file here is a copy from the old mechanism. If it differs it may
+    # carry local edits never exported, so it is kept rather than overwritten.
+    # Backups go in a dot-directory: ~/bin/*.backup-* would otherwise be listed by
+    # toolbelt and adopted by export.sh as though it were a tool of its own.
+    if [ -f ~/bin/$tool ] && [ ! -L ~/bin/$tool ] && ! cmp -s ~/bin/$tool "$tool_src"; then
+        mkdir -p ~/bin/.backups
+        mv ~/bin/$tool ~/bin/.backups/$tool.$(date +%Y%m%d-%H%M%S)
+        print "${YELLOW}→ ~/bin/$tool differed from the repo; kept in ~/bin/.backups/${NC}"
+    fi
+    ln -sfn "$tool_src" ~/bin/$tool
+    print "${GREEN}✓ Symlinked $tool → bin/$tool${NC}"
+done
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 13: Claude Code Settings (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 13: Claude Code Settings ==="
 
 # "<repo subdir>:<target config dir>"
 AGENTS_DIR="agents"
@@ -695,9 +715,9 @@ done
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 13: Window & Keyboard Configs (optional)
+# Step 14: Window & Keyboard Configs (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 13: Window & Keyboard Configs ==="
+echo "=== Step 14: Window & Keyboard Configs ==="
 
 HAS_WK=false
 [ -f .phoenix.js ] && HAS_WK=true
@@ -737,9 +757,9 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 14: lazygit + repo-tabs Configuration (optional)
+# Step 15: lazygit + repo-tabs Configuration (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 14: lazygit + repo-tabs Configuration ==="
+echo "=== Step 15: lazygit + repo-tabs Configuration ==="
 
 LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
 HAS_LG=false

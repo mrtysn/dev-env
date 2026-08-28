@@ -1,5 +1,5 @@
 #!/bin/zsh
-# DESC: List the hand-invoked tools on this machine — everything in ~/.local/bin and ~/bin carrying a DESC line
+# DESC: List the hand-invoked tools on this machine — everything in ~/bin and ~/.local/bin carrying a DESC line
 #
 # A tool is anything executable in one of the scanned directories that declares
 # itself with a `# DESC: <one-liner>` in its first 20 lines. Compiled binaries
@@ -9,6 +9,11 @@
 # Undeclared executables are ignored, which is what keeps the listing to tools
 # you wrote and out of everything a package manager happens to drop alongside
 # them.
+#
+# ~/bin is scanned first, matching PATH order: it holds what you wrote, as
+# symlinks into the repo each tool lives in. ~/.local/bin belongs to package
+# managers (uv, pipx) and is scanned only so installed tools that declare a DESC
+# still show up.
 #
 # Usage:
 #   toolbelt                # list every declared tool
@@ -40,7 +45,7 @@ while (( $# )); do
   esac
 done
 
-(( ${#DIRS} )) || DIRS=("$HOME/.local/bin" "$HOME/bin")
+(( ${#DIRS} )) || DIRS=("$HOME/bin" "$HOME/.local/bin")
 
 # Describe how a file is run, for the second column.
 tool_type() {
