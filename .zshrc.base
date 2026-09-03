@@ -310,12 +310,27 @@ _pnpm-migrate-globals() {
   rm -rf "$old_root"
 }
 
+# A peer-dep bump renames the .pnpm directory and the $PNPM_HOME wrappers stop
+# resolving. `pnpm install -g` short-circuits on an up-to-date lockfile without
+# re-linking; `pnpm add -g` re-links, so re-add each global at its recorded spec.
+# Manifests sit at <root>/package.json (pnpm <=10) or <root>/<hash>/package.json (>=11).
+_pnpm-fix-shims() {
+  local root; root="$(pnpm root -g 2>/dev/null)" || return 0
+  root="${root%/node_modules}"
+  local -a manifests pkgs
+  manifests=("$root"/package.json(N) "$root"/*/package.json(N))
+  (( ${#manifests} )) || return 0
+  pkgs=(${(f)"$(node -p '[...new Set(process.argv.slice(1).flatMap(p => Object.entries(require(p).dependencies || {}).map(([n, v]) => n + "@" + v)))].join("\n")' $manifests 2>/dev/null)"})
+  (( ${#pkgs} )) && pnpm add -g $pkgs
+}
+
 # update-all = "bu, all": brew + pnpm globals + Mac App Store.
 # Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
+# Each stage runs independently so one failing manager does not skip the rest.
 update-all() {
-  echo "==> brew"    && brew update && brew upgrade || return 1
+  echo "==> brew"; brew update && brew upgrade
   if command -v pnpm >/dev/null; then
-    echo "==> pnpm -g" && _pnpm-migrate-globals && pnpm update -g && pnpm install -g  # install -g regenerates bin shims; update -g leaves them stale when a peer-dep suffix changes
+    echo "==> pnpm -g"; _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims
   fi
   command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
 }
