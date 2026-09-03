@@ -522,8 +522,8 @@ Referenced by the environment but excluded from this (public) repo — set up ma
 
 - `claude` CLI — native installer, not brew-managed
 - `~/.gitconfig` + `~/.gitconfig-personal` — git identity / includeIf split
-- `~/.ssh/config` — hosts `c1`/`c2` used by `bin/tgo` (security material)
-- `~/.tmux-sessions.conf` — read by `bin/tmux-start`; contains work repo paths
+- `~/.ssh/config` — hosts `c1`/`c2` used by `tgo` in the `tools` repo (security material)
+- `~/.tmux-sessions.conf` — read by `tmux-start` in the `tools` repo; contains work repo paths
 - `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
 - Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
 - `~/.local/share/claude-open-shim/` — Chrome profile shim used by `claude()` in `.zshrc.c01`
