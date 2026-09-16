@@ -77,6 +77,10 @@ typeset -U PATH path
 # Go environment (sets GOBIN, etc.)
 [[ -f "$HOME/.asdf/plugins/golang/set-env.zsh" ]] && source "$HOME/.asdf/plugins/golang/set-env.zsh"
 
+# JAVA_HOME follows the JDK a project pins in .tool-versions. It only speaks up
+# where asdf resolves a java, so a machine JAVA_HOME set below stays the default.
+[[ -f "$HOME/.asdf/plugins/java/set-java-home.zsh" ]] && source "$HOME/.asdf/plugins/java/set-java-home.zsh"
+
 # Dotnet root for tooling (avoid "." / empty)
 DOTNET_ROOT=""
 if command -v asdf >/dev/null 2>&1; then
