@@ -317,29 +317,204 @@ _pnpm-migrate-globals() {
   rm -rf "$old_root"
 }
 
+_pnpm-global-manifests() {
+  local root; root="$(pnpm root -g 2>/dev/null)" || return 0
+  root="${root%/node_modules}"
+  print -l -- "$root"/package.json(N) "$root"/*/package.json(N)
+}
+
+# True when a global bin wrapper points at a file that no longer exists, or
+# when globals are installed but no wrappers are. Each wrapper records its
+# target on a `# cmd-shim-target=` line.
+_pnpm-shims-broken() {
+  local -a manifests wrappers
+  manifests=(${(f)"$(_pnpm-global-manifests)"})
+  (( ${#manifests} )) || return 1
+  local bindir; bindir="$(pnpm bin -g 2>/dev/null)" || return 0
+  wrappers=("$bindir"/*(N.))
+  (( ${#wrappers} )) || return 0
+  local w target
+  for w in $wrappers; do
+    target="$(sed -n 's/^# cmd-shim-target=//p' "$w")"
+    [[ -n "$target" && -e "$target" ]] || return 0
+  done
+  return 1
+}
+
 # A peer-dep bump renames the .pnpm directory and the $PNPM_HOME wrappers stop
 # resolving. `pnpm install -g` short-circuits on an up-to-date lockfile without
 # re-linking; `pnpm add -g` re-links, so re-add each global at its recorded spec.
-# Manifests sit at <root>/package.json (pnpm <=10) or <root>/<hash>/package.json (>=11).
 _pnpm-fix-shims() {
-  local root; root="$(pnpm root -g 2>/dev/null)" || return 0
-  root="${root%/node_modules}"
+  _pnpm-shims-broken || return 0
   local -a manifests pkgs
-  manifests=("$root"/package.json(N) "$root"/*/package.json(N))
-  (( ${#manifests} )) || return 0
+  manifests=(${(f)"$(_pnpm-global-manifests)"})
   pkgs=(${(f)"$(node -p '[...new Set(process.argv.slice(1).flatMap(p => Object.entries(require(p).dependencies || {}).map(([n, v]) => n + "@" + v)))].join("\n")' $manifests 2>/dev/null)"})
+  echo "==> pnpm: re-linking global bin wrappers"
   (( ${#pkgs} )) && pnpm add -g $pkgs
 }
 
-# update-all = "bu, all": brew + pnpm globals + Mac App Store.
+# Casks leave com.apple.quarantine on every app they install, so each upgrade
+# brings back the "downloaded from the internet" prompt on first launch. Clear
+# it only where Gatekeeper already accepts the app as notarized; anything else
+# keeps the flag and stays blocked.
+_unquarantine-notarized-casks() {
+  local app
+  for app in /Applications/*.app(N/) "$HOME"/Applications/*.app(N/); do
+    xattr -p com.apple.quarantine "$app" 2>/dev/null | grep -q 'Homebrew' || continue
+    spctl -a -t exec -vv "$app" 2>&1 | grep -q '^source=Notarized Developer ID' || continue
+    xattr -dr com.apple.quarantine "$app" && echo "unquarantined ${app:t}"
+  done
+}
+
+# One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
+# against the cwd's version pins, so a project's packageManager must not pick them.
+_update-all-stage() {
+  cd "$HOME" || return 1
+  case "$1" in
+    brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
+    pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims ;;
+    asdf) asdf plugin update --all ;;
+    uv)   uv tool upgrade --all ;;
+    mas)  mas upgrade ;;
+  esac
+}
+
+_update-all-report-brew-bin() {
+  local f
+  for f in "$(brew --prefix)"/bin/*(N.*); do
+    [[ "${f:t}" == brew ]] && continue
+    echo "$f is a regular file, not a Homebrew link"
+  done
+}
+
+_update-all-report-missing-casks() {
+  local token app
+  brew info --json=v2 --installed --cask 2>/dev/null \
+    | jq -r '.casks[] | .token as $t | .artifacts[] | select(.app) | .app
+             | "\($t)\t\(if (.[1]|type)=="object" then .[1].target else (.[0]|split("/")|last) end)"' \
+    | while IFS=$'\t' read -r token app; do
+        if [[ "$app" == /* ]]; then
+          [[ -e "$app" ]] && continue
+        else
+          [[ -e "/Applications/$app" || -e "$HOME/Applications/$app" ]] && continue
+        fi
+        echo "$token: $app is not installed"
+      done
+}
+
+# Newest release on the pin's own line: the major for node and pnpm, major.minor
+# for the rest. asdf's pnpm list includes releases npm tags `next`, so pnpm reads
+# the stable latest-<major> tag instead. Pins are never changed here.
+_update-all-report-asdf-pins() {
+  local tv="$HOME/.tool-versions" tool ver line latest
+  [[ -f "$tv" ]] || return 0
+  while read -r tool ver _; do
+    [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
+    case "$tool" in
+      nodejs|pnpm) line="${ver%%.*}" ;;
+      *)           line="${ver%.*}" ;;
+    esac
+    if [[ "$tool" == pnpm ]]; then
+      latest="$(npm view pnpm "dist-tags.latest-$line" 2>/dev/null)" || continue
+    else
+      latest="$(asdf latest "$tool" "$line" 2>/dev/null)" || continue
+    fi
+    [[ -n "$latest" && "$latest" != "$ver" ]] && echo "$tool $ver → $latest"
+  done < "$tv"
+}
+
+# update-all = "bu, all": brew + pnpm globals + asdf plugins + uv tools + Mac App Store.
 # Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
-# Each stage runs independently so one failing manager does not skip the rest.
+# Plugin updates only refresh install scripts; pinned versions stay put.
+# Each stage runs independently so one failing manager does not skip the rest, and
+# under `script` so brew keeps its prompt and colors while the output is logged to
+# ~/Library/Logs/update-all/<timestamp>/ (last 10 runs kept). Ends with per-stage
+# status, every error line, and read-only reports on drift no stage fixes.
 update-all() {
-  echo "==> brew"; brew update && brew upgrade
-  if command -v pnpm >/dev/null; then
-    echo "==> pnpm -g"; _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims
-  fi
-  command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
+  emulate -L zsh
+  setopt no_monitor 2>/dev/null   # no job notices for the background lookups
+  zmodload zsh/datetime
+
+  local log_root="$HOME/Library/Logs/update-all"
+  local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
+  mkdir -p "$run_dir" || return 1
+
+  local -a stages=(brew pnpm asdf uv mas)
+  local -A stage_status stage_secs
+  local stage start rc failed=0
+  local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
+    _pnpm-shims-broken _pnpm-fix-shims _unquarantine-notarized-casks)"
+
+  # Slow network lookups no stage depends on run alongside the updates.
+  softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
+  local su_pid=$!
+  _update-all-report-asdf-pins > "$run_dir/report-asdf.txt" 2>/dev/null &
+  local asdf_pid=$!
+
+  for stage in $stages; do
+    if ! command -v $stage >/dev/null; then
+      stage_status[$stage]=skipped; stage_secs[$stage]=0
+      continue
+    fi
+    print -P "%B==> $stage%b"
+    start=$EPOCHSECONDS
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; _update-all-stage $stage"
+    rc=$?
+    stage_secs[$stage]=$(( EPOCHSECONDS - start ))
+    if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
+  done
+  wait $su_pid $asdf_pid 2>/dev/null
+
+  print; print -P "%B==> Summary%b"
+  local s
+  for stage in $stages; do
+    s=${stage_secs[$stage]}
+    printf '  %-6s %-12s %s\n' $stage "${stage_status[$stage]}" \
+      "$( (( s >= 60 )) && echo "$(( s / 60 ))m$(( s % 60 ))s" || echo "${s}s" )"
+  done
+
+  # Error lines, from pty logs with color codes and carriage returns stripped
+  local e errors=""
+  for stage in $stages; do
+    [[ -f "$run_dir/$stage.log" ]] || continue
+    e="$(sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$run_dir/$stage.log" \
+      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM)')"
+    [[ -n "$e" ]] && errors+="  [$stage]"$'\n'"$(print -r -- "$e" | sed 's/^/    /')"$'\n'
+  done
+  [[ -n "$errors" ]] && { print; print -P "%B==> Errors%b"; print -rn -- "$errors" }
+
+  local -a titles=(
+    "Regular files in the brew bin dir"
+    "Casks with a missing app"
+    "asdf pins behind their line"
+    "Unneeded brew formulae"
+    "Pending macOS updates"
+  )
+  local -a bodies=(
+    "$(_update-all-report-brew-bin)"
+    "$(_update-all-report-missing-casks)"
+    "$(<"$run_dir/report-asdf.txt")"
+    "$(brew autoremove -n 2>/dev/null | grep -v '^==>')"
+    "$(<"$run_dir/report-softwareupdate.txt")"
+  )
+  local i shown=0
+  for i in {1..${#titles}}; do
+    [[ -n "${bodies[$i]}" ]] || continue
+    (( shown++ )) || { print; print -P "%B==> Reports%b" }
+    print "  ${titles[$i]}:"
+    print -r -- "${bodies[$i]}" | sed 's/^/    /'
+  done
+
+  print; print "Logs: $run_dir"
+
+  # Run dirs are timestamps, so name order is age order.
+  local -a runs=("$log_root"/*(N/on))
+  while (( ${#runs} > 10 )); do
+    rm -rf -- "${runs[1]}"
+    shift runs
+  done
+
+  return $failed
 }
 
 # ─── Aliases: Navigation ────────────────────────────────────────────────────────
