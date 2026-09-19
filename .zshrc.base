@@ -353,6 +353,26 @@ _pnpm-fix-shims() {
   (( ${#pkgs} )) && pnpm add -g $pkgs
 }
 
+# pnpm ≥11 installs each global update into a fresh directory and deletes the
+# old one, so a running happy daemon is left executing deleted files and can no
+# longer spawn sessions. Restart it only when it has no sessions; with sessions
+# active, leave it running and flag it for later.
+_happy-daemon-refresh() {
+  command -v happy >/dev/null || return 0
+  local pid entry
+  pid="$(pgrep -f 'happy/dist/index.mjs daemon start-sync' | head -1)"
+  [[ -n "$pid" ]] || return 0
+  entry="$(ps -o command= -p "$pid" | grep -o '/[^ ]*/happy/dist/index.mjs')"
+  [[ -e "$entry" ]] && return 0
+  if happy daemon list 2>/dev/null | grep -q 'No active sessions'; then
+    echo "==> happy: restarting daemon, its install was replaced"
+    happy daemon stop && happy daemon start
+  else
+    echo "Action needed: happy daemon runs from a replaced install and has active sessions;" \
+      "once they finish: happy daemon stop && happy daemon start"
+  fi
+}
+
 # Casks leave com.apple.quarantine on every app they install, so each upgrade
 # brings back the "downloaded from the internet" prompt on first launch. Clear
 # it only where Gatekeeper already accepts the app as notarized; anything else
@@ -372,7 +392,7 @@ _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
     brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
-    pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims ;;
+    pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
     asdf) asdf plugin update --all ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
@@ -443,7 +463,7 @@ update-all() {
   local -A stage_status stage_secs
   local stage start rc failed=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
-    _pnpm-shims-broken _pnpm-fix-shims _unquarantine-notarized-casks)"
+    _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
@@ -478,10 +498,10 @@ update-all() {
   for stage in $stages; do
     [[ -f "$run_dir/$stage.log" ]] || continue
     e="$(sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$run_dir/$stage.log" \
-      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM)')"
+      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM|Action needed)')"
     [[ -n "$e" ]] && errors+="  [$stage]"$'\n'"$(print -r -- "$e" | sed 's/^/    /')"$'\n'
   done
-  [[ -n "$errors" ]] && { print; print -P "%B==> Errors%b"; print -rn -- "$errors" }
+  [[ -n "$errors" ]] && { print; print -P "%B==> Needs attention%b"; print -rn -- "$errors" }
 
   local -a titles=(
     "Regular files in the brew bin dir"
