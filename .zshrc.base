@@ -134,6 +134,12 @@ export SAVEHIST=$HISTSIZE
 # path. The file is absent until that script has run on this machine.
 [[ -r "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh" ]] && source "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh"
 
+# ─── atlas ──────────────────────────────────────────────────────────────────────
+# The per-repo patterns saying which files are documents, for atlas's document
+# manager. Setting it also says this machine files documents at all: /new-repo
+# offers to add a section for a new repo only when it is set.
+[[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/atlas/atlasinclude" ]] && export ATLAS_INCLUDE="${XDG_CONFIG_HOME:-$HOME/.config}/atlas/atlasinclude"
+
 # ─── Tool Initialization ────────────────────────────────────────────────────────
 # Powerlevel10k theme
 source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
