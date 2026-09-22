@@ -769,6 +769,7 @@
       "Tags": [],
       "Terminal Type": "xterm-256color",
       "Transparency": 0.0,
+      "Triggers": [],
       "Unicode Normalization": 0,
       "Unlimited Scrollback": true,
       "Use Bold Font": true,
