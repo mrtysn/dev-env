@@ -16,3 +16,7 @@ AGENTS_SHARED_DIR="$HOME/path/to/agents-shared"
 # SessionStart check sources it; unset means the limiter is not installed here and the check
 # does nothing.
 # ARL_DIR="$HOME/path/to/agent-request-limiter"
+
+# cc-status binary (iTerm2 tab-status integration), set on machines that have it installed.
+# Every cc-status hook sources this file and exits 0 quietly if unset — it's optional.
+# CC_STATUS_PATH="$HOME/.config/iterm2/cc-status"

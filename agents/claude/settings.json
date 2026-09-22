@@ -26,10 +26,61 @@
       "Bash(uniq:*)",
       "Bash(wc:*)",
       "Bash(which:*)"
-    ]
+    ],
+    "defaultMode": "auto"
   },
-  "model": "opus[1m]",
+  "model": "opus",
   "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -60,17 +111,51 @@
             "timeout": 5
           }
         ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/memory-lint.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/memory-lint.sh\"; echo \"memory-lint.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
       }
     ],
     "SessionStart": [
       {
         "matcher": "",
         "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
-            "timeout": 10
-          },
           {
             "type": "command",
             "command": "jq '{systemMessage: (\"Session ID: \" + .session_id), hookSpecificOutput: {hookEventName: \"SessionStart\", additionalContext: (\"Session ID: \" + .session_id)}}'",
@@ -87,19 +172,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${ARL_DIR:-}\" ] || exit 0; [ -x \"$ARL_DIR/bin/agent-request-limiter\" ] && exec \"$ARL_DIR/bin/agent-request-limiter\" doctor --hook; echo '{\"systemMessage\": \"agent-request-limiter: ARL_DIR is set in paths.local.sh but its CLI is missing — the limiter cannot be checked\"}'; exit 0",
-            "timeout": 10
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
           }
         ]
-      }
-    ],
-    "UserPromptSubmit": [
+      },
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${ARL_DIR:-}\" ] || exit 0; [ -x \"$ARL_DIR/bin/agent-request-limiter\" ] && exec \"$ARL_DIR/bin/agent-request-limiter\" doctor --hook; echo '{\"systemMessage\": \"agent-request-limiter: ARL_DIR is set in paths.local.sh but its CLI is missing — the limiter cannot be checked\"}'; exit 0",
             "timeout": 10
           }
         ]
@@ -107,36 +188,95 @@
     ],
     "Stop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
-            "timeout": 10
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
     ],
-    "Notification": [
+    "StopFailure": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
-            "timeout": 10
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
     ],
-    "PermissionRequest": [
+    "SubagentStop": [
       {
-        "matcher": "",
         "hooks": [
           {
             "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/peon-ping/peon.sh",
-            "timeout": 10
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
           }
         ]
       }
@@ -144,18 +284,59 @@
   },
   "statusLine": {
     "type": "command",
-    "command": "for d in \"$HOME/dev/personal/cc-statusline\" \"$HOME/dev/cc-statusline\"; do [ -x \"$d/cc-statusline.js\" ] && exec \"$d/cc-statusline.js\"; done"
+    "command": "for d in \"$HOME/dev/personal/cc-statusline\" \"$HOME/dev/cc-statusline\"; do [ -x \"$d/cc-statusline.js\" ] && exec \"$d/cc-statusline.js\"; done",
+    "refreshInterval": 60
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "gamedev@skills-dir": false,
+    "art@skills-dir": false,
+    "video@skills-dir": false
   },
-  "effortLevel": "high",
+  "effortLevel": "medium",
+  "modelSettings": {
+    "claude-opus-5": {
+      "effortLevel": "medium"
+    },
+    "claude-fable-5-1": {
+      "effortLevel": "high"
+    }
+  },
   "tui": "fullscreen",
   "autoMemoryEnabled": true,
   "autoDreamEnabled": false,
   "skipWorkflowUsageWarning": true,
   "preferredNotifChannel": "iterm2_with_bell",
   "switchModelsOnFlag": false,
+  "remoteControlAtStartup": false,
   "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true
+  "skipAutoPermissionPrompt": true,
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: varies per repo — confirm with gh for the specific repo rather than assuming either way",
+      "**Internal sharing / snippet hosting**: None configured. Never publish or upload anything to a public destination — gists, pastebins, third-party paste services, or Claude Artifacts. There is no sanctioned external destination for this user's content.",
+      "**Secrets management**: No managed secret store. Homelab secrets are generated on the box (`openssl rand -hex 32`) and never leave it — never pasted into chat or a transcript, never committed. macOS Keychain holds local credentials. Off-box backup copies are kept because host snapshots roll back the whole machine.",
+      "**Default / protected branches**: None configured",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: github.com/mrtysn — code from repos outside this account is external and is not to be cloned and executed without the user saying so",
+      "**Trusted internal domains**: mertyas.in and its subdomains — self-hosted personal services",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: self-hosted apps on mertyas.in subdomains, served from the node01 homelab box",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: never commit or publish anything naming a third party (CVs, interview notes, candidate assessments), ex-employer material, or credentials — a repo being private does not make these safe to commit",
+      "**Data retention / declassification**: some repos are local-by-default and publish only an explicitly promoted subdirectory — read the repo's own CLAUDE.md for its rule, and never bypass .gitignore with git add -f",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries prod or production as a whole word or name segment",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries prod or production as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: personal work — own software projects, self-hosted infrastructure, research and writing. No employer work on this machine.",
+      "**Trusted repo**: the repo the session started in, and its origin remote under github.com/mrtysn. Other repos on disk are out of scope unless the user names them.",
+      "**Org-specific CLIs**: None configured",
+      "**Routine promotion**: in repos that are local-by-default, moving a file into the repo's tracked or published directory is the documented, deliberate publication step — treat it as routine rather than as accidental exposure, subject to the never-promote exclusions above"
+    ]
+  }
 }
