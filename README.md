@@ -506,10 +506,6 @@ Feel free to use, modify, and share.
   `asdf/tool-versions.c02`, `tmux/c02.conf`) are therefore maintained by hand
   from c01, and nothing verifies they match that machine except a manual diff.
   One `./export.sh` run on c02 would make it self-reporting.
-- **peon-ping is still installed on c01.** Its hooks are gone from the synced
-  `settings.json` (cc-statusline's event hook and Agent Bar Hopping replace its
-  sounds), and c02's copy is uninstalled, but c01 keeps the brew formula until
-  `brew uninstall peon-ping && brew untap PeonPing/tap` runs there.
 - **Why c01 runs two Claude config dirs is undocumented.** `~/.claude` and
   `~/.claude-personal`, selected by the `claudep` / `ojc` / `claudepany` aliases
   in `.zshrc.c01`; c02 runs one. If the split separates identities it belongs in
