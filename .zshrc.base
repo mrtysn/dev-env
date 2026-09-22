@@ -428,12 +428,64 @@ _update-all-report-missing-casks() {
       done
 }
 
+# Right-aligns each dot-separated segment of _uapv_in into its own column across
+# every row (e.g. "3.12.5" / "12.4.2" -> " 3.12.5" / "12. 4.2"), into _uapv_out.
+# Both arrays are dynamically-scoped locals the caller declares before calling.
+_update-all-align-versions() {
+  local -a widths=()
+  local -a parts
+  local n=${#_uapv_in} idx c
+  for idx in {1..$n}; do
+    parts=("${(@s:.:)_uapv_in[idx]}")
+    for c in {1..${#parts}}; do
+      (( ${#parts[c]} > ${widths[c]:-0} )) && widths[c]=${#parts[c]}
+    done
+  done
+  _uapv_out=()
+  local seg aligned
+  for idx in {1..$n}; do
+    parts=("${(@s:.:)_uapv_in[idx]}")
+    aligned=""
+    for c in {1..${#parts}}; do
+      seg=$(printf '%*s' ${widths[c]} "${parts[c]}")
+      (( c == 1 )) && aligned="$seg" || aligned="${aligned}.${seg}"
+    done
+    _uapv_out+=("$aligned")
+  done
+}
+
+# Colors the segments from the first mismatching dot-separated part onward, in
+# both numbers, so "1.2.3 -> 1.9.0" reads with only ".9.0"/".2.3" in yellow.
+# $1/$2 are the plain (unpadded) pair, used only to find the first difference;
+# $3/$4 are the column-aligned pair actually shown, so alignment survives. Sets
+# REPLY_A/REPLY_B rather than echoing, since a printf width spec can't see
+# through the ANSI codes to know the visible width.
+_update-all-highlight-diff() {
+  local -a a_parts b_parts aa_parts bb_parts
+  a_parts=("${(@s:.:)1}")
+  b_parts=("${(@s:.:)2}")
+  aa_parts=("${(@s:.:)3}")
+  bb_parts=("${(@s:.:)4}")
+  local i=1 max=$(( ${#a_parts} > ${#b_parts} ? ${#a_parts} : ${#b_parts} ))
+  while (( i <= max )) && [[ "${a_parts[i]:-}" == "${b_parts[i]:-}" ]]; do (( i++ )); done
+  local yellow=$'\e[33m' reset=$'\e[0m'
+  local a_same="${(j:.:)aa_parts[1,i-1]}" a_diff="${(j:.:)aa_parts[i,-1]}"
+  local b_same="${(j:.:)bb_parts[1,i-1]}" b_diff="${(j:.:)bb_parts[i,-1]}"
+  [[ -n "$a_same" ]] && a_same+="."
+  [[ -n "$b_same" ]] && b_same+="."
+  REPLY_A="${a_same}${yellow}${a_diff}${reset}"
+  REPLY_B="${b_same}${yellow}${b_diff}${reset}"
+}
+
 # Newest release on the pin's own line: the major for node and pnpm, major.minor
 # for the rest. asdf's pnpm list includes releases npm tags `next`, so pnpm reads
 # the stable latest-<major> tag instead. Pins are never changed here.
+# Buffers every line before printing so tool names and version segments can be
+# column-aligned; the arrows only line up once every row's widths are known.
 _update-all-report-asdf-pins() {
   local tv="$HOME/.tool-versions" tool ver line latest
   [[ -f "$tv" ]] || return 0
+  local -a tools vers latests
   while read -r tool ver _; do
     [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
     case "$tool" in
@@ -445,8 +497,25 @@ _update-all-report-asdf-pins() {
     else
       latest="$(asdf latest "$tool" "$line" 2>/dev/null)" || continue
     fi
-    [[ -n "$latest" && "$latest" != "$ver" ]] && echo "$tool $ver → $latest"
+    [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    tools+=("$tool"); vers+=("$ver"); latests+=("$latest")
   done < "$tv"
+  (( ${#tools} )) || return 0
+
+  local -a _uapv_in _uapv_out vers_aligned latests_aligned
+  _uapv_in=("${vers[@]}"); _update-all-align-versions; vers_aligned=("${_uapv_out[@]}")
+  _uapv_in=("${latests[@]}"); _update-all-align-versions; latests_aligned=("${_uapv_out[@]}")
+
+  local tool_w=0 ver_w=0 t v
+  for t in "${tools[@]}"; do (( ${#t} > tool_w )) && tool_w=${#t}; done
+  for v in "${vers_aligned[@]}"; do (( ${#v} > ver_w )) && ver_w=${#v}; done
+
+  local idx pad REPLY_A REPLY_B
+  for idx in {1..${#tools}}; do
+    _update-all-highlight-diff "${vers[idx]}" "${latests[idx]}" "${vers_aligned[idx]}" "${latests_aligned[idx]}"
+    pad=$(( ver_w - ${#vers_aligned[idx]} ))
+    printf '%-*s %s%*s → %s\n' $tool_w "${tools[idx]}" "$REPLY_A" $pad "" "$REPLY_B"
+  done
 }
 
 # update-all = "bu, all": brew + pnpm globals + asdf plugins + uv tools + Mac App Store.
