@@ -131,6 +131,3 @@ alias redisstart="iterm_tab_color $_TAB_RED && iterm_tab_title '📒 redis-serve
 alias tls="tmux ls 2>/dev/null || echo 'no live tmux sessions'"
 alias tlw="tmux list-windows -a -F '#{session_name}  #{window_index}:#{window_name}#{?window_active, *,}' 2>/dev/null || echo 'no live tmux sessions'"
 
-# Peon-ping mute/unmute (all config dirs)
-alias peon-ping-mute="touch \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
-alias peon-ping-unmute="rm -f \$HOME/.openpeon/.paused $_CLAUDE_DIR/hooks/peon-ping/.paused $_CLAUDE_PERSONAL_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
