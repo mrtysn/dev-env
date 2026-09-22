@@ -43,6 +43,11 @@
             "type": "command",
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-absolute-rm.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-absolute-rm.sh\"; echo \"require-absolute-rm.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\"; echo \"ssh-request-guard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 10
           }
         ]
       },
@@ -75,6 +80,15 @@
             "type": "command",
             "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/focus-policy.sh\" ] && exec \"$d/hooks/focus-policy.sh\"; done",
             "timeout": 5
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${ARL_DIR:-}\" ] || exit 0; [ -x \"$ARL_DIR/bin/agent-request-limiter\" ] && exec \"$ARL_DIR/bin/agent-request-limiter\" doctor --hook; echo '{\"systemMessage\": \"agent-request-limiter: ARL_DIR is set in paths.local.sh but its CLI is missing — the limiter cannot be checked\"}'; exit 0",
+            "timeout": 10
           }
         ]
       }
