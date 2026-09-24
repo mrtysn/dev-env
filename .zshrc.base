@@ -150,6 +150,9 @@ source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
 # https://github.com/junegunn/fzf?tab=readme-ov-file#setting-up-shell-integration
 command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
 
+# clo (agents-shared) — wraps it so the terminal is left in the folder it launched Claude in
+command -v clo >/dev/null 2>&1 && eval "$(clo --init zsh)"
+
 # Homebrew command-not-found handler
 HOMEBREW_COMMAND_NOT_FOUND_HANDLER="$(brew --repository)/Library/Homebrew/command-not-found/handler.sh"
 [ -f "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER" ] && source "$HOMEBREW_COMMAND_NOT_FOUND_HANDLER"
