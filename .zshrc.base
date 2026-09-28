@@ -605,6 +605,10 @@ update-all() {
 
   print; print "Logs: $run_dir"
 
+  # Copy this run's upgrades into upgrades.tsv beside the logs, which the pruning
+  # below leaves alone, so upgrade history outlives the last 10 runs.
+  (( $+commands[find-unused-packages] )) && find-unused-packages --ingest "$run_dir"
+
   # Run dirs are timestamps, so name order is age order.
   local -a runs=("$log_root"/*(N/on))
   while (( ${#runs} > 10 )); do
