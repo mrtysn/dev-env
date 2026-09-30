@@ -443,6 +443,16 @@ for pair in "${CLAUDE_PAIRS[@]}"; do
     fi
 
     mkdir -p "$repo_sub"
+    # A hook the repo copy has and the live file lacks is a repo-side fix the live file
+    # never received (import.sh was not run); this export is about to overwrite it.
+    if [ -f "$dest" ] && command -v jq >/dev/null 2>&1; then
+        hook_cmds='[.hooks[]?[]?.hooks[]?.command // empty] | unique[]'
+        lost="$(comm -23 <(jq -r "$hook_cmds" "$dest" 2>/dev/null) <(jq -r "$hook_cmds" "$src" 2>/dev/null))"
+        if [[ -n "$lost" ]]; then
+            warn "$dest has hooks the live $src lacks — this export drops them (git has them; restore or fix the live file):"
+            print -r -- "$lost" | cut -c1-110 | sed 's/^/      /'
+        fi
+    fi
     if command -v jq >/dev/null 2>&1 && jq "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
         mv "$dest.tmp" "$dest"
         echo "  Exported $src → $dest"
