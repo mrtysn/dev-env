@@ -402,7 +402,7 @@ _update-all-stage() {
   case "$1" in
     brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
-    asdf) asdf plugin update --all ;;
+    asdf) asdf plugin update --all && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
   esac
@@ -482,24 +482,54 @@ _update-all-highlight-diff() {
 
 # Newest release on the pin's own line: the major for node and pnpm, major.minor
 # for the rest. asdf's pnpm list includes releases npm tags `next`, so pnpm reads
-# the stable latest-<major> tag instead. Pins are never changed here.
+# the stable latest-<major> tag instead. Prints nothing when the lookup fails.
+_update-all-asdf-latest() {
+  local tool="$1" ver="$2" line
+  case "$tool" in
+    nodejs|pnpm) line="${ver%%.*}" ;;
+    *)           line="${ver%.*}" ;;
+  esac
+  if [[ "$tool" == pnpm ]]; then
+    npm view pnpm "dist-tags.latest-$line" 2>/dev/null
+  else
+    asdf latest "$tool" "$line" 2>/dev/null
+  fi
+}
+
+# Moves each ~/.tool-versions pin to the newest release on its own line: install
+# first, re-pin only once the install succeeded, so a failed install leaves the old
+# pin and the old version working. A move to a new line (3.12 -> 3.13) is never made
+# here, and per-project pins are untouched. Old versions stay installed. dotnet is
+# skipped because its newest release on the line can jump SDK feature bands
+# (10.0.1xx -> 10.0.4xx) and break a global.json build; java is the system JDK.
+_update-all-bump-asdf-pins() {
+  local -a manual=(dotnet java)   # a function-local list: the stage's fresh zsh gets functions, not variables
+  local tv="$HOME/.tool-versions" tool ver latest rc=0
+  [[ -f "$tv" ]] || return 0
+  while read -r tool ver _; do
+    [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
+    (( ${manual[(Ie)$tool]} )) && continue
+    latest="$(_update-all-asdf-latest "$tool" "$ver")"
+    [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    echo "$tool $ver -> $latest"
+    asdf install "$tool" "$latest" && asdf set --home "$tool" "$latest" || {
+      echo "Error: could not move $tool from $ver to $latest; pin left at $ver"
+      rc=1
+    }
+  done < "$tv"
+  return $rc
+}
+
+# Report-only rows: what is still behind after the bump (dotnet, or a failed install).
 # Buffers every line before printing so tool names and version segments can be
 # column-aligned; the arrows only line up once every row's widths are known.
 _update-all-report-asdf-pins() {
-  local tv="$HOME/.tool-versions" tool ver line latest
+  local tv="$HOME/.tool-versions" tool ver latest
   [[ -f "$tv" ]] || return 0
   local -a tools vers latests
   while read -r tool ver _; do
     [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
-    case "$tool" in
-      nodejs|pnpm) line="${ver%%.*}" ;;
-      *)           line="${ver%.*}" ;;
-    esac
-    if [[ "$tool" == pnpm ]]; then
-      latest="$(npm view pnpm "dist-tags.latest-$line" 2>/dev/null)" || continue
-    else
-      latest="$(asdf latest "$tool" "$line" 2>/dev/null)" || continue
-    fi
+    latest="$(_update-all-asdf-latest "$tool" "$ver")"
     [[ -n "$latest" && "$latest" != "$ver" ]] || continue
     tools+=("$tool"); vers+=("$ver"); latests+=("$latest")
   done < "$tv"
@@ -521,9 +551,9 @@ _update-all-report-asdf-pins() {
   done
 }
 
-# update-all = "bu, all": brew + pnpm globals + asdf plugins + uv tools + Mac App Store.
-# Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
-# Plugin updates only refresh install scripts; pinned versions stay put.
+# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store.
+# The asdf stage moves each ~/.tool-versions pin to the newest release on its own line
+# (never across a major/minor line, never dotnet or java, per-project pins untouched).
 # Each stage runs independently so one failing manager does not skip the rest, and
 # under `script` so brew keeps its prompt and colors while the output is logged to
 # ~/Library/Logs/update-all/<timestamp>/ (last 10 runs kept). Ends with per-stage
@@ -541,13 +571,12 @@ update-all() {
   local -A stage_status stage_secs
   local stage start rc failed=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
-    _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks)"
+    _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
+    _update-all-bump-asdf-pins _update-all-asdf-latest)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
   local su_pid=$!
-  _update-all-report-asdf-pins > "$run_dir/report-asdf.txt" 2>/dev/null &
-  local asdf_pid=$!
 
   for stage in $stages; do
     if ! command -v $stage >/dev/null; then
@@ -561,7 +590,8 @@ update-all() {
     stage_secs[$stage]=$(( EPOCHSECONDS - start ))
     if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
   done
-  wait $su_pid $asdf_pid 2>/dev/null
+  wait $su_pid 2>/dev/null
+  _update-all-report-asdf-pins > "$run_dir/report-asdf.txt" 2>/dev/null   # after the asdf stage bumped the pins
 
   print; print -P "%B==> Summary%b"
   local s
