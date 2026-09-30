@@ -79,6 +79,16 @@
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 3
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -99,6 +109,21 @@
             "type": "command",
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\"; echo \"ssh-request-guard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-bash.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-bash.sh\"; echo \"system-one-bash.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 0",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-ask.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-ask.sh\"; echo \"system-one-ask.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 3
           }
         ]
       },
@@ -150,6 +175,16 @@
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": false
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -164,6 +199,11 @@
           {
             "type": "command",
             "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/focus-policy.sh\" ] && exec \"$d/hooks/focus-policy.sh\"; done",
+            "timeout": 5
+          },
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-start.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-start.sh\"; echo \"system-one-start.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 0",
             "timeout": 5
           }
         ]
@@ -192,6 +232,15 @@
           {
             "type": "command",
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-stop.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-stop.sh\"; echo \"system-one-stop.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 5
           }
         ]
       },
@@ -249,6 +298,15 @@
         "hooks": [
           {
             "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-prompt.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-prompt.sh\"; echo \"system-one-prompt.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 3
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
             "async": true
@@ -265,6 +323,16 @@
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 3
           }
         ]
       }
@@ -291,7 +359,8 @@
     "swift-lsp@claude-plugins-official": true,
     "gamedev@skills-dir": false,
     "art@skills-dir": false,
-    "video@skills-dir": false
+    "video@skills-dir": false,
+    "clangd-lsp@claude-plugins-official": true
   },
   "effortLevel": "medium",
   "modelSettings": {
@@ -299,7 +368,7 @@
       "effortLevel": "medium"
     },
     "claude-fable-5-1": {
-      "effortLevel": "high"
+      "effortLevel": "medium"
     }
   },
   "tui": "fullscreen",

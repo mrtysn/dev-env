@@ -66,6 +66,9 @@ ZSH_THEME=""  # using homebrew p10k, not OMZ theme
 export PNPM_HOME="$HOME/Library/pnpm"              # pnpm
 export ANDROID_HOME="$HOME/Library/Android/sdk"   # android
 export OLLAMA_ORIGINS="*"
+export OLLAMA_MAX_LOADED_MODELS=1      # 32 GB: one model resident at a time
+export OLLAMA_KEEP_ALIVE=1h            # stay loaded between prompts
+export OLLAMA_CONTEXT_LENGTH=32768     # 256K advertised; KV cache for more does not fit
 
 # Perl local::lib
 export PERL5LIB="$HOME/perl5/lib/perl5${PERL5LIB:+:$PERL5LIB}"
@@ -79,6 +82,10 @@ typeset -U PATH path
 
 # Go environment (sets GOBIN, etc.)
 [[ -f "$HOME/.asdf/plugins/golang/set-env.zsh" ]] && source "$HOME/.asdf/plugins/golang/set-env.zsh"
+
+# JAVA_HOME follows the JDK a project pins in .tool-versions. It only speaks up
+# where asdf resolves a java, so a machine JAVA_HOME set below stays the default.
+[[ -f "$HOME/.asdf/plugins/java/set-java-home.zsh" ]] && source "$HOME/.asdf/plugins/java/set-java-home.zsh"
 
 # Dotnet root for tooling (avoid "." / empty)
 DOTNET_ROOT=""
@@ -127,6 +134,18 @@ fi
 export HISTSIZE=99999
 export SAVEHIST=$HISTSIZE
 
+# ─── agents-shared ──────────────────────────────────────────────────────────────
+# $AGENTS_SHARED and $DEV_ROOT, written by agents-shared/scripts/init-global.sh from
+# the checkout's own location. Skills invoke scripts through these instead of a baked
+# path. The file is absent until that script has run on this machine.
+[[ -r "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh" ]] && source "${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/env.zsh"
+
+# ─── atlas ──────────────────────────────────────────────────────────────────────
+# The per-repo patterns saying which files are documents, for atlas's document
+# manager. Setting it also says this machine files documents at all: /new-repo
+# offers to add a section for a new repo only when it is set.
+[[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/atlas/atlasinclude" ]] && export ATLAS_INCLUDE="${XDG_CONFIG_HOME:-$HOME/.config}/atlas/atlasinclude"
+
 # ─── Tool Initialization ────────────────────────────────────────────────────────
 # Powerlevel10k theme
 source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
@@ -136,6 +155,9 @@ source /opt/homebrew/share/powerlevel10k/powerlevel10k.zsh-theme
 
 # https://github.com/junegunn/fzf?tab=readme-ov-file#setting-up-shell-integration
 command -v fzf >/dev/null 2>&1 && source <(fzf --zsh)
+
+# clo (agents-shared) — wraps it so the terminal is left in the folder it launched Claude in
+command -v clo >/dev/null 2>&1 && eval "$(clo --init zsh)"
 
 # Homebrew command-not-found handler
 HOMEBREW_COMMAND_NOT_FOUND_HANDLER="$(brew --repository)/Library/Homebrew/command-not-found/handler.sh"
@@ -310,14 +332,327 @@ _pnpm-migrate-globals() {
   rm -rf "$old_root"
 }
 
-# update-all = "bu, all": brew + pnpm globals + Mac App Store.
-# Deliberately excludes asdf runtime bumps — those can break projects, so keep them manual.
-update-all() {
-  echo "==> brew"    && brew update && brew upgrade || return 1
-  if command -v pnpm >/dev/null; then
-    echo "==> pnpm -g" && _pnpm-migrate-globals && pnpm update -g
+_pnpm-global-manifests() {
+  local root; root="$(pnpm root -g 2>/dev/null)" || return 0
+  root="${root%/node_modules}"
+  print -l -- "$root"/package.json(N) "$root"/*/package.json(N)
+}
+
+# True when a global bin wrapper points at a file that no longer exists, or
+# when globals are installed but no wrappers are. Each wrapper records its
+# target on a `# cmd-shim-target=` line.
+_pnpm-shims-broken() {
+  local -a manifests wrappers
+  manifests=(${(f)"$(_pnpm-global-manifests)"})
+  (( ${#manifests} )) || return 1
+  local bindir; bindir="$(pnpm bin -g 2>/dev/null)" || return 0
+  wrappers=("$bindir"/*(N.))
+  (( ${#wrappers} )) || return 0
+  local w target
+  for w in $wrappers; do
+    target="$(sed -n 's/^# cmd-shim-target=//p' "$w")"
+    [[ -n "$target" && -e "$target" ]] || return 0
+  done
+  return 1
+}
+
+# A peer-dep bump renames the .pnpm directory and the $PNPM_HOME wrappers stop
+# resolving. `pnpm install -g` short-circuits on an up-to-date lockfile without
+# re-linking; `pnpm add -g` re-links, so re-add each global at its recorded spec.
+_pnpm-fix-shims() {
+  _pnpm-shims-broken || return 0
+  local -a manifests pkgs
+  manifests=(${(f)"$(_pnpm-global-manifests)"})
+  pkgs=(${(f)"$(node -p '[...new Set(process.argv.slice(1).flatMap(p => Object.entries(require(p).dependencies || {}).map(([n, v]) => n + "@" + v)))].join("\n")' $manifests 2>/dev/null)"})
+  echo "==> pnpm: re-linking global bin wrappers"
+  (( ${#pkgs} )) && pnpm add -g $pkgs
+}
+
+# pnpm ≥11 installs each global update into a fresh directory and deletes the
+# old one, so a running happy daemon is left executing deleted files and can no
+# longer spawn sessions. Restart it only when it has no sessions; with sessions
+# active, leave it running and flag it for later.
+_happy-daemon-refresh() {
+  command -v happy >/dev/null || return 0
+  local pid entry
+  pid="$(pgrep -f 'happy/dist/index.mjs daemon start-sync' | head -1)"
+  [[ -n "$pid" ]] || return 0
+  entry="$(ps -o command= -p "$pid" | grep -o '/[^ ]*/happy/dist/index.mjs')"
+  [[ -e "$entry" ]] && return 0
+  if happy daemon list 2>/dev/null | grep -q 'No active sessions'; then
+    echo "==> happy: restarting daemon, its install was replaced"
+    happy daemon stop && happy daemon start
+  else
+    echo "Action needed: happy daemon runs from a replaced install and has active sessions;" \
+      "once they finish: happy daemon stop && happy daemon start"
   fi
-  command -v mas >/dev/null && { echo "==> mas" && mas upgrade; }
+}
+
+# Casks leave com.apple.quarantine on every app they install, so each upgrade
+# brings back the "downloaded from the internet" prompt on first launch. Clear
+# it only where Gatekeeper already accepts the app as notarized; anything else
+# keeps the flag and stays blocked.
+_unquarantine-notarized-casks() {
+  local app
+  for app in /Applications/*.app(N/) "$HOME"/Applications/*.app(N/); do
+    xattr -p com.apple.quarantine "$app" 2>/dev/null | grep -q 'Homebrew' || continue
+    spctl -a -t exec -vv "$app" 2>&1 | grep -q '^source=Notarized Developer ID' || continue
+    xattr -dr com.apple.quarantine "$app" && echo "unquarantined ${app:t}"
+  done
+}
+
+# One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
+# against the cwd's version pins, so a project's packageManager must not pick them.
+_update-all-stage() {
+  cd "$HOME" || return 1
+  case "$1" in
+    brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
+    pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
+    asdf) asdf plugin update --all && _update-all-bump-asdf-pins ;;
+    uv)   uv tool upgrade --all ;;
+    mas)  mas upgrade ;;
+  esac
+}
+
+_update-all-report-brew-bin() {
+  local f
+  for f in "$(brew --prefix)"/bin/*(N.*); do
+    [[ "${f:t}" == brew ]] && continue
+    echo "$f is a regular file, not a Homebrew link"
+  done
+}
+
+_update-all-report-missing-casks() {
+  local token app
+  brew info --json=v2 --installed --cask 2>/dev/null \
+    | jq -r '.casks[] | .token as $t | .artifacts[] | select(.app) | .app
+             | "\($t)\t\(if (.[1]|type)=="object" then .[1].target else (.[0]|split("/")|last) end)"' \
+    | while IFS=$'\t' read -r token app; do
+        if [[ "$app" == /* ]]; then
+          [[ -e "$app" ]] && continue
+        else
+          [[ -e "/Applications/$app" || -e "$HOME/Applications/$app" ]] && continue
+        fi
+        echo "$token: $app is not installed"
+      done
+}
+
+# Right-aligns each dot-separated segment of _uapv_in into its own column across
+# every row (e.g. "3.12.5" / "12.4.2" -> " 3.12.5" / "12. 4.2"), into _uapv_out.
+# Both arrays are dynamically-scoped locals the caller declares before calling.
+_update-all-align-versions() {
+  local -a widths=()
+  local -a parts
+  local n=${#_uapv_in} idx c
+  for idx in {1..$n}; do
+    parts=("${(@s:.:)_uapv_in[idx]}")
+    for c in {1..${#parts}}; do
+      (( ${#parts[c]} > ${widths[c]:-0} )) && widths[c]=${#parts[c]}
+    done
+  done
+  _uapv_out=()
+  local seg aligned
+  for idx in {1..$n}; do
+    parts=("${(@s:.:)_uapv_in[idx]}")
+    aligned=""
+    for c in {1..${#parts}}; do
+      seg=$(printf '%*s' ${widths[c]} "${parts[c]}")
+      (( c == 1 )) && aligned="$seg" || aligned="${aligned}.${seg}"
+    done
+    _uapv_out+=("$aligned")
+  done
+}
+
+# Colors the segments from the first mismatching dot-separated part onward, in
+# both numbers, so "1.2.3 -> 1.9.0" reads with only ".9.0"/".2.3" in yellow.
+# $1/$2 are the plain (unpadded) pair, used only to find the first difference;
+# $3/$4 are the column-aligned pair actually shown, so alignment survives. Sets
+# REPLY_A/REPLY_B rather than echoing, since a printf width spec can't see
+# through the ANSI codes to know the visible width.
+_update-all-highlight-diff() {
+  local -a a_parts b_parts aa_parts bb_parts
+  a_parts=("${(@s:.:)1}")
+  b_parts=("${(@s:.:)2}")
+  aa_parts=("${(@s:.:)3}")
+  bb_parts=("${(@s:.:)4}")
+  local i=1 max=$(( ${#a_parts} > ${#b_parts} ? ${#a_parts} : ${#b_parts} ))
+  while (( i <= max )) && [[ "${a_parts[i]:-}" == "${b_parts[i]:-}" ]]; do (( i++ )); done
+  local yellow=$'\e[33m' reset=$'\e[0m'
+  local a_same="${(j:.:)aa_parts[1,i-1]}" a_diff="${(j:.:)aa_parts[i,-1]}"
+  local b_same="${(j:.:)bb_parts[1,i-1]}" b_diff="${(j:.:)bb_parts[i,-1]}"
+  [[ -n "$a_same" ]] && a_same+="."
+  [[ -n "$b_same" ]] && b_same+="."
+  REPLY_A="${a_same}${yellow}${a_diff}${reset}"
+  REPLY_B="${b_same}${yellow}${b_diff}${reset}"
+}
+
+# Newest release on the pin's own line: the major for node and pnpm, major.minor
+# for the rest. asdf's pnpm list includes releases npm tags `next`, so pnpm reads
+# the stable latest-<major> tag instead. Prints nothing when the lookup fails.
+_update-all-asdf-latest() {
+  local tool="$1" ver="$2" line
+  case "$tool" in
+    nodejs|pnpm) line="${ver%%.*}" ;;
+    *)           line="${ver%.*}" ;;
+  esac
+  if [[ "$tool" == pnpm ]]; then
+    npm view pnpm "dist-tags.latest-$line" 2>/dev/null
+  else
+    asdf latest "$tool" "$line" 2>/dev/null
+  fi
+}
+
+# Moves each ~/.tool-versions pin to the newest release on its own line: install
+# first, re-pin only once the install succeeded, so a failed install leaves the old
+# pin and the old version working. A move to a new line (3.12 -> 3.13) is never made
+# here, and per-project pins are untouched. Old versions stay installed. dotnet is
+# skipped because its newest release on the line can jump SDK feature bands
+# (10.0.1xx -> 10.0.4xx) and break a global.json build; java is the system JDK.
+_update-all-bump-asdf-pins() {
+  local -a manual=(dotnet java)   # a function-local list: the stage's fresh zsh gets functions, not variables
+  local tv="$HOME/.tool-versions" tool ver latest rc=0
+  [[ -f "$tv" ]] || return 0
+  while read -r tool ver _; do
+    [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
+    (( ${manual[(Ie)$tool]} )) && continue
+    latest="$(_update-all-asdf-latest "$tool" "$ver")"
+    [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    echo "$tool $ver -> $latest"
+    asdf install "$tool" "$latest" && asdf set --home "$tool" "$latest" || {
+      echo "Error: could not move $tool from $ver to $latest; pin left at $ver"
+      rc=1
+    }
+  done < "$tv"
+  return $rc
+}
+
+# Report-only rows: what is still behind after the bump (dotnet, or a failed install).
+# Buffers every line before printing so tool names and version segments can be
+# column-aligned; the arrows only line up once every row's widths are known.
+_update-all-report-asdf-pins() {
+  local tv="$HOME/.tool-versions" tool ver latest
+  [[ -f "$tv" ]] || return 0
+  local -a tools vers latests
+  while read -r tool ver _; do
+    [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
+    latest="$(_update-all-asdf-latest "$tool" "$ver")"
+    [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    tools+=("$tool"); vers+=("$ver"); latests+=("$latest")
+  done < "$tv"
+  (( ${#tools} )) || return 0
+
+  local -a _uapv_in _uapv_out vers_aligned latests_aligned
+  _uapv_in=("${vers[@]}"); _update-all-align-versions; vers_aligned=("${_uapv_out[@]}")
+  _uapv_in=("${latests[@]}"); _update-all-align-versions; latests_aligned=("${_uapv_out[@]}")
+
+  local tool_w=0 ver_w=0 t v
+  for t in "${tools[@]}"; do (( ${#t} > tool_w )) && tool_w=${#t}; done
+  for v in "${vers_aligned[@]}"; do (( ${#v} > ver_w )) && ver_w=${#v}; done
+
+  local idx pad REPLY_A REPLY_B
+  for idx in {1..${#tools}}; do
+    _update-all-highlight-diff "${vers[idx]}" "${latests[idx]}" "${vers_aligned[idx]}" "${latests_aligned[idx]}"
+    pad=$(( ver_w - ${#vers_aligned[idx]} ))
+    printf '%-*s %s%*s → %s\n' $tool_w "${tools[idx]}" "$REPLY_A" $pad "" "$REPLY_B"
+  done
+}
+
+# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store.
+# The asdf stage moves each ~/.tool-versions pin to the newest release on its own line
+# (never across a major/minor line, never dotnet or java, per-project pins untouched).
+# Each stage runs independently so one failing manager does not skip the rest, and
+# under `script` so brew keeps its prompt and colors while the output is logged to
+# ~/Library/Logs/update-all/<timestamp>/ (last 10 runs kept). Ends with per-stage
+# status, every error line, and read-only reports on drift no stage fixes.
+update-all() {
+  emulate -L zsh
+  setopt no_monitor 2>/dev/null   # no job notices for the background lookups
+  zmodload zsh/datetime
+
+  local log_root="$HOME/Library/Logs/update-all"
+  local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
+  mkdir -p "$run_dir" || return 1
+
+  local -a stages=(brew pnpm asdf uv mas)
+  local -A stage_status stage_secs
+  local stage start rc failed=0
+  local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
+    _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
+    _update-all-bump-asdf-pins _update-all-asdf-latest)"
+
+  # Slow network lookups no stage depends on run alongside the updates.
+  softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
+  local su_pid=$!
+
+  for stage in $stages; do
+    if ! command -v $stage >/dev/null; then
+      stage_status[$stage]=skipped; stage_secs[$stage]=0
+      continue
+    fi
+    print -P "%B==> $stage%b"
+    start=$EPOCHSECONDS
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; _update-all-stage $stage"
+    rc=$?
+    stage_secs[$stage]=$(( EPOCHSECONDS - start ))
+    if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
+  done
+  wait $su_pid 2>/dev/null
+  _update-all-report-asdf-pins > "$run_dir/report-asdf.txt" 2>/dev/null   # after the asdf stage bumped the pins
+
+  print; print -P "%B==> Summary%b"
+  local s
+  for stage in $stages; do
+    s=${stage_secs[$stage]}
+    printf '  %-6s %-12s %s\n' $stage "${stage_status[$stage]}" \
+      "$( (( s >= 60 )) && echo "$(( s / 60 ))m$(( s % 60 ))s" || echo "${s}s" )"
+  done
+
+  # Error lines, from pty logs with color codes and carriage returns stripped
+  local e errors=""
+  for stage in $stages; do
+    [[ -f "$run_dir/$stage.log" ]] || continue
+    e="$(sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$run_dir/$stage.log" \
+      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM|Action needed)')"
+    [[ -n "$e" ]] && errors+="  [$stage]"$'\n'"$(print -r -- "$e" | sed 's/^/    /')"$'\n'
+  done
+  [[ -n "$errors" ]] && { print; print -P "%B==> Needs attention%b"; print -rn -- "$errors" }
+
+  local -a titles=(
+    "Regular files in the brew bin dir"
+    "Casks with a missing app"
+    "asdf pins behind their line"
+    "Unneeded brew formulae"
+    "Pending macOS updates"
+  )
+  local -a bodies=(
+    "$(_update-all-report-brew-bin)"
+    "$(_update-all-report-missing-casks)"
+    "$(<"$run_dir/report-asdf.txt")"
+    "$(brew autoremove -n 2>/dev/null | grep -v '^==>')"
+    "$(<"$run_dir/report-softwareupdate.txt")"
+  )
+  local i shown=0
+  for i in {1..${#titles}}; do
+    [[ -n "${bodies[$i]}" ]] || continue
+    (( shown++ )) || { print; print -P "%B==> Reports%b" }
+    print "  ${titles[$i]}:"
+    print -r -- "${bodies[$i]}" | sed 's/^/    /'
+  done
+
+  print; print "Logs: $run_dir"
+
+  # Copy this run's upgrades into upgrades.tsv beside the logs, which the pruning
+  # below leaves alone, so upgrade history outlives the last 10 runs.
+  (( $+commands[find-unused-packages] )) && find-unused-packages --ingest "$run_dir"
+
+  # Run dirs are timestamps, so name order is age order.
+  local -a runs=("$log_root"/*(N/on))
+  while (( ${#runs} > 10 )); do
+    rm -rf -- "${runs[1]}"
+    shift runs
+  done
+
+  return $failed
 }
 
 # ─── Aliases: Navigation ────────────────────────────────────────────────────────

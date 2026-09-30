@@ -1,6 +1,6 @@
 nodejs 24.21.0
-python 3.12.5
-pnpm 10.27.0
-golang 1.23.0
+python 3.12.14
+pnpm 12.8.1
+golang 1.23.12
 dotnet 10.0.102
 java system

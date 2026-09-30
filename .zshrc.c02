@@ -54,3 +54,6 @@ codex() {
   CLAUDE_PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$PWD}" command codex "$@"
 }
 
+# Peon-ping mute/unmute (c01 also touches ~/.openpeon; not installed here)
+alias peon-ping-mute="touch $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
+alias peon-ping-unmute="rm -f $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
