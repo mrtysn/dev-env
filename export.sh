@@ -479,6 +479,16 @@ for g in work personal; do
     fi
 done
 
+# Absolute home paths in exported files break the repo on any other machine (and leak
+# the layout). The live files are the source, so say which one to fix.
+echo "✓ Checking exports for hardcoded home paths"
+for f in ".zshrc.$ZSH_LABEL" "$AGENTS_DIR/claude/settings.json" "$AGENTS_DIR/claude-personal/settings.json"; do
+    [[ -f "$f" ]] || continue
+    if grep -qF "$HOME/" "$f"; then
+        warn "$f contains $HOME/ — fix the live source (use \$HOME) before committing"
+    fi
+done
+
 # Log export to EXPORTS.md
 echo "✓ Logging export"
 if [ ! -f EXPORTS.md ]; then
@@ -490,7 +500,9 @@ if [ ! -f EXPORTS.md ]; then
 EOF
 fi
 
-echo "| $DATE | $HOSTNAME | $USERNAME |" >> EXPORTS.md
+# The label, not the raw hostname: every other per-machine file is keyed by it, and
+# `hostname -s` can be a DHCP name or leak the machine's real name into a public repo.
+echo "| $DATE | ${MACHINE_LABEL:-$HOSTNAME} | $USERNAME |" >> EXPORTS.md
 note "EXPORTS.md (appended)"
 
 echo ""
