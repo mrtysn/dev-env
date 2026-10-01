@@ -395,6 +395,19 @@ _unquarantine-notarized-casks() {
   done
 }
 
+# Plugin repos move rarely; pulling all six on every run cost half of a no-op
+# run. Refresh at most once a day (UPDATE_ALL_FORCE=1 overrides).
+_update-all-asdf-plugins() {
+  setopt local_options extended_glob
+  local stamp="${XDG_CACHE_HOME:-$HOME/.cache}/update-all/asdf-plugins.stamp"
+  if [[ -z "${UPDATE_ALL_FORCE:-}" ]] && [[ -n $stamp(#qN.mh-24) ]]; then
+    echo "asdf plugins refreshed within 24h, skipping"
+    return 0
+  fi
+  asdf plugin update --all || return 1
+  mkdir -p "${stamp:h}" && touch "$stamp"
+}
+
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
 _update-all-stage() {
@@ -402,7 +415,7 @@ _update-all-stage() {
   case "$1" in
     brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
-    asdf) asdf plugin update --all && _update-all-bump-asdf-pins ;;
+    asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
   esac
@@ -572,7 +585,7 @@ update-all() {
   local stage start rc failed=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
-    _update-all-bump-asdf-pins _update-all-asdf-latest)"
+    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
