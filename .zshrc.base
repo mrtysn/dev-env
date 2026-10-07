@@ -418,6 +418,10 @@ _update-all-stage() {
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
+    omz-plugins)
+      upgrade_oh_my_zsh_custom || return 1
+      # the autoupdate plugin's own "time to update" reminder keys off this stamp
+      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
 }
 
@@ -564,7 +568,8 @@ _update-all-report-asdf-pins() {
   done
 }
 
-# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store.
+# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store
+# + oh-my-zsh custom plugins (replaces the autoupdate plugin's reminder).
 # The asdf stage moves each ~/.tool-versions pin to the newest release on its own line
 # (never across a major/minor line, never dotnet or java, per-project pins untouched).
 # Each stage runs independently so one failing manager does not skip the rest, and
@@ -580,25 +585,26 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas)
+  local -a stages=(brew pnpm asdf uv mas omz-plugins)
   local -A stage_status stage_secs
   local stage start rc failed=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
-    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins)"
+    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
+    _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
   local su_pid=$!
 
   for stage in $stages; do
-    if ! command -v $stage >/dev/null; then
+    if ! { command -v $stage >/dev/null || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
