@@ -600,6 +600,13 @@ update-all() {
     start=$EPOCHSECONDS
     script -q "$run_dir/$stage.log" zsh -c "$stage_env; _update-all-stage $stage"
     rc=$?
+    # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
+    # (130) and would otherwise start the next one. Treat it as abort-the-run.
+    if (( rc == 130 )); then
+      kill $su_pid 2>/dev/null
+      print -P "\n%B==> Interrupted during $stage%b  (logs: $run_dir)"
+      return 130
+    fi
     stage_secs[$stage]=$(( EPOCHSECONDS - start ))
     if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
   done
