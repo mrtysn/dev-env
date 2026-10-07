@@ -419,6 +419,13 @@ _update-all-stage() {
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
     omz-plugins)
+      # Same interval the autoupdate plugin uses: ':omz:update' frequency (days), passed in
+      local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" LAST_EPOCH=0
+      [[ -f $stamp ]] && . "$stamp"
+      if [[ -z "${UPDATE_ALL_FORCE:-}" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} <= ${OMZ_UPDATE_DAYS:-13} )); then
+        echo "oh-my-zsh custom plugins checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
+        return 0
+      fi
       upgrade_oh_my_zsh_custom || return 1
       # the autoupdate plugin's own "time to update" reminder keys off this stamp
       echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
@@ -587,7 +594,8 @@ update-all() {
 
   local -a stages=(brew pnpm asdf uv mas omz-plugins)
   local -A stage_status stage_secs
-  local stage start rc failed=0
+  local stage start rc failed=0 omz_days
+  zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
@@ -604,7 +612,7 @@ update-all() {
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR}; trap 'exit 130' INT; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
