@@ -365,10 +365,16 @@
   },
   "effortLevel": "medium",
   "modelSettings": {
-    "claude-opus-5": {
+    "claude-fable-5-1": {
       "effortLevel": "medium"
     },
-    "claude-fable-5-1": {
+    "claude-opus-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "medium"
+    },
+    "claude-haiku-5-5": {
       "effortLevel": "medium"
     }
   },
