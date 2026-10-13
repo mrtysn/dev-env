@@ -428,10 +428,12 @@ _update-all-stage() {
         echo "oh-my-zsh core checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
         return 0
       fi
-      local cooldown=${OMZ_UPDATE_COOLDOWN:-0}
+      local cooldown=${OMZ_UPDATE_COOLDOWN:-0} head_before=$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)
       [[ $cooldown == <-> ]] || cooldown=0
       ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v ${OMZ_UPDATE_VERBOSE:-default} -c $cooldown || return 1
-      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "$stamp"
+      # Past the interval every run checks again; the stamp moves only when an update landed.
+      [[ "$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)" == "$head_before" ]] \
+        || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "$stamp"
       command rm -rf "$ZSH/log/update.lock" ;;
     omz-plugins)
       # Same interval the autoupdate plugin uses: ':omz:update' frequency (days), passed in
