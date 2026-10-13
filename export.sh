@@ -447,7 +447,9 @@ for pair in "${CLAUDE_PAIRS[@]}"; do
     # never received (import.sh was not run); this export is about to overwrite it.
     if [ -f "$dest" ] && command -v jq >/dev/null 2>&1; then
         hook_cmds='[.hooks[]?[]?.hooks[]?.command // empty] | unique[]'
-        lost="$(comm -23 <(jq -r "$hook_cmds" "$dest" 2>/dev/null) <(jq -r "$hook_cmds" "$src" 2>/dev/null))"
+        # jq's unique sorts by code point, so comm must compare in the C locale; under another
+        # locale it reports "not in sorted order", exits 1 and aborts the export mid-way.
+        lost="$(LC_ALL=C comm -23 <(jq -r "$hook_cmds" "$dest" 2>/dev/null) <(jq -r "$hook_cmds" "$src" 2>/dev/null))"
         if [[ -n "$lost" ]]; then
             warn "$dest has hooks the live $src lacks — this export drops them (git has them; restore or fix the live file):"
             print -r -- "$lost" | cut -c1-110 | sed 's/^/      /'
