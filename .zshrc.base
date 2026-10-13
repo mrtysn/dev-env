@@ -418,6 +418,22 @@ _update-all-stage() {
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
+    omz)
+      # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
+      # Skipped within ':omz:update' frequency days (passed in as OMZ_UPDATE_DAYS).
+      local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-update" LAST_EPOCH=0 EXIT_STATUS=
+      [[ -f $stamp ]] && . "$stamp"
+      if [[ -z "${UPDATE_ALL_FORCE:-}" && -z "$EXIT_STATUS" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} <= ${OMZ_UPDATE_DAYS:-13} )); then
+        echo "oh-my-zsh core checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
+        return 0
+      fi
+      local verbose cooldown
+      zstyle -s ':omz:update' verbose verbose || verbose=default
+      zstyle -s ':omz:update' cooldown cooldown || cooldown=0
+      [[ $cooldown == <-> ]] || cooldown=0
+      ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v $verbose -c $cooldown || return 1
+      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "$stamp"
+      command rm -rf "$ZSH/log/update.lock" ;;
     omz-plugins)
       # Same interval the autoupdate plugin uses: ':omz:update' frequency (days), passed in
       local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" LAST_EPOCH=0
@@ -592,7 +608,7 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas omz-plugins)
+  local -a stages=(brew pnpm asdf uv mas omz omz-plugins)
   local -A stage_status stage_secs
   local stage start rc failed=0 omz_days
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
@@ -606,13 +622,13 @@ update-all() {
   local su_pid=$!
 
   for stage in $stages; do
-    if ! { command -v $stage >/dev/null || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
+    if ! { command -v $stage >/dev/null || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
