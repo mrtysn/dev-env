@@ -9,6 +9,7 @@
     "pr": ""
   },
   "includeCoAuthoredBy": false,
+  "cleanupPeriodDays": 36500,
   "permissions": {
     "allow": [
       "Bash(cat:*)",
@@ -30,7 +31,7 @@
     ],
     "defaultMode": "auto"
   },
-  "model": "opus",
+  "model": "sonnet",
   "hooks": {
     "Notification": [
       {
@@ -48,6 +49,14 @@
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
             "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
           }
         ]
       }
@@ -70,6 +79,14 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -90,6 +107,49 @@
             "timeout": 3
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 3
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
+            "timeout": 5,
+            "async": true
+          }
+        ]
       }
     ],
     "PreToolUse": [
@@ -99,6 +159,11 @@
           {
             "type": "command",
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\"; echo \"block-tree-discard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/limit-signed-releases.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/limit-signed-releases.py\"; echo \"limit-signed-releases.py unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10
           },
           {
@@ -119,6 +184,16 @@
         ]
       },
       {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-subagent-sizing.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-subagent-sizing.sh\"; echo \"require-subagent-sizing.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 10
+          }
+        ]
+      },
+      {
         "matcher": "AskUserQuestion",
         "hooks": [
           {
@@ -134,6 +209,16 @@
           {
             "type": "command",
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/nudge-transcript-parsers.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/nudge-transcript-parsers.sh\"; exit 0",
             "timeout": 5
           }
         ]
@@ -166,6 +251,14 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
       }
     ],
     "SessionEnd": [
@@ -184,6 +277,14 @@
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
             "async": false
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
           }
         ]
       }
@@ -225,6 +326,14 @@
             "timeout": 10
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -254,6 +363,23 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/log-buried-go-ahead.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/log-buried-go-ahead.sh\"; exit 0",
+            "timeout": 5
+          }
+        ]
       }
     ],
     "StopFailure": [
@@ -274,6 +400,14 @@
             "async": true
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
+          }
+        ]
       }
     ],
     "SubagentStop": [
@@ -282,6 +416,14 @@
           {
             "type": "command",
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.config/iterm2/cc-status"
           }
         ]
       }
@@ -313,39 +455,12 @@
             "async": true
           }
         ]
-      }
-    ],
-    "PostToolUseFailure": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
-            "timeout": 5,
-            "async": true
-          }
-        ]
       },
       {
-        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
-            "timeout": 3
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
-            "timeout": 5,
-            "async": true
+            "command": "$HOME/.config/iterm2/cc-status"
           }
         ]
       }
@@ -357,12 +472,13 @@
     "refreshInterval": 60
   },
   "enabledPlugins": {
-    "swift-lsp@claude-plugins-official": true,
-    "gamedev@skills-dir": false,
     "art@skills-dir": false,
-    "video@skills-dir": false,
-    "clangd-lsp@claude-plugins-official": true
+    "clangd-lsp@claude-plugins-official": true,
+    "gamedev@skills-dir": false,
+    "swift-lsp@claude-plugins-official": true,
+    "video@skills-dir": false
   },
+  "language": "english",
   "effortLevel": "medium",
   "modelSettings": {
     "claude-fable-5-1": {
