@@ -671,7 +671,7 @@ update-all() {
   local s
   for stage in $stages; do
     s=${stage_secs[$stage]}
-    printf '  %-6s %-12s %s\n' $stage "${stage_status[$stage]}" \
+    printf '  %-12s %-12s %s\n' $stage "${stage_status[$stage]}" \
       "$( (( s >= 60 )) && echo "$(( s / 60 ))m$(( s % 60 ))s" || echo "${s}s" )"
   done
 
