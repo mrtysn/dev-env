@@ -430,6 +430,8 @@ CLAUDE_PAIRS=(
     "${CLAUDE_PERSONAL_DIR}:$AGENTS_DIR/claude-personal"
 )
 # Churny state fields stripped on export — they regenerate locally and only add diff noise.
+# The copy is written with sorted keys (jq -S): Claude Code reorders the live file on its own,
+# so an unsorted copy shows a whole-file diff on every export.
 CLAUDE_STRIP_FILTER='del(.feedbackSurveyState)'
 
 for pair in "${CLAUDE_PAIRS[@]}"; do
@@ -455,7 +457,7 @@ for pair in "${CLAUDE_PAIRS[@]}"; do
             print -r -- "$lost" | cut -c1-110 | sed 's/^/      /'
         fi
     fi
-    if command -v jq >/dev/null 2>&1 && jq "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
+    if command -v jq >/dev/null 2>&1 && jq -S "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
         mv "$dest.tmp" "$dest"
         echo "  Exported $src → $dest"
     else
