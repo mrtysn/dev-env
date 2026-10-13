@@ -401,6 +401,19 @@ _unquarantine-notarized-casks() {
   done
 }
 
+# Plugin repos move rarely; pulling all six on every run cost half of a no-op
+# run. Refresh at most once a day (UPDATE_ALL_FORCE=1 overrides).
+_update-all-asdf-plugins() {
+  setopt local_options extended_glob
+  local stamp="${XDG_CACHE_HOME:-$HOME/.cache}/update-all/asdf-plugins.stamp"
+  if [[ -z "${UPDATE_ALL_FORCE:-}" ]] && [[ -n $stamp(#qN.mh-24) ]]; then
+    echo "asdf plugins refreshed within 24h, skipping"
+    return 0
+  fi
+  asdf plugin update --all || return 1
+  mkdir -p "${stamp:h}" && touch "$stamp"
+}
+
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
 _update-all-stage() {
@@ -408,9 +421,20 @@ _update-all-stage() {
   case "$1" in
     brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
-    asdf) asdf plugin update --all && _update-all-bump-asdf-pins ;;
+    asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
+    omz-plugins)
+      # Same interval the autoupdate plugin uses: ':omz:update' frequency (days), passed in
+      local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" LAST_EPOCH=0
+      [[ -f $stamp ]] && . "$stamp"
+      if [[ -z "${UPDATE_ALL_FORCE:-}" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} <= ${OMZ_UPDATE_DAYS:-13} )); then
+        echo "oh-my-zsh custom plugins checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
+        return 0
+      fi
+      upgrade_oh_my_zsh_custom || return 1
+      # the autoupdate plugin's own "time to update" reminder keys off this stamp
+      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
 }
 
@@ -557,7 +581,8 @@ _update-all-report-asdf-pins() {
   done
 }
 
-# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store.
+# update-all = "bu, all": brew + pnpm globals + asdf plugins and home pins + uv tools + Mac App Store
+# + oh-my-zsh custom plugins (replaces the autoupdate plugin's reminder).
 # The asdf stage moves each ~/.tool-versions pin to the newest release on its own line
 # (never across a major/minor line, never dotnet or java, per-project pins untouched).
 # Each stage runs independently so one failing manager does not skip the rest, and
@@ -573,26 +598,35 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas)
+  local -a stages=(brew pnpm asdf uv mas omz-plugins)
   local -A stage_status stage_secs
-  local stage start rc failed=0
+  local stage start rc failed=0 omz_days
+  zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
-    _update-all-bump-asdf-pins _update-all-asdf-latest)"
+    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
+    _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
   local su_pid=$!
 
   for stage in $stages; do
-    if ! command -v $stage >/dev/null; then
+    if ! { command -v $stage >/dev/null || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
+    # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
+    # (130) and would otherwise start the next one. Treat it as abort-the-run.
+    if (( rc == 130 )); then
+      kill $su_pid 2>/dev/null
+      print -P "\n%B==> Interrupted during $stage%b  (logs: $run_dir)"
+      return 130
+    fi
     stage_secs[$stage]=$(( EPOCHSECONDS - start ))
     if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
   done
