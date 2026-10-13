@@ -410,6 +410,14 @@ _update-all-asdf-plugins() {
 
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
+# HEAD of every custom plugin/theme repo, to tell whether an update changed anything.
+_update-all-custom-heads() {
+  local d
+  find -L "$ZSH_CUSTOM" -maxdepth 3 -name .git | sort | while IFS= read -r d; do
+    print -r -- "$d $(git -C "${d:h}" rev-parse HEAD 2>/dev/null)"
+  done
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
@@ -430,6 +438,16 @@ _update-all-stage() {
       fi
       local cooldown=${OMZ_UPDATE_COOLDOWN:-0} head_before=$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)
       [[ $cooldown == <-> ]] || cooldown=0
+      # One ls-remote call settles "nothing new" without a fetch (a cooldown needs the full path)
+      if (( cooldown == 0 )); then
+        local branch=${"$(git -C "$ZSH" config --local oh-my-zsh.branch)":-master}
+        local remote=${"$(git -C "$ZSH" config --local oh-my-zsh.remote)":-origin}
+        local remote_head=$(git -C "$ZSH" ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
+        if [[ -n $remote_head && $remote_head == $head_before ]]; then
+          echo "Oh My Zsh is already at the latest version."
+          return 0
+        fi
+      fi
       ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v ${OMZ_UPDATE_VERBOSE:-default} -c $cooldown || return 1
       # Past the interval every run checks again; the stamp moves only when an update landed.
       [[ "$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)" == "$head_before" ]] \
@@ -443,9 +461,12 @@ _update-all-stage() {
         echo "oh-my-zsh custom plugins checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
         return 0
       fi
+      # Past the interval every run checks again; the stamp moves only when a plugin changed.
+      local heads_before=$(_update-all-custom-heads)
       upgrade_oh_my_zsh_custom || return 1
       # the autoupdate plugin's own "time to update" reminder keys off this stamp
-      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
+      [[ "$(_update-all-custom-heads)" == "$heads_before" ]] \
+        || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
 }
 
@@ -618,7 +639,7 @@ update-all() {
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
-    _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
+    _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
