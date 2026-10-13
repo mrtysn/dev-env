@@ -416,6 +416,14 @@ _update-all-asdf-plugins() {
 
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
+# HEAD of every custom plugin/theme repo, to tell whether an update changed anything.
+_update-all-custom-heads() {
+  local d
+  find -L "$ZSH_CUSTOM" -maxdepth 3 -name .git | sort | while IFS= read -r d; do
+    print -r -- "$d $(git -C "${d:h}" rev-parse HEAD 2>/dev/null)"
+  done
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
@@ -424,6 +432,33 @@ _update-all-stage() {
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
+    omz)
+      # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
+      # Skipped within ':omz:update' frequency days; frequency, verbose and cooldown are read in
+      # update-all and passed in as OMZ_UPDATE_DAYS/_VERBOSE/_COOLDOWN (this shell reads no zstyles).
+      local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-update" LAST_EPOCH=0 EXIT_STATUS=
+      [[ -f $stamp ]] && . "$stamp"
+      if [[ -z "${UPDATE_ALL_FORCE:-}" && -z "$EXIT_STATUS" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} < ${OMZ_UPDATE_DAYS:-13} )); then
+        echo "oh-my-zsh core checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
+        return 0
+      fi
+      local cooldown=${OMZ_UPDATE_COOLDOWN:-0} head_before=$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)
+      [[ $cooldown == <-> ]] || cooldown=0
+      # One ls-remote call settles "nothing new" without a fetch (a cooldown needs the full path)
+      if (( cooldown == 0 )); then
+        local branch=${"$(git -C "$ZSH" config --local oh-my-zsh.branch)":-master}
+        local remote=${"$(git -C "$ZSH" config --local oh-my-zsh.remote)":-origin}
+        local remote_head=$(git -C "$ZSH" ls-remote "$remote" "refs/heads/$branch" 2>/dev/null | cut -f1)
+        if [[ -n $remote_head && $remote_head == $head_before ]]; then
+          echo "Oh My Zsh is already at the latest version."
+          return 0
+        fi
+      fi
+      ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v ${OMZ_UPDATE_VERBOSE:-default} -c $cooldown || return 1
+      # Past the interval every run checks again; the stamp moves only when an update landed.
+      [[ "$(git -C "$ZSH" rev-parse HEAD 2>/dev/null)" == "$head_before" ]] \
+        || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "$stamp"
+      command rm -rf "$ZSH/log/update.lock" ;;
     omz-plugins)
       # Same interval the autoupdate plugin uses: ':omz:update' frequency (days), passed in
       local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" LAST_EPOCH=0
@@ -432,9 +467,12 @@ _update-all-stage() {
         echo "oh-my-zsh custom plugins checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
         return 0
       fi
+      # Past the interval every run checks again; the stamp moves only when a plugin changed.
+      local heads_before=$(_update-all-custom-heads)
       upgrade_oh_my_zsh_custom || return 1
       # the autoupdate plugin's own "time to update" reminder keys off this stamp
-      echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
+      [[ "$(_update-all-custom-heads)" == "$heads_before" ]] \
+        || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
 }
 
@@ -598,27 +636,29 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas omz-plugins)
+  local -a stages=(brew pnpm asdf uv mas omz omz-plugins)
   local -A stage_status stage_secs
-  local stage start rc failed=0 omz_days
+  local stage start rc failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
+  zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
+  zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
-    _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
+    _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
   local su_pid=$!
 
   for stage in $stages; do
-    if ! { command -v $stage >/dev/null || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
+    if ! { command -v $stage >/dev/null || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
