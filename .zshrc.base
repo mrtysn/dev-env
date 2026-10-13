@@ -420,18 +420,17 @@ _update-all-stage() {
     mas)  mas upgrade ;;
     omz)
       # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
-      # Skipped within ':omz:update' frequency days (passed in as OMZ_UPDATE_DAYS).
+      # Skipped within ':omz:update' frequency days; frequency, verbose and cooldown are read in
+      # update-all and passed in as OMZ_UPDATE_DAYS/_VERBOSE/_COOLDOWN (this shell reads no zstyles).
       local stamp="${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-update" LAST_EPOCH=0 EXIT_STATUS=
       [[ -f $stamp ]] && . "$stamp"
-      if [[ -z "${UPDATE_ALL_FORCE:-}" && -z "$EXIT_STATUS" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} <= ${OMZ_UPDATE_DAYS:-13} )); then
+      if [[ -z "${UPDATE_ALL_FORCE:-}" && -z "$EXIT_STATUS" ]] && (( EPOCHSECONDS / 86400 - ${LAST_EPOCH:-0} < ${OMZ_UPDATE_DAYS:-13} )); then
         echo "oh-my-zsh core checked within ${OMZ_UPDATE_DAYS:-13} days, skipping"
         return 0
       fi
-      local verbose cooldown
-      zstyle -s ':omz:update' verbose verbose || verbose=default
-      zstyle -s ':omz:update' cooldown cooldown || cooldown=0
+      local cooldown=${OMZ_UPDATE_COOLDOWN:-0}
       [[ $cooldown == <-> ]] || cooldown=0
-      ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v $verbose -c $cooldown || return 1
+      ZSH="$ZSH" command zsh -f "$ZSH/tools/upgrade.sh" -i -v ${OMZ_UPDATE_VERBOSE:-default} -c $cooldown || return 1
       echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "$stamp"
       command rm -rf "$ZSH/log/update.lock" ;;
     omz-plugins)
@@ -610,8 +609,10 @@ update-all() {
 
   local -a stages=(brew pnpm asdf uv mas omz omz-plugins)
   local -A stage_status stage_secs
-  local stage start rc failed=0 omz_days
+  local stage start rc failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
+  zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
+  zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
   local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
@@ -628,7 +629,7 @@ update-all() {
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days}; trap 'exit 130' INT; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown}; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
