@@ -117,16 +117,6 @@
       {
         "hooks": [
           {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
-            "timeout": 3,
-            "type": "command"
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
             "command": "$HOME/.config/iterm2/cc-status",
             "type": "command"
           }
@@ -140,16 +130,6 @@
             "async": true,
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
-            "type": "command"
-          }
-        ],
-        "matcher": "Bash"
-      },
-      {
-        "hooks": [
-          {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-bash-post.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-bash-post.sh\"; echo \"system-one-bash-post.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
-            "timeout": 3,
             "type": "command"
           }
         ],
@@ -190,11 +170,6 @@
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\"; echo \"ssh-request-guard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10,
             "type": "command"
-          },
-          {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-bash.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-bash.sh\"; echo \"system-one-bash.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 0",
-            "timeout": 3,
-            "type": "command"
           }
         ],
         "matcher": "Bash"
@@ -208,16 +183,6 @@
           }
         ],
         "matcher": "Agent"
-      },
-      {
-        "hooks": [
-          {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-ask.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-ask.sh\"; echo \"system-one-ask.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
-            "timeout": 3,
-            "type": "command"
-          }
-        ],
-        "matcher": "AskUserQuestion"
       },
       {
         "hooks": [
@@ -364,15 +329,6 @@
       {
         "hooks": [
           {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-stop.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-stop.sh\"; echo \"system-one-stop.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
-            "timeout": 5,
-            "type": "command"
-          }
-        ]
-      },
-      {
-        "hooks": [
-          {
             "async": true,
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
@@ -456,7 +412,7 @@
       {
         "hooks": [
           {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-prompt.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-prompt.sh\"; echo \"system-one-prompt.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/nudge-named-skills-and-stale-shells.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/nudge-named-skills-and-stale-shells.sh\"; echo \"nudge-named-skills-and-stale-shells.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
             "timeout": 3,
             "type": "command"
           }
