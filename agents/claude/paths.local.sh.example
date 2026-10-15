@@ -12,6 +12,9 @@
 # $HOME/src/agents-shared or $HOME/work/tools/agents-shared.
 AGENTS_SHARED_DIR="$HOME/path/to/agents-shared"
 
+# Checkout of the system-one repo, which holds the decision-model wrapper, its hooks and skill.
+SYSTEM_ONE_DIR="$HOME/path/to/system-one"
+
 # Checkout of agent-request-limiter, set by its install.sh on machines that run it. The
 # SessionStart check sources it; unset means the limiter is not installed here and the check
 # does nothing.
