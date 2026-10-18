@@ -187,6 +187,26 @@
       {
         "hooks": [
           {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/show-rule-at-action.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/show-rule-at-action.sh\"; echo \"show-rule-at-action.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|Write|Edit|SendMessage|AskUserQuestion|WebFetch|WebSearch|mcp__exa__.*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-question-facts-in-question.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-question-facts-in-question.sh\"; exit 0",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "AskUserQuestion"
+      },
+      {
+        "hooks": [
+          {
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/subagent-guard.sh",
             "timeout": 5,
             "type": "command"
@@ -280,6 +300,11 @@
           },
           {
             "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/focus-policy.sh\" ] && exec \"$d/hooks/focus-policy.sh\"; done",
+            "timeout": 5,
+            "type": "command"
+          },
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/note-skill-groups-used-here.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/note-skill-groups-used-here.sh\"; exit 0",
             "timeout": 5,
             "type": "command"
           },
@@ -401,6 +426,15 @@
       }
     ],
     "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "command -v bigarrow >/dev/null 2>&1 && bigarrow stop --hook; exit 0",
+            "timeout": 3,
+            "type": "command"
+          }
+        ]
+      },
       {
         "hooks": [
           {
