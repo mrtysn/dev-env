@@ -152,6 +152,11 @@
       {
         "hooks": [
           {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/block-adb-server-kill.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/block-adb-server-kill.sh\"; echo \"block-adb-server-kill.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 10,
+            "type": "command"
+          },
+          {
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/block-tree-discard.sh\"; echo \"block-tree-discard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10,
             "type": "command"
