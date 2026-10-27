@@ -418,10 +418,31 @@ _update-all-custom-heads() {
   done
 }
 
+# `brew upgrade`, repeated after reinstalling a cask whose install receipt names an app
+# that is gone (brew: "It seems the App source '...' is not there"): a reinstall forces the
+# uninstall and skips the missing app. Each cask is reinstalled once per run.
+_update-all-brew-upgrade() {
+  local out rc token
+  local -a fixed=()
+  out=$(mktemp) || return 1
+  while :; do
+    brew upgrade 2>&1 | tee "$out"
+    rc=${pipestatus[1]}
+    (( rc )) || break
+    token=$(sed -n "s/^Error: \([^:]*\): It seems the App source .* is not there.*/\1/p" "$out" | head -n 1)
+    [[ -n $token && ${fixed[(Ie)$token]} == 0 ]] || break
+    fixed+=($token)
+    print -P "%B==> $token: receipt names an app that is gone, reinstalling%b"
+    brew reinstall --cask "$token" || { rc=$?; break; }
+  done
+  command rm -f -- "$out"
+  return $rc
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
-    brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
+    brew) brew update && _update-all-brew-upgrade && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
@@ -636,7 +657,7 @@ update-all() {
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
