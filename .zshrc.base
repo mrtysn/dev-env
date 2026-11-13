@@ -450,8 +450,9 @@ _update-all-spicetify-reapply() {
     echo "spicetify already applied to Spotify ${now% *} (spicetify ${now#* })"
     return 0
   fi
-  if ! spicetify restore backup apply; then
-    echo "Error: spicetify restore backup apply failed; if it reports a file not found, allow this terminal under Settings > Privacy & Security > App Management and rerun"
+  # restore fails when Spotify is already stock and its backup is outdated; backup apply fixes that
+  if ! spicetify restore backup apply && ! spicetify backup apply; then
+    echo "Error: spicetify apply failed; if it reports a file not found, allow this terminal under Settings > Privacy & Security > App Management and rerun"
     return 1
   fi
   mkdir -p "${stamp:h}" && print -r -- "$now" >| "$stamp"
