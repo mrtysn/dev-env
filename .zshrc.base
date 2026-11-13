@@ -439,6 +439,24 @@ _update-all-brew-upgrade() {
   return $rc
 }
 
+# Spotify overwrites spicetify's patch when it updates itself, and a new spicetify
+# build needs the patch redone: re-apply only when either version differs from the pair
+# last applied. On macOS the terminal needs App Management permission to edit Spotify.app.
+_update-all-spicetify-reapply() {
+  local app=/Applications/Spotify.app stamp="${XDG_CACHE_HOME:-$HOME/.cache}/update-all/spicetify-applied" now
+  [[ -d $app ]] || { echo "Spotify.app not installed, skipping"; return 0; }
+  now="$(defaults read "$app/Contents/Info" CFBundleShortVersionString) $(spicetify --version)"
+  if [[ -f $stamp && "$(<$stamp)" == "$now" ]]; then
+    echo "spicetify already applied to Spotify ${now% *} (spicetify ${now#* })"
+    return 0
+  fi
+  if ! spicetify restore backup apply; then
+    echo "Error: spicetify restore backup apply failed; if it reports a file not found, allow this terminal under Settings > Privacy & Security > App Management and rerun"
+    return 1
+  fi
+  mkdir -p "${stamp:h}" && print -r -- "$now" >| "$stamp"
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
@@ -447,6 +465,7 @@ _update-all-stage() {
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
+    spicetify) _update-all-spicetify-reapply ;;
     omz)
       # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
       # Skipped within ':omz:update' frequency days; frequency, verbose and cooldown are read in
@@ -651,13 +670,13 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas omz omz-plugins)
+  local -a stages=(brew spicetify pnpm asdf uv mas omz omz-plugins)
   local -A stage_status stage_secs
   local stage start rc failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-spicetify-reapply _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
