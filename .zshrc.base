@@ -467,6 +467,7 @@ _update-all-stage() {
     uv)   uv tool upgrade --all ;;
     mas)  mas upgrade ;;
     spicetify) _update-all-spicetify-reapply ;;
+    local-builds) _update-all-local-builds ;;
     omz)
       # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
       # Skipped within ':omz:update' frequency days; frequency, verbose and cooldown are read in
@@ -509,6 +510,57 @@ _update-all-stage() {
       [[ "$(_update-all-custom-heads)" == "$heads_before" ]] \
         || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
+}
+
+# Apps built from the user's own repos under ~/dev, each with the script that builds,
+# installs and relaunches it. Fast-forwards main and rebuilds only when HEAD moved; a
+# repo on another branch, with uncommitted changes, or diverged from origin is left
+# untouched and reported.
+_update-all-local-builds() {
+  local -A builds=(
+    hiddenbar-mirror scripts/build-install.zsh
+  )
+  local name repo before branch rc=0
+  for name in ${(ko)builds}; do
+    repo="$HOME/dev/$name"
+    [[ -d "$repo/.git" ]] || { echo "$name: no repo at $repo, skipping"; continue; }
+    branch=$(git -C "$repo" symbolic-ref --short -q HEAD)
+    if [[ "$branch" != main ]]; then
+      echo "Action needed: $name is on ${branch:-a detached HEAD}, not main; not pulled"; continue
+    fi
+    if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+      echo "Action needed: $name has uncommitted changes; not pulled"; continue
+    fi
+    before=$(git -C "$repo" rev-parse HEAD)
+    if ! git -C "$repo" pull --ff-only -q; then
+      echo "Action needed: $name main cannot fast-forward to origin; pull and rebuild by hand"; rc=1; continue
+    fi
+    if [[ "$(git -C "$repo" rev-parse HEAD)" == "$before" ]]; then
+      echo "$name: up to date"; continue
+    fi
+    echo "$name: pulled ${before:0:7}..$(git -C "$repo" rev-parse --short HEAD), rebuilding"
+    ( cd "$repo" && "./${builds[$name]}" ) || { echo "Error: $name build failed; see this stage's log"; rc=1; }
+  done
+  return $rc
+}
+
+# Packages whose update needs a step by hand, each with that step. Report only: uall
+# never runs it. A row shows when the package is outdated (casks that update themselves
+# included) or brew upgraded it in this run. Add a row to watch another package.
+_update-all-report-manual-updates() {
+  local -A steps=(
+    macfuse            "reboot, then allow the macFUSE system extension under System Settings > Privacy & Security"
+    karabiner-elements "re-approve its driver extension if macOS asks (System Settings > Privacy & Security)"
+  )
+  local brew_log="$1" token
+  local -a outdated=(${${(f)"$(brew outdated --greedy --quiet 2>/dev/null)"}:t})
+  for token in ${(ko)steps}; do
+    if (( ${outdated[(Ie)$token]} )); then
+      echo "$token is outdated; update it, then ${steps[$token]}"
+    elif [[ -f "$brew_log" ]] && grep -qE "^==> Upgrading ${token}"$'\r'"?\$" "$brew_log"; then
+      echo "$token was upgraded this run; ${steps[$token]}"
+    fi
+  done
 }
 
 _update-all-report-brew-bin() {
@@ -671,13 +723,13 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew spicetify pnpm asdf uv mas omz omz-plugins)
+  local -a stages=(brew spicetify pnpm asdf uv mas omz omz-plugins local-builds)
   local -A stage_status stage_secs
   local stage start rc failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-spicetify-reapply _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
@@ -687,7 +739,7 @@ update-all() {
   local su_pid=$!
 
   for stage in $stages; do
-    if ! { command -v $stage >/dev/null || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
+    if ! { command -v $stage >/dev/null || [[ $stage == local-builds ]] || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
@@ -727,6 +779,7 @@ update-all() {
   [[ -n "$errors" ]] && { print; print -P "%B==> Needs attention%b"; print -rn -- "$errors" }
 
   local -a titles=(
+    "Updates to finish by hand"
     "Regular files in the brew bin dir"
     "Casks with a missing app"
     "asdf pins behind their line"
@@ -734,6 +787,7 @@ update-all() {
     "Pending macOS updates"
   )
   local -a bodies=(
+    "$(_update-all-report-manual-updates "$run_dir/brew.log")"
     "$(_update-all-report-brew-bin)"
     "$(_update-all-report-missing-casks)"
     "$(<"$run_dir/report-asdf.txt")"
