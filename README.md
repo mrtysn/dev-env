@@ -47,6 +47,96 @@ git commit -m "Update config"
 git push
 ```
 
+## Machines and Profiles
+
+Two things select what a machine gets.
+
+- **Machine label** (`c02`, `c03`, ...): `machine-label.sh` maps the Mac's LocalHostName to it.
+  The label names every per-machine file: `.zshrc.<label>`, `Brewfile.<label>`,
+  `tmux/<label>.conf`, `asdf/tool-versions.<label>`. `.zshrc.loader` repeats the hostname
+  cases, because shell startup must not depend on this repo.
+- **Profile** (`personal` or `work`): what a Claude config folder, and the machine as a whole,
+  is used for. `machine-label.sh` lists each machine's profiles; the first is its primary one.
+
+| Label | Machine | LocalHostName | Profiles |
+|---|---|---|---|
+| c02 | Home Mac | `mrtysn-mbp-m2max` | personal |
+| c03 | Work Mac | `mrtysn-mbp-m5` | work, personal |
+
+A new machine is one case in `machine-label.sh` and one in `.zshrc.loader`, plus whichever
+per-machine files it needs.
+
+### Brewfile layers
+
+`import.sh` step 2 runs `brew bundle` on each layer that exists, in order:
+
+1. `Brewfile`: what every machine wants (shell, terminal, git tooling, font).
+2. `Brewfile.<primary profile>`: `Brewfile.personal` holds casks that need a personal licence,
+   an Apple ID or system grants a managed machine may refuse (mas, sublime-text,
+   karabiner-elements, phoenix, sourcetree). `Brewfile.work` holds what every work machine wants.
+3. `Brewfile.<label>`: this machine only.
+
+Only the primary profile's layer is installed, so the work Mac's personal config folder does
+not bring the personal casks with it. `export.sh` reports installed formulae and casks that no
+layer lists; it never writes a Brewfile.
+
+### Claude config folders
+
+A machine may run any number of Claude config folders, one per account: `~/.claude` and any
+`~/.claude-<name>` (set `CLAUDE_CONFIG_DIRS` to a space-separated list to name them instead).
+Each folder declares its profile in its own, never-synced `paths.local.sh`:
+
+    AGENT_PROFILE="work"
+
+Its `settings.json` is built, never copied:
+
+    agents/claude/settings.json                 base: valid on every machine and profile
+  + agents/claude/overlays/<profile>.json       committed overlay (personal.json)
+  + agents/claude/overlays/<profile>.local.json untracked overlay (work.local.json)
+
+The personal overlay holds the auto-mode text about the homelab and the personal domains, and
+the hooks for personal-only tools (system-one, agent-request-limiter, bigarrow). The work
+overlay names the employer's GitHub org, domains and production markers, so it is never
+committed: `overlays/work.json.example` has `<FILL: ...>` placeholders, and the merge refuses a
+file that still has one. `agents/claude/settings-profile.sh` does the merge
+(`merge PROFILE`), the comparison (`check DIR`) and the folder discovery (`dirs`);
+`agents/claude/test-settings-profile.sh` checks it.
+
+The merge concatenates arrays instead of replacing them, so an overlay adds hooks and
+allow rules to the base's. `autoMode.environment` is merged by field label: an overlay line
+`**Source control**: ...` replaces the base line with that label in place, keeping the base's
+section order, and a new label is appended.
+
+`import.sh` step 12 asks each folder's profile when its `paths.local.sh` has none, records it
+there (`write-paths-local.sh --profile`), and writes the merged settings. `export.sh` writes no
+Claude settings: it refuses a folder whose live file differs from the merge and names the keys,
+with a diff. Move the change into the base or the overlay, then re-run step 12. The comparison
+ignores `feedbackSurveyState`, `env.AGENTS_SHARED` and the order of hooks within an event
+(Claude Code runs them in parallel).
+
+### Setting up the work Mac
+
+1. Set its hostname: `sudo scutil --set LocalHostName mrtysn-mbp-m5`.
+2. Clone this repo and agents-shared.
+3. Copy `agents/claude/overlays/work.json.example` to `agents/claude/overlays/work.local.json`
+   and fill in every placeholder.
+4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. Step 12
+   asks the profile of `~/.claude` (work) and offers to add a folder for the personal account
+   (for example `~/.claude-personal`, personal).
+5. Run agents-shared's `scripts/init-global.sh` for each config folder.
+6. Create the push denylist (step 15 says where) before the first push from this machine.
+
+### Push name guard
+
+This repo is public. `import.sh` step 15 points this clone's `core.hooksPath` at
+agents-shared's `githooks/`, whose `pre-push` refuses a push that adds a line, path or commit
+message naming an entry on a local, untracked denylist. It refuses every push while the
+denylist is missing. By hand:
+
+```bash
+git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+```
+
 ## Configuration Structure
 
 ### Base Configuration (`.zshrc.base`)
@@ -100,12 +190,13 @@ What it exports:
 - Your full `.zshrc` as `.zshrc.full`
 - Your `.p10k.zsh` configuration
 - List of installed custom plugins
-- List of required brew packages
-- Claude Code `settings.json` for both config dirs (`agents/claude/`, `agents/claude-personal/`); machine-local `*.local.json` and memory are never exported
+- A report of brew packages no Brewfile layer lists
+- A check of every Claude config folder's `settings.json` against base + its profile's
+  overlays (see "Claude config folders"); it writes nothing there, and machine-local
+  `*.local.json` and memory are never read
 
-Paths inside those `settings.json` files must resolve at runtime — `import.sh`
-copies them verbatim, so a hardcoded `/Users/<name>/...` silently breaks the
-other machine. Hooks living under the config dir use
+Paths inside the base and overlays must resolve at runtime on every machine, so a
+hardcoded `/Users/<name>/...` silently breaks the other machine. Hooks living under the config dir use
 `${CLAUDE_CONFIG_DIR:-$HOME/.claude}`; repos that sit at a different depth per
 machine are probed, e.g.
 `for d in "$HOME/dev/personal/cc-statusline" "$HOME/dev/cc-statusline"; do ...`.
@@ -139,8 +230,8 @@ Sets up your terminal from this repo configuration.
 
 What it does:
 1. Installs Homebrew (if not present)
-2. Installs brew dependencies via `brew bundle` (shared `Brewfile` + this machine's `Brewfile.c01|c2`; includes FiraCode Nerd Font)
-3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.c01|c2`
+2. Installs brew dependencies via `brew bundle`: `Brewfile`, `Brewfile.<primary profile>`, `Brewfile.<label>` (includes FiraCode Nerd Font)
+3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.<label>`
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
@@ -149,7 +240,10 @@ What it does:
 9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
-12. Backs up and copies Claude Code `settings.json` into each config dir, asked one at a time — a dir that already exists defaults to yes, an absent one defaults to no, so a machine that runs a single Claude config is never given a second one. Then writes `paths.local.sh` for that config dir via `agents/claude/write-paths-local.sh`, because the guard hooks refuse every Bash tool call until it exists
+12. For each Claude config folder (`~/.claude`, every `~/.claude-*`, and any you add when asked): records its profile and agents-shared checkout in `paths.local.sh` via `agents/claude/write-paths-local.sh` (the guard hooks refuse every Bash tool call until it resolves), then backs up and writes `settings.json` as base + that profile's overlays
+13. Copies Phoenix and Karabiner configs
+14. Copies lazygit and repo-tabs configs
+15. Routes this clone's pushes through agents-shared's name guard
 
 The script is idempotent - it checks what's already installed and skips those steps.
 
@@ -446,9 +540,12 @@ asdf global dotnet latest
 - `.zshrc.personal` - Personal configuration (customize freely)
 - `.p10k.zsh` - Powerlevel10k theme config
 - `plugins.list` - List of custom plugins to install
-- `Brewfile` - Shared brew dependencies (formulae + casks), hand-curated — never `brew bundle dump`ed
-- `Brewfile.c01` / `Brewfile.c02` - Machine-specific brew dependencies
-- `asdf/tool-versions.c01` / `.c02` - Per-machine runtime pins (each machine exports/imports only its own)
+- `machine-label.sh` - hostname → machine label and profiles
+- `Brewfile` - Shared brew dependencies, hand-curated — never `brew bundle dump`ed
+- `Brewfile.personal` / `Brewfile.work` - Per-profile brew dependencies
+- `Brewfile.c02` / `Brewfile.c03` - Machine-specific brew dependencies
+- `asdf/tool-versions.<label>` - Per-machine runtime pins (each machine exports/imports only its own)
+- `agents/claude/` - Claude settings base, `overlays/`, and the scripts that merge, check and set up config folders
 - `iterm-profiles/` - iTerm2 dynamic profile configurations
   - `default.json` - Full Default profile
   - `hotkey-window.json` - Full Hotkey Window profile
@@ -501,16 +598,13 @@ Feel free to use, modify, and share.
 
 ## Known Gaps
 
-- **C02 has never run `export.sh`.** Every row in `EXPORTS.md` is
-  `c01`. The per-machine c02 files (`.zshrc.c02`, `Brewfile.c02`,
-  `asdf/tool-versions.c02`, `tmux/c02.conf`) are therefore maintained by hand
-  from c01, and nothing verifies they match that machine except a manual diff.
-  One `./export.sh` run on c02 would make it self-reporting.
-- **Why c01 runs two Claude config dirs is undocumented.** `~/.claude` and
-  `~/.claude-personal`, selected by the `claudep` / `ojc` / `claudepany` aliases
-  in `.zshrc.c01`; c02 runs one. If the split separates identities it belongs in
-  writing here. If it is vestigial, collapsing to a single dir on both machines
-  removes the whole class of "which settings file is live" confusion.
+- **The c03 files are empty until the work Mac exports.** `.zshrc.c03`,
+  `tmux/c03.conf` and `asdf/tool-versions.c03` were added before the machine
+  existed; its first `./export.sh` fills them.
+- **A loader case added in the repo is lost by exporting first.** `export.sh`
+  copies the live `~/.zshrc` over `.zshrc.loader`; it warns when the repo copy maps
+  a machine the live file lacks. Run `import.sh` step 8 on each machine after
+  adding a machine.
 
 ## Deliberately Not Synced
 
@@ -522,4 +616,5 @@ Referenced by the environment but excluded from this (public) repo — set up ma
 - `~/.tmux-sessions.conf` — read by `tmux-start` in the `tools` repo; contains work repo paths
 - `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
 - Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
-- `~/.local/share/claude-open-shim/` — Chrome profile shim used by `claude()` in `.zshrc.c01`
+- Each Claude config folder's `paths.local.sh` — its profile and checkout paths
+- `agents/claude/overlays/*.local.json` — gitignored; the work overlay names the employer
