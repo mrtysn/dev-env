@@ -70,11 +70,18 @@ per-machine files it needs.
 
 `import.sh` step 2 runs `brew bundle` on each layer that exists, in order:
 
-1. `Brewfile`: what every machine wants (shell, terminal, git tooling, font).
-2. `Brewfile.<primary profile>`: `Brewfile.personal` holds casks that need a personal licence,
-   an Apple ID or system grants a managed machine may refuse (mas, sublime-text,
-   karabiner-elements, phoenix, sourcetree). `Brewfile.work` holds what every work machine wants.
+1. `Brewfile`: what every machine wants, the work Mac included: shell and terminal tools,
+   git and cloud tooling, editors, window and keyboard utilities, everyday apps and the Mac
+   App Store apps (`mas "<name>", id: <id>`).
+2. `Brewfile.<primary profile>`: `Brewfile.personal` holds casks that need a system grant or a
+   driver extension a managed machine may refuse (karabiner-elements, phoenix, sourcetree).
+   `Brewfile.work` holds what every work machine wants beyond the shared file.
 3. `Brewfile.<label>`: this machine only.
+
+An entry is listed once, in the layer that owns it. The `mas` lines need an Apple ID signed in
+to the App Store: step 2 checks (`mas account` where mas has it, otherwise it asks) and, with
+no Apple ID, skips every `mas` entry with a message instead of failing; re-run the step once
+signed in.
 
 Only the primary profile's layer is installed, so the work Mac's personal config folder does
 not bring the personal casks with it. `export.sh` reports installed formulae and casks that no
@@ -141,12 +148,35 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
 2. Clone this repo and agents-shared.
 3. Copy `agents/claude/overlays/work.json.example` to `agents/claude/overlays/work.local.json`
    and fill in every placeholder.
-4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. Step 12
+4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. The `mas`
+   apps in `Brewfile` wait for the work Mac's own Apple ID: answer no when step 2 asks whether
+   one is signed in, then sign in to the App Store and re-run step 2 later. Step 12
    asks the profile of `~/.claude` (work) and offers to add a folder for the personal account
    (for example `~/.claude-personal`, personal).
 5. For each config folder, follow "Setting up a fresh config folder" (cc-statusline's
    `install-event-hook.zsh`, then agents-shared's `scripts/init-global.sh`).
 6. Create the push denylist (step 15 says where) before the first push from this machine.
+7. Install the command-line tools. Tell the `tools` repo this is a work machine, then run its
+   installer; the profile file is untracked, and without it every tool is linked:
+
+   ```bash
+   mkdir -p ~/.config/tools && echo work > ~/.config/tools/profile
+   <tools checkout>/install.sh
+   ```
+
+   On a work profile the installer skips the tools named in `tools/personal-only.txt`.
+8. Clone these repos next to `tools` (in the dev root) so the shared tools in `tools/links.txt`
+   resolve; a repo that is not cloned is skipped, not an error. Re-run `tools/install.sh`
+   afterwards.
+
+   | Repo | Links |
+   |---|---|
+   | agents-shared (step 2) | `allow-ssh-host-for-session`, `away-obligation`, `clo`, `find-interrupted-responses` |
+   | project-lifecycle | `project-lifecycle` |
+   | dev-repos-skills | `local-repos-list`, `skill-tree` |
+   | keep-mac-awake | `keep-mac-awake` |
+   | launchpad-map | `launchpad-map` |
+   | agent-ui-clicker | `agent-ui-clicker`, linked by that repo's own install, not by `links.txt` |
 
 ### Push name guard
 
@@ -563,7 +593,7 @@ asdf global dotnet latest
 - `.p10k.zsh` - Powerlevel10k theme config
 - `plugins.list` - List of custom plugins to install
 - `machine-label.sh` - hostname → machine label and profiles
-- `Brewfile` - Shared brew dependencies, hand-curated — never `brew bundle dump`ed
+- `Brewfile` - Shared brew, cask and Mac App Store dependencies, hand-curated — never `brew bundle dump`ed
 - `Brewfile.personal` / `Brewfile.work` - Per-profile brew dependencies
 - `Brewfile.c02` / `Brewfile.c03` - Machine-specific brew dependencies
 - `asdf/tool-versions.<label>` - Per-machine runtime pins (each machine exports/imports only its own)

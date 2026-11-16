@@ -1,27 +1,5 @@
 # C03 · Work Mac (mrtysn-mbp-m5) — machine-specific dependencies.
 # Apps the employer installs through its own portal are not listed here.
-# Terminal
-brew "gh"                       # GitHub CLI
-brew "htop"                     # process viewer
-brew "wget"
-brew "gawk"                     # GNU awk
-brew "tlrc"                     # tldr pages client
-brew "progress"                 # progress of running coreutils commands
 # Development
-brew "uv"                       # Python packages and environments
 brew "bun"                      # JavaScript runtime and package manager
 brew "mise"                     # runtime version manager
-brew "cmake"
-brew "pandoc"
-cask "visual-studio-code"
-cask "dbeaver-community"        # database client
-cask "hoppscotch"               # API client
-cask "meld"                     # diff and merge
-cask "hex-fiend"                # hex editor
-cask "devtoys"                  # developer utilities
-# Window and keyboard
-cask "rectangle"                # window snapping
-cask "alt-tab"                  # window switcher
-cask "itsycal"                  # menu bar calendar
-cask "keepingyouawake"          # keep the Mac awake
-cask "shottr"                   # screenshots
