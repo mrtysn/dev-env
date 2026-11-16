@@ -11,6 +11,11 @@ path=("$JAVA_HOME/bin" "$HOME/.rd/bin" $path)   # java, rancher desktop (deduped
 # https://github.com/sissbruecker/linkding
 alias linkding-start='docker run --name linkding -p 9090:9090 -v "$HOME/dev/linkding:/etc/linkding/data" -d sissbruecker/linkding:latest'
 
+# ── Folder shortcuts (home Mac only) ──
+alias dl="cd $HOME/Downloads"
+alias dt="cd $HOME/Desktop"
+alias dv="cd $HOME/dev"
+
 # ── Project shortcuts ──
 alias oj="cd $HOME/dev/oj"
 alias mertyasdotin="cd $HOME/dev/mertyas.in"

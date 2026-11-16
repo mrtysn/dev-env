@@ -822,11 +822,6 @@ update-all() {
   return $failed
 }
 
-# ─── Aliases: Navigation ────────────────────────────────────────────────────────
-alias dl="cd $HOME/Downloads"
-alias dt="cd $HOME/Desktop"
-alias dv="cd $HOME/dev"
-
 # ─── Aliases: Git ───────────────────────────────────────────────────────────────
 # fancy git log
 alias gitlog="git log --graph --format=format:'%C(bold blue)%h%C(reset) - %C(bold green)(%ar)%C(reset) %C(white)%an%C(reset)%C(bold yellow)%d%C(reset) %C(dim white)- %s%C(reset)' --all"
