@@ -165,18 +165,9 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
    ```
 
    On a work profile the installer skips the tools named in `tools/personal-only.txt`.
-8. Clone these repos next to `tools` (in the dev root) so the shared tools in `tools/links.txt`
-   resolve; a repo that is not cloned is skipped, not an error. Re-run `tools/install.sh`
-   afterwards.
-
-   | Repo | Links |
-   |---|---|
-   | agents-shared (step 2) | `allow-ssh-host-for-session`, `away-obligation`, `clo`, `find-interrupted-responses` |
-   | project-lifecycle | `project-lifecycle` |
-   | dev-repos-skills | `local-repos-list`, `skill-tree` |
-   | keep-mac-awake | `keep-mac-awake` |
-   | launchpad-map | `launchpad-map` |
-   | agent-ui-clicker | `agent-ui-clicker`, linked by that repo's own install, not by `links.txt` |
+8. Clone each repo the installer reported as `skipped: <path> is not on this machine` into the
+   dev root, next to `tools`, then run `tools/install.sh` again. The tools README says which
+   repos link themselves instead.
 
 ### Push name guard
 
