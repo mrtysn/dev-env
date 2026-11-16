@@ -44,9 +44,24 @@
   "enabledPlugins": {
     "art@skills-dir": false,
     "clangd-lsp@claude-plugins-official": true,
+    "gamedev-genres@skills-dir": false,
+    "gamedev-publish@skills-dir": false,
     "gamedev@skills-dir": false,
+    "gsap@skills-dir": false,
+    "hyperframes@skills-dir": false,
+    "interface-imagegen@skills-dir": false,
+    "interface-styles@skills-dir": false,
+    "interface-tools@skills-dir": false,
+    "interface@skills-dir": false,
+    "motion@skills-dir": false,
+    "react@skills-dir": false,
     "swift-lsp@claude-plugins-official": true,
-    "video@skills-dir": false
+    "threejs@skills-dir": false,
+    "tooling@skills-dir": false,
+    "video-analysis@skills-dir": false,
+    "video-films@skills-dir": false,
+    "video@skills-dir": false,
+    "web-animation@skills-dir": false
   },
   "env": {
     "CLAUDE_AFK_TIMEOUT_MS": "86400000",
@@ -125,6 +140,24 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/note-published-source-edited.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/note-published-source-edited.sh\"; exit 0",
+            "type": "command"
+          }
+        ],
+        "matcher": "Edit|Write|MultiEdit"
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/end-turn-for-queued-slash-command.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/end-turn-for-queued-slash-command.py\"; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -179,9 +212,24 @@
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/ssh-request-guard.sh\"; echo \"ssh-request-guard.sh unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
             "timeout": 10,
             "type": "command"
+          },
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-approval-before-public-push.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-approval-before-public-push.py\"; echo \"require-approval-before-public-push.py unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 2",
+            "timeout": 20,
+            "type": "command"
           }
         ],
         "matcher": "Bash"
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/require-user-quote-before-session-message.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/require-user-quote-before-session-message.py\"; echo \"require-user-quote-before-session-message.py unavailable: set AGENTS_SHARED_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\" >&2; exit 2",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "SendMessage"
       },
       {
         "hooks": [
@@ -212,6 +260,16 @@
           }
         ],
         "matcher": "AskUserQuestion"
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/refuse-requested-content-before-tool-call.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/refuse-requested-content-before-tool-call.sh\"; exit 0",
+            "timeout": 10,
+            "type": "command"
+          }
+        ],
+        "matcher": "AskUserQuestion|Skill|Agent|SendMessage|Bash|Edit|Write"
       },
       {
         "hooks": [
@@ -269,6 +327,16 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/end-turn-for-queued-slash-command.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/end-turn-for-queued-slash-command.py\"; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": "AskUserQuestion|Skill"
       }
     ],
     "SessionEnd": [
@@ -381,8 +449,35 @@
       {
         "hooks": [
           {
-            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/log-buried-go-ahead.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/log-buried-go-ahead.sh\"; exit 0",
-            "timeout": 5,
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/refuse-idle-end-of-turn.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/refuse-idle-end-of-turn.sh\"; exit 0",
+            "timeout": 15,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/refuse-stop-while-away.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/refuse-stop-while-away.sh\"; exit 0",
+            "timeout": 30,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/refuse-unasked-draft-reply.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/refuse-unasked-draft-reply.sh\"; exit 0",
+            "timeout": 15,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/note-lesson-on-revised-draft.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/note-lesson-on-revised-draft.sh\"; exit 0",
+            "timeout": 15,
             "type": "command"
           }
         ]
@@ -464,6 +559,15 @@
       {
         "hooks": [
           {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/open-away-stretch.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/open-away-stretch.sh\"; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
             "async": true,
             "command": "${CLAUDE_CONFIG_DIR:-$HOME/.claude}/hooks/cc-statusline-event.zsh",
             "timeout": 5,
@@ -483,16 +587,16 @@
   },
   "includeCoAuthoredBy": false,
   "language": "english",
-  "model": "sonnet",
+  "model": "opus",
   "modelSettings": {
     "claude-fable-5-1": {
-      "effortLevel": "medium"
+      "effortLevel": "high"
     },
     "claude-haiku-5-5": {
       "effortLevel": "medium"
     },
     "claude-opus-5-5": {
-      "effortLevel": "medium"
+      "effortLevel": "xhigh"
     },
     "claude-sonnet-5-5": {
       "effortLevel": "medium"
@@ -517,10 +621,58 @@
       "Bash(wc:*)",
       "Bash(which:*)"
     ],
+    "ask": [
+      "Edit(./.env)",
+      "Edit(./.env.*)"
+    ],
     "defaultMode": "auto"
   },
   "preferredNotifChannel": "iterm2_with_bell",
   "remoteControlAtStartup": false,
+  "skillListingBudgetFraction": 0.005,
+  "skillOverrides": {
+    "aristocrat": "name-only",
+    "big-arrow": "name-only",
+    "blame-session": "name-only",
+    "board": "off",
+    "caveman": "name-only",
+    "cmt": "name-only",
+    "cmt-msg": "name-only",
+    "discover-prompts": "name-only",
+    "discover-skills": "name-only",
+    "finance-import": "name-only",
+    "game-ideation": "name-only",
+    "game-ui-refs": "name-only",
+    "game-ui-refs-compare": "name-only",
+    "gauntlet-loop": "name-only",
+    "grilling": "name-only",
+    "gs": "name-only",
+    "improve": "name-only",
+    "learn-from-finished-process": "name-only",
+    "load-my-timeline": "name-only",
+    "new-account-signup": "name-only",
+    "new-android-app": "name-only",
+    "new-docker-service": "name-only",
+    "new-godot-game": "name-only",
+    "new-launchd-job": "name-only",
+    "new-mobile-game-backend-client": "name-only",
+    "new-roblox-game": "name-only",
+    "new-symlinks-into-home": "name-only",
+    "new-tool": "name-only",
+    "recent-sessions": "name-only",
+    "refactor": "name-only",
+    "search-saved-links": "name-only",
+    "search-turkish-shops": "name-only",
+    "send-it": "name-only",
+    "slack-gif-creator": "name-only",
+    "socratic-quiz": "name-only",
+    "standup": "name-only",
+    "statusline-topic": "name-only",
+    "stg-msg": "name-only",
+    "system-one": "name-only",
+    "update-external-skills": "name-only",
+    "write-pitch": "name-only"
+  },
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "statusLine": {

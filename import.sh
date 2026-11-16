@@ -661,11 +661,21 @@ else
         fi
 
         mkdir -p "$target_dir"
+        # env.AGENTS_SHARED is this machine's checkout path, written by agents-shared's
+        # init-global.sh and stripped on export; carry the live value over the copy.
+        local_shared=""
         if [ -f "$target" ]; then
+            local_shared="$(jq -r '.env.AGENTS_SHARED // empty' "$target" 2>/dev/null || true)"
             cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
             print "${YELLOW}→ Backed up existing $target${NC}"
         fi
-        cp "$src" "$target"
+        if [[ -n "$local_shared" ]] && jq --arg p "$local_shared" '.env.AGENTS_SHARED = $p' "$src" > "$target.tmp"; then
+            mv "$target.tmp" "$target"
+        else
+            rm -f "$target.tmp"
+            cp "$src" "$target"
+            [[ -z "$local_shared" ]] && print "${YELLOW}  Run agents-shared/scripts/init-global.sh to set env.AGENTS_SHARED here${NC}"
+        fi
         print "${GREEN}✓ Copied $src → $target${NC}"
     done
 fi

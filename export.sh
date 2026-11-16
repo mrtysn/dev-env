@@ -432,7 +432,9 @@ CLAUDE_PAIRS=(
 # Churny state fields stripped on export — they regenerate locally and only add diff noise.
 # The copy is written with sorted keys (jq -S): Claude Code reorders the live file on its own,
 # so an unsorted copy shows a whole-file diff on every export.
-CLAUDE_STRIP_FILTER='del(.feedbackSurveyState)'
+# .env.AGENTS_SHARED is machine-local too: agents-shared's init-global.sh writes this machine's
+# checkout path there, so exporting it would hand one machine's absolute path to every other.
+CLAUDE_STRIP_FILTER='del(.feedbackSurveyState) | del(.env.AGENTS_SHARED) | if .env == {} then del(.env) else . end'
 
 for pair in "${CLAUDE_PAIRS[@]}"; do
     src="${pair%%:*}/settings.json"
