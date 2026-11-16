@@ -1,3 +1,0 @@
-# tmux-sessions.conf — session-name:/path/to/repo
-# Used by tgo and tmux-start to create named sessions
-backend-core:/Users/you/dev/backend-core

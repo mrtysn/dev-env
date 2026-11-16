@@ -579,14 +579,6 @@ else
                 print "${GREEN}✓ Symlinked ~/.tmux.conf → $TMUX_CONF${NC}"
             fi
 
-            # Copy sessions config example (only if not present)
-            if [ ! -f ~/.tmux-sessions.conf ]; then
-                cp "$SCRIPT_DIR/tmux/tmux-sessions.conf.example" ~/.tmux-sessions.conf
-                print "${GREEN}✓ Created ~/.tmux-sessions.conf from example${NC}"
-            else
-                print "${GREEN}✓ ~/.tmux-sessions.conf already exists (kept)${NC}"
-            fi
-
             # Append SSH config snippet (guarded by marker comment)
             SSH_MARKER="# --- Tmux Cross-SSH ---"
             if [ -f ~/.ssh/config ] && grep -qF "$SSH_MARKER" ~/.ssh/config; then
