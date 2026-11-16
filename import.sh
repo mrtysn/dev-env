@@ -840,6 +840,11 @@ echo "=== Step 15: Push Name Guard ==="
 # This repo is public. agents-shared's githooks/pre-push reads every commit a push sends
 # and refuses it when an added line, path or message names an entry on a local, untracked
 # denylist (an employer, a client); an empty denylist passes everything, so this step warns on one. Opting in points this clone's core.hooksPath at it.
+# The hook skips private GitHub repos and runs a repo's own hooks, so it is safe globally; still,
+# on a work machine it runs per repo only (this one and agents-shared), never globally, because
+# globally it would run on the employer's repos. There the denylist is written by hand with only
+# the employer's own names and internal terms, never a copy of the home machine's list.
+# On a personal machine, enabling it globally is the recommended setup.
 # By hand: git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
 GUARD_SHARED="${AGENTS_SHARED:-}"
 if [[ -z "$GUARD_SHARED" && -r "$HOME/.claude/paths.local.sh" ]]; then
@@ -858,6 +863,8 @@ elif [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "$GUARD
 else
     existing_hooks="$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)"
     [[ -n "$existing_hooks" ]] && print "${YELLOW}! core.hooksPath is currently $existing_hooks; it will be replaced${NC}"
+    print "${YELLOW}  Per repo here: on a work machine do not set it globally (git config --global core.hooksPath), it would run on the employer's repos.${NC}"
+    print "${YELLOW}  On a personal machine the recommended setup is global: git config --global core.hooksPath \"$GUARD_HOOKS\"${NC}"
     if ask_yes_no "Route this clone's pushes through the name guard ($GUARD_HOOKS/pre-push)?"; then
         git -C "$SCRIPT_DIR" config core.hooksPath "$GUARD_HOOKS"
         print "${GREEN}✓ core.hooksPath → $GUARD_HOOKS${NC}"
@@ -869,10 +876,12 @@ if [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "${GUARD_
     if [[ ! -r "$GUARD_LIST" ]]; then
         print "${YELLOW}! $GUARD_LIST does not exist, so every push is refused until it does:${NC}"
         print "${YELLOW}  copy $GUARD_HOOKS/push-denylist.txt.example there and add one name per line${NC}"
+        print "${YELLOW}  on a work machine write it by hand with only the employer's own names and internal terms, never a copy of the home machine's list${NC}"
     elif [[ -z "$(grep -Ev '^[[:space:]]*(#|$)' "$GUARD_LIST" || true)" ]]; then
         # The hook passes with an empty list, so the guard looks installed while it blocks nothing.
         print "${RED}✗ $GUARD_LIST holds no entries (only comments or blank lines): the name guard blocks NOTHING.${NC}"
         print "${RED}  Add one name per line (an employer, a client; see $GUARD_HOOKS/push-denylist.txt.example) before the next push.${NC}"
+        print "${RED}  On a work machine that is the employer's own names and internal terms, never a copy of the home machine's list.${NC}"
     fi
 fi
 echo ""

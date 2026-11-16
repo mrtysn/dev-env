@@ -155,7 +155,10 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
    (for example `~/.claude-personal`, personal).
 5. For each config folder, follow "Setting up a fresh config folder" (cc-statusline's
    `install-event-hook.zsh`, then agents-shared's `scripts/init-global.sh`).
-6. Create the push denylist (step 15 says where) before the first push from this machine.
+6. Write the push denylist by hand (step 15 says where) before the first push from this machine.
+   It holds only the employer's own names and internal terms and is never a copy of the home
+   machine's list, which names private projects and people. Leave `core.hooksPath` unset globally
+   on this machine: step 15 routes agents-shared and this repo through the guard per repo.
 7. Install the command-line tools. Tell the `tools` repo this is a work machine, then run its
    installer; the profile file is untracked, and without it every tool is linked:
 
@@ -173,13 +176,21 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
 
 This repo is public. `import.sh` step 15 points this clone's `core.hooksPath` at
 agents-shared's `githooks/`, whose `pre-push` refuses a push that adds a line, path or commit
-message naming an entry on a local, untracked denylist. It refuses every push while the
-denylist is missing, and passes every push while it holds no entries, so step 15 warns when
-the file has only comments or blank lines. By hand:
+message naming an entry on a local, untracked denylist. It skips private GitHub repos, scans
+public and unknown ones, and still runs a repo's own hooks (git-lfs and the like). It refuses
+every scanned push while the denylist is missing, and passes every push while it holds no
+entries, so step 15 warns when the file has only comments or blank lines. By hand:
 
 ```bash
 git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
 ```
+
+- **Personal machine:** enabling the guard globally is the recommended setup, so every public repo
+  is covered: `git config --global core.hooksPath "$AGENTS_SHARED/githooks"`.
+- **Work machine:** the guard runs per repo, agents-shared and this repo only, as step 15 sets it,
+  and never globally, because globally it would run on the employer's repos. The work machine's
+  denylist is written there by hand and holds only the employer's own names and internal terms.
+  It is never a copy of the home machine's list, which names private projects and people.
 
 ## Configuration Structure
 
