@@ -634,8 +634,8 @@ Referenced by the environment but excluded from this (public) repo — set up ma
 
 - `claude` CLI — native installer, not brew-managed
 - `~/.gitconfig` + `~/.gitconfig-personal` — git identity / includeIf split
-- `~/.ssh/config` — hosts `c1`/`c2` used by `tgo` in the `tools` repo (security material)
-- `~/.tmux-sessions.conf` — read by `tmux-start` in the `tools` repo; contains work repo paths
+- `~/.ssh/config` — ssh hosts (security material)
+- `~/.tmux-sessions.conf` — session folders for `tgo` and `tmux-start` in the `tools` repo; holds machine paths
 - `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
 - Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
 - Each Claude config folder's `paths.local.sh` — its profile and checkout paths
