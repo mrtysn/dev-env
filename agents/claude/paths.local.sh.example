@@ -11,7 +11,10 @@
 # settings.json from the base plus agents/claude/overlays/<profile>*.json, export.sh
 # checks the live file against the same, and agents-shared's init-global.sh links the
 # profile's rules and skills. One machine may hold several folders with different profiles.
-AGENT_PROFILE="personal"
+# No default: copying this file must not make a work folder personal. import.sh step 12 asks
+# and records it; by hand, uncomment one line.
+# AGENT_PROFILE="personal"
+# AGENT_PROFILE="work"
 
 # Checkout of the agents-shared repo, which holds hooks/ and claude/rules/.
 # Whatever this machine actually uses, e.g. $HOME/dev/agents-shared or
