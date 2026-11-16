@@ -11,7 +11,7 @@
       "**Trusted internal domains**: mertyas.in and its subdomains — self-hosted personal services",
       "**Key internal services**: self-hosted apps on mertyas.in subdomains, served from the node01 homelab box",
       "**Sensitive data locations & audiences**: never commit or publish anything naming a third party (CVs, interview notes, candidate assessments), ex-employer material, or credentials — a repo being private does not make these safe to commit",
-      "**Primary use of Claude Code**: personal work — own software projects, self-hosted infrastructure, research and writing. No employer work on this machine.",
+      "**Primary use of Claude Code**: personal work — own software projects, self-hosted infrastructure, research and writing. No employer work in this config folder (the machine may also run a work profile in another folder).",
       "**Trusted repo**: the repo the session started in, and its origin remote under github.com/mrtysn. Other repos on disk are out of scope unless the user names them."
     ]
   },
