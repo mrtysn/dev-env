@@ -114,6 +114,27 @@ with a diff. Move the change into the base or the overlay, then re-run step 12. 
 ignores `feedbackSurveyState`, `env.AGENTS_SHARED` and the order of hooks within an event
 (Claude Code runs them in parallel).
 
+### Setting up a fresh config folder
+
+The base settings call hooks that live outside this repo, and a new folder has none of them
+until you set them up. `import.sh` step 12 writes `settings.json` and `paths.local.sh`; then,
+with `CLAUDE_CONFIG_DIR` set to the folder (leave it unset for `~/.claude`):
+
+```bash
+# 1. Status line and its event hook: clone cc-statusline next to this repo, so step 12 can record
+#    CC_STATUSLINE_DIR (or set it in paths.local.sh by hand), then link its hook into the folder.
+git clone <cc-statusline-url> "$(dirname "$PWD")/cc-statusline"
+CLAUDE_CONFIG_DIR=~/.claude-<name> "$(dirname "$PWD")/cc-statusline/scripts/install-event-hook.zsh"
+
+# 2. agents-shared: links the profile's rules, skills and commands, and hooks/subagent-guard.sh
+CLAUDE_CONFIG_DIR=~/.claude-<name> <agents-shared checkout>/scripts/init-global.sh
+```
+
+Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` has no
+`CC_STATUSLINE_DIR`; until then the status line is blank. Without step 1 the
+`cc-statusline-event.zsh` hook entries point at a missing file, and without step 2 the
+`subagent-guard.sh` entry does. `agents/claude/verify-hook-paths.sh` checks the guards only.
+
 ### Setting up the work Mac
 
 1. Set its hostname: `sudo scutil --set LocalHostName mrtysn-mbp-m5`.
@@ -123,7 +144,8 @@ ignores `feedbackSurveyState`, `env.AGENTS_SHARED` and the order of hooks within
 4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. Step 12
    asks the profile of `~/.claude` (work) and offers to add a folder for the personal account
    (for example `~/.claude-personal`, personal).
-5. Run agents-shared's `scripts/init-global.sh` for each config folder.
+5. For each config folder, follow "Setting up a fresh config folder" (cc-statusline's
+   `install-event-hook.zsh`, then agents-shared's `scripts/init-global.sh`).
 6. Create the push denylist (step 15 says where) before the first push from this machine.
 
 ### Push name guard
@@ -198,23 +220,22 @@ What it exports:
 
 Paths inside the base and overlays must resolve at runtime on every machine, so a
 hardcoded `/Users/<name>/...` silently breaks the other machine. Hooks living under the config dir use
-`${CLAUDE_CONFIG_DIR:-$HOME/.claude}`; repos that sit at a different depth per
-machine are probed, e.g.
-`for d in "$HOME/dev/personal/cc-statusline" "$HOME/dev/cc-statusline"; do ...`.
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}`; a repo that sits at a different depth per machine is
+never probed for at fixed paths: every hook, the status line included, reads its checkout from
+`${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh` (machine-local, never exported).
 
-Probing is fine for cosmetic tooling, which may quietly do nothing when the
-repo is absent. It is **not** fine for a safety hook: probing leaves a machine
-with a different layout unguarded and unwarned. So the `PreToolUse` guards read
-their checkout path from `${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh`
-(machine-local, never exported) and exit 2 — blocking the tool call — when it is
-missing.
+The two kinds differ only in what an unset path does. Cosmetic tooling (the status line, the
+tab-status and focus-policy hooks) exits 0 and quietly does nothing. A safety hook must not: the
+`PreToolUse` guards exit 2, blocking the tool call, so a machine with a different layout is never
+left unguarded and unwarned.
 
 `import.sh` writes that file for you as part of step 12, deriving the checkout
 from an existing rules symlink or a sibling of this repo and asking if it finds
 neither — it never guesses a layout. To write or repair it by hand, run
 `agents/claude/write-paths-local.sh` (`--path DIR` to name the checkout, `--yes`
 for non-interactive); `agents/claude/verify-hook-paths.sh` confirms every hook
-resolves. `agents/claude/paths.local.sh.example` documents the shape.
+resolves. `agents/claude/paths.local.sh.example` documents the shape (`AGENT_PROFILE`,
+`AGENTS_SHARED_DIR`, `CC_STATUSLINE_DIR` and the optional ones).
 
 After export, you should:
 1. Review the changes

@@ -12,7 +12,8 @@
 #
 # --profile also records the folder's agent profile (AGENT_PROFILE=work|personal),
 # which import.sh and export.sh read to pick the settings overlay. Rewriting the
-# file keeps every other line in it (SYSTEM_ONE_DIR, CC_STATUS_PATH, ...).
+# file keeps every other line in it (SYSTEM_ONE_DIR, CC_STATUS_PATH, ...). It also records
+# CC_STATUSLINE_DIR when a cc-statusline checkout sits beside this repo.
 
 set -euo pipefail
 
@@ -90,6 +91,21 @@ set_var() {
     mv "$TARGET.tmp" "$TARGET"
 }
 
+# The status line reads CC_STATUSLINE_DIR from the same file and shows nothing when it is
+# unset. Set it only from a cc-statusline checkout beside this repo; never overwrite a value.
+ensure_statusline() {
+    local current=""
+    [ -r "$TARGET" ] && current=$(CC_STATUSLINE_DIR=""; . "$TARGET" >/dev/null 2>&1; print -r -- "${CC_STATUSLINE_DIR:-}")
+    [ -n "$current" ] && return 0
+    local candidate="${REPO_ROOT:h}/cc-statusline"
+    if [ -x "$candidate/cc-statusline.js" ]; then
+        set_var CC_STATUSLINE_DIR "$candidate"
+        print "✓ Set CC_STATUSLINE_DIR=$candidate in $SHOWN_TARGET"
+    else
+        print "! No cc-statusline checkout beside this repo: this folder's status line stays blank. Clone it, then re-run this script (README, \"Setting up a fresh config folder\")."
+    fi
+}
+
 if [ -n "$WANT_PROFILE" ]; then
     current=""
     [ -r "$TARGET" ] && current=$(AGENT_PROFILE=""; . "$TARGET" >/dev/null 2>&1; print -r -- "${AGENT_PROFILE:-}")
@@ -104,6 +120,7 @@ if [ "$FORCE" -eq 0 ] && [ -r "$TARGET" ]; then
     existing=$(AGENTS_SHARED_DIR=""; . "$TARGET" >/dev/null 2>&1; print -r -- "${AGENTS_SHARED_DIR:-}")
     if is_checkout "$existing"; then
         print "✓ $SHOWN_TARGET already resolves to $existing"
+        ensure_statusline
         exit 0
     fi
     print "! $SHOWN_TARGET exists but does not resolve to a checkout; rewriting"
@@ -186,4 +203,5 @@ fi
 set_var AGENTS_SHARED_DIR "$resolved"
 
 print "✓ Wrote $SHOWN_TARGET (AGENTS_SHARED_DIR=$resolved)"
+ensure_statusline
 print "  Verify with: $SCRIPT_DIR/verify-hook-paths.sh"

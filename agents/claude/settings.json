@@ -375,7 +375,7 @@
             "type": "command"
           },
           {
-            "command": "for d in \"$HOME/dev/personal/agents-shared\" \"$HOME/dev/agents-shared\"; do [ -x \"$d/hooks/focus-policy.sh\" ] && exec \"$d/hooks/focus-policy.sh\"; done",
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/focus-policy.sh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/focus-policy.sh\"; exit 0",
             "timeout": 5,
             "type": "command"
           },
@@ -652,7 +652,7 @@
   "skipAutoPermissionPrompt": true,
   "skipWorkflowUsageWarning": true,
   "statusLine": {
-    "command": "for d in \"$HOME/dev/personal/cc-statusline\" \"$HOME/dev/cc-statusline\"; do [ -x \"$d/cc-statusline.js\" ] && exec \"$d/cc-statusline.js\"; done",
+    "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUSLINE_DIR:-}\" ] && [ -x \"$CC_STATUSLINE_DIR/cc-statusline.js\" ] && exec \"$CC_STATUSLINE_DIR/cc-statusline.js\"; exit 0",
     "refreshInterval": 60,
     "type": "command"
   },

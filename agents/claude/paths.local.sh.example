@@ -30,3 +30,8 @@ SYSTEM_ONE_DIR="$HOME/path/to/system-one"
 # cc-status binary (iTerm2 tab-status integration), set on machines that have it installed.
 # Every cc-status hook sources this file and exits 0 quietly if unset — it's optional.
 # CC_STATUS_PATH="$HOME/.config/iterm2/cc-status"
+
+# Checkout of the cc-statusline repo, which holds cc-statusline.js (the status line) and
+# scripts/install-event-hook.zsh. The settings' statusLine sources this file and shows
+# nothing when it is unset. write-paths-local.sh sets it from a checkout beside this repo.
+# CC_STATUSLINE_DIR="$HOME/path/to/cc-statusline"
