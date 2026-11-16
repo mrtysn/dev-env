@@ -120,8 +120,12 @@ unalias _ 2>/dev/null  # OMZ sets _='sudo'; prefer explicit sudo
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
-else
+elif (( $+commands[subl] )); then
   export EDITOR='subl --wait'
+elif (( $+commands[code] )); then
+  export EDITOR='code --wait'   # a work profile machine may not carry Sublime
+else
+  export EDITOR='nano'
 fi
 
 # history size fix
