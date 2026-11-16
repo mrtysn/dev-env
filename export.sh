@@ -93,11 +93,15 @@ if [ -f ~/.zshrc.base ]; then
     lost_loader="$(comm -23 <(grep -E '^ +[A-Za-z0-9-]+\)' .zshrc.loader 2>/dev/null | LC_ALL=C sort) \
                             <(grep -E '^ +[A-Za-z0-9-]+\)' ~/.zshrc | LC_ALL=C sort) || true)"
     if [[ -n "$lost_loader" ]]; then
-        warn "the repo .zshrc.loader maps machines the live ~/.zshrc lacks — this export drops them (git has them; run import.sh step 8 or copy the cases into ~/.zshrc):"
+        # Refuse, not warn: the copy would delete the machine cases from the repo's only
+        # loader, and the warning scrolls past before anyone reads it.
+        fail ".zshrc.loader NOT overwritten: the repo copy maps machines the live ~/.zshrc lacks. Missing cases:"
         print -r -- "$lost_loader" | sed 's/^/      /'
+        echo "      Fix: run ./import.sh (step 8 installs the repo loader as ~/.zshrc), then export again."
+    else
+        copy_atomic ~/.zshrc .zshrc.loader
+        note ".zshrc.loader"
     fi
-    copy_atomic ~/.zshrc .zshrc.loader
-    note ".zshrc.loader"
     if [[ -n "$ZSH_LABEL" ]] && [ -f ~/.zshrc.$ZSH_LABEL ]; then
         copy_atomic ~/.zshrc.$ZSH_LABEL .zshrc.$ZSH_LABEL
         note ".zshrc.$ZSH_LABEL"
