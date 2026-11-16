@@ -1,0 +1,7 @@
+# Personal profile — installed on machines whose primary profile is personal (machine-label.sh).
+# Casks here need a personal licence, an Apple ID or system grants a managed machine may refuse.
+brew "mas"                      # Mac App Store CLI (used by update-all in .zshrc.base; needs an Apple ID)
+cask "sublime-text"             # $EDITOR 'subl --wait' and lazygit editPreset (personal licence)
+cask "karabiner-elements"       # keymaps (karabiner/karabiner.json synced; installs a driver extension)
+cask "phoenix"                  # window manager (.phoenix.js synced; needs Accessibility)
+cask "sourcetree"               # repo-tabs st mode

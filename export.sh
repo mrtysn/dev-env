@@ -151,7 +151,7 @@ else
 fi
 note "plugins.list"
 
-# Brew dependencies live in Brewfile (shared) + Brewfile.c01/c2 (per-machine) —
+# Brew dependencies live in Brewfile (shared) + Brewfile.<primary profile> + Brewfile.<label> —
 # hand-curated tracked files, edited directly, never written by this script and
 # never generated via `brew bundle dump`. Export only reports drift against them:
 # report-only by design, so silent drift stays loud without auto-adding noise
@@ -159,6 +159,7 @@ note "plugins.list"
 if command -v brew >/dev/null 2>&1; then
     echo "✓ Checking brew drift (leaves/casks vs Brewfiles)"
     BREWFILES=(Brewfile)
+    [[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREWFILES+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
     [[ -n "$ZSH_LABEL" && -f "Brewfile.$ZSH_LABEL" ]] && BREWFILES+=("Brewfile.$ZSH_LABEL")
     # Compare top-level installs only — `brew bundle cleanup` would also list
     # every transitive dep, which drowns the signal. || true: comm/grep exit

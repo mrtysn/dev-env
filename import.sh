@@ -69,19 +69,23 @@ echo ""
 # Step 2: Brew Packages (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 2: Brew Bundle ==="
-# Shared Brewfile + this machine's Brewfile.c01/c2 — brew bundle is natively
-# idempotent (skips installed, reports per-item).
+# Layers, each installed if present: the shared Brewfile, Brewfile.<primary profile>
+# (the first profile machine-label.sh lists for this machine), then Brewfile.<label>.
+# brew bundle is natively idempotent (skips installed, reports per-item).
 BREW_LABEL="$MACHINE_LABEL"  # from machine-label.sh
+BREW_LAYERS=(Brewfile)
+[[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREW_LAYERS+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
+[[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && BREW_LAYERS+=("Brewfile.$BREW_LABEL")
 
 if [ -f Brewfile ]; then
-    print "${BLUE}Shared Brewfile:${NC} $(grep -cE '^(brew|cask|mas) ' Brewfile) entries"
-    [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && \
-        print "${BLUE}Machine Brewfile.$BREW_LABEL:${NC} $(grep -cE '^(brew|cask|mas) ' Brewfile.$BREW_LABEL) entries"
-    if ask_yes_no "Install brew dependencies (brew bundle)?"; then
-        brew bundle --file=Brewfile || print "${RED}✗ some shared Brewfile entries failed${NC}"
-        if [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]]; then
-            brew bundle --file="Brewfile.$BREW_LABEL" || print "${RED}✗ some Brewfile.$BREW_LABEL entries failed${NC}"
-        fi
+    [[ -z "$MACHINE_PRIMARY_PROFILE" ]] && print "${YELLOW}! Unknown machine — no profile or machine Brewfile, shared layer only${NC}"
+    for layer in "${BREW_LAYERS[@]}"; do
+        print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask|mas) ' "$layer") entries"
+    done
+    if ask_yes_no "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
+        for layer in "${BREW_LAYERS[@]}"; do
+            brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
+        done
     else
         print "${YELLOW}! Skipped brew bundle${NC}"
     fi
