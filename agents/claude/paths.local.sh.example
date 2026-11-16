@@ -7,17 +7,24 @@
 # Hook commands source this file and exit 2 — blocking the tool call — when a
 # path it should define is missing.
 
+# This config folder's agent profile: personal or work. dev-env's import.sh builds
+# settings.json from the base plus agents/claude/overlays/<profile>*.json, export.sh
+# checks the live file against the same, and agents-shared's init-global.sh links the
+# profile's rules and skills. One machine may hold several folders with different profiles.
+AGENT_PROFILE="personal"
+
 # Checkout of the agents-shared repo, which holds hooks/ and claude/rules/.
 # Whatever this machine actually uses, e.g. $HOME/dev/agents-shared or
 # $HOME/src/agents-shared or $HOME/work/tools/agents-shared.
 AGENTS_SHARED_DIR="$HOME/path/to/agents-shared"
 
 # Checkout of the system-one repo, which holds the decision-model wrapper, its hooks and skill.
+# Personal profile only: its hook is in overlays/personal.json.
 SYSTEM_ONE_DIR="$HOME/path/to/system-one"
 
 # Checkout of agent-request-limiter, set by its install.sh on machines that run it. The
 # SessionStart check sources it; unset means the limiter is not installed here and the check
-# does nothing.
+# does nothing. Personal profile only, like SYSTEM_ONE_DIR.
 # ARL_DIR="$HOME/path/to/agent-request-limiter"
 
 # cc-status binary (iTerm2 tab-status integration), set on machines that have it installed.

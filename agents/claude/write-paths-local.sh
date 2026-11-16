@@ -9,6 +9,10 @@
 # AGENTS_SHARED_DIR, a rules symlink in the config dir, or a sibling checkout
 # beside this repo. A candidate must contain the hooks to be accepted; with none
 # found, the script asks.
+#
+# --profile also records the folder's agent profile (AGENT_PROFILE=work|personal),
+# which import.sh and export.sh read to pick the settings overlay. Rewriting the
+# file keeps every other line in it (SYSTEM_ONE_DIR, CC_STATUS_PATH, ...).
 
 set -euo pipefail
 
@@ -22,16 +26,18 @@ CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 ASSUME_YES=0
 FORCE=0
 WANT_PATH=""
+WANT_PROFILE=""
 
 usage() {
     cat <<'USAGE'
-usage: write-paths-local.sh [--path DIR] [--yes] [--force]
+usage: write-paths-local.sh [--path DIR] [--profile NAME] [--yes] [--force]
 
 Writes ${CLAUDE_DIR:-$HOME/.claude}/paths.local.sh with AGENTS_SHARED_DIR set to
 this machine's agents-shared checkout, which the guard hooks in settings.json
 source at run time.
 
   --path DIR   use this checkout instead of detecting one
+  --profile N  set AGENT_PROFILE=N (work, personal, ...) for this config folder
   --yes        accept the detected path without prompting
   --force      rewrite the file even if it already resolves
 
@@ -44,6 +50,8 @@ while [ $# -gt 0 ]; do
     case "$1" in
         --path) WANT_PATH=${2-}; shift 2 ;;
         --path=*) WANT_PATH=${1#--path=}; shift ;;
+        --profile) WANT_PROFILE=${2-}; shift 2 ;;
+        --profile=*) WANT_PROFILE=${1#--profile=}; shift ;;
         -y|--yes) ASSUME_YES=1; shift ;;
         --force) FORCE=1; shift ;;
         -h|--help) usage; exit 0 ;;
@@ -58,6 +66,38 @@ SHOWN_TARGET="${TARGET/#$HOME/~}"
 is_checkout() {
     [ -n "${1:-}" ] && [ -x "$1/hooks/require-absolute-rm.sh" ]
 }
+
+if [[ -n "$WANT_PROFILE" && ! "$WANT_PROFILE" =~ '^[a-z0-9-]+$' ]]; then
+    print "profile must be lowercase letters, digits or -: $WANT_PROFILE" >&2
+    exit 1
+fi
+
+# Replace one VAR="value" assignment in TARGET, keeping every other line.
+set_var() {
+    local var=$1 value=$2 kept=""
+    mkdir -p "$CLAUDE_DIR"
+    if [ -f "$TARGET" ]; then
+        kept=$(grep -v "^${var}=" "$TARGET" || true)
+    else
+        kept="# Machine-local paths for hook commands in settings.json. Not committed:
+# ~/.claude is not a repo, and dev-env/export.sh reads only settings.json.
+# Written by dev-env/agents/claude/write-paths-local.sh; the committed shape is
+# dev-env/agents/claude/paths.local.sh.example.
+"
+    fi
+    print -r -- "$kept" > "$TARGET.tmp"
+    print -r -- "${var}=\"${value}\"" >> "$TARGET.tmp"
+    mv "$TARGET.tmp" "$TARGET"
+}
+
+if [ -n "$WANT_PROFILE" ]; then
+    current=""
+    [ -r "$TARGET" ] && current=$(AGENT_PROFILE=""; . "$TARGET" >/dev/null 2>&1; print -r -- "${AGENT_PROFILE:-}")
+    if [ "$current" != "$WANT_PROFILE" ]; then
+        set_var AGENT_PROFILE "$WANT_PROFILE"
+        print "✓ Set AGENT_PROFILE=$WANT_PROFILE in $SHOWN_TARGET"
+    fi
+fi
 
 # Already configured and working — nothing to do.
 if [ "$FORCE" -eq 0 ] && [ -r "$TARGET" ]; then
@@ -143,15 +183,7 @@ if [ -f "$TARGET" ]; then
     print "→ Backed up existing $SHOWN_TARGET"
 fi
 
-cat > "$TARGET" <<EOF
-# Machine-local paths for hook commands in settings.json. Not committed:
-# ~/.claude is not a repo, and dev-env/export.sh reads only settings.json.
-# Written by dev-env/agents/claude/write-paths-local.sh; the committed shape is
-# dev-env/agents/claude/paths.local.sh.example.
-
-# Checkout of the agents-shared repo, which holds hooks/ and claude/rules/.
-AGENTS_SHARED_DIR="$resolved"
-EOF
+set_var AGENTS_SHARED_DIR "$resolved"
 
 print "✓ Wrote $SHOWN_TARGET (AGENTS_SHARED_DIR=$resolved)"
 print "  Verify with: $SCRIPT_DIR/verify-hook-paths.sh"

@@ -9,12 +9,6 @@ SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 source "$SCRIPT_DIR/machine-label.sh"
 cd "$SCRIPT_DIR"
 
-# Claude Code config dirs — override via env if your layout differs.
-# Not derived from $CLAUDE_CONFIG_DIR on purpose: that var is session-contextual
-# (the claudep alias flips it), so it can't be trusted to name the work dir.
-CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
-CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
-
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -618,77 +612,91 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 12: Claude Code Settings ==="
 
-# "<repo subdir>:<target config dir>"
-AGENTS_DIR="agents"
-CLAUDE_PAIRS=(
-    "$AGENTS_DIR/claude:${CLAUDE_DIR}"
-    "$AGENTS_DIR/claude-personal:${CLAUDE_PERSONAL_DIR}"
-)
+# Each config folder gets base settings.json + the overlays of the profile it declares in
+# its paths.local.sh (AGENT_PROFILE). Folders come from settings-profile.sh dirs:
+# $CLAUDE_CONFIG_DIRS when set, else ~/.claude and every ~/.claude-* holding settings.
+SETTINGS_TOOL="$SCRIPT_DIR/agents/claude/settings-profile.sh"
+WRITE_PATHS="$SCRIPT_DIR/agents/claude/write-paths-local.sh"
 
-# Collect the pairs we actually have settings for
-AVAILABLE_CLAUDE=()
-for pair in "${CLAUDE_PAIRS[@]}"; do
-    [ -f "${pair%%:*}/settings.json" ] && AVAILABLE_CLAUDE+=("$pair")
-done
-
-if [[ ${#AVAILABLE_CLAUDE[@]} -eq 0 ]]; then
-    print "${YELLOW}! No Claude settings found in repo, skipping${NC}"
+if ! command_exists jq; then
+    print "${RED}✗ jq not installed — Claude settings are merged with jq (brew install jq), skipping${NC}"
 else
-    # Asked per directory, not once for all: a config dir this machine does not
-    # have is one it does not use, so creating it defaults to no. Machines differ
-    # in how many Claude configs they run, and an absent dir is that answer.
-    for pair in "${AVAILABLE_CLAUDE[@]}"; do
-        src="${pair%%:*}/settings.json"
-        target_dir="${pair##*:}"
+    CLAUDE_DIRS=("${(@f)$("$SETTINGS_TOOL" dirs)}")
+    print "${BLUE}Config folders:${NC} ${${CLAUDE_DIRS[@]/#$HOME/~}[*]}"
+    print "${BLUE}This machine's profiles:${NC} ${MACHINE_PROFILES[*]:-none (unknown machine)}"
+    while ask_yes_no "Add another Claude config folder (one per account)?" "n"; do
+        read "extra_dir?Path, e.g. ~/.claude-work or ~/.claude-personal: "
+        extra_dir="${extra_dir/#\~/$HOME}"
+        [[ -n "$extra_dir" ]] && CLAUDE_DIRS+=("${extra_dir%/}")
+    done
+
+    for target_dir in "${CLAUDE_DIRS[@]}"; do
         target="$target_dir/settings.json"
         shown="${target_dir/#$HOME/~}"
+        echo ""
+        print "${BLUE}── $shown${NC}"
 
-        if [ -d "$target_dir" ]; then
-            claude_prompt="Update $shown/settings.json from $src? (backed up first)"
-            claude_default="y"
-        else
-            claude_prompt="$shown does not exist — create it and copy $src there?"
-            claude_default="n"
-        fi
-
-        if ! ask_yes_no "$claude_prompt" "$claude_default"; then
+        if [ ! -d "$target_dir" ] && ! ask_yes_no "$shown does not exist — create it?" "n"; then
             print "${YELLOW}! Skipped $shown${NC}"
             continue
         fi
 
+        # The profile is the folder's own declaration; ask only when it has none.
+        profile="$("$SETTINGS_TOOL" profile "$target_dir")"
+        if [[ -z "$profile" ]]; then
+            # ~/.claude takes the machine's primary profile; another folder the next one.
+            suggested="${MACHINE_PRIMARY_PROFILE:-personal}"
+            if [[ "$target_dir" != "$HOME/.claude" && ${#MACHINE_PROFILES[@]} -gt 1 ]]; then
+                suggested="${MACHINE_PROFILES[2]}"
+            fi
+            read "profile?Profile for $shown (${MACHINE_PROFILES[*]:-personal work}) [$suggested]: "
+            profile="${profile:-$suggested}"
+        fi
+        if (( ${#MACHINE_PROFILES[@]} )) && (( ! ${MACHINE_PROFILES[(Ie)$profile]} )); then
+            print "${YELLOW}! $shown declares profile '$profile', which machine-label.sh does not list for $MACHINE_LABEL${NC}"
+        fi
+
+        # paths.local.sh first: it records the profile, and the guard hooks in the merged
+        # settings exit 2 — refusing every Bash tool call — until it resolves agents-shared.
         mkdir -p "$target_dir"
+        if ! CLAUDE_DIR="$target_dir" "$WRITE_PATHS" --profile "$profile"; then
+            print "${YELLOW}! paths.local.sh in $shown does not resolve agents-shared — Claude Code will refuse Bash tool calls there until it does${NC}"
+            print "${YELLOW}  Fix with: CLAUDE_DIR=$shown agents/claude/write-paths-local.sh --profile $profile --path <agents-shared checkout>${NC}"
+        fi
+
+        if ! merged="$("$SETTINGS_TOOL" merge "$profile")"; then
+            print "${RED}✗ Could not build settings for profile '$profile' — $shown left as it is${NC}"
+            continue
+        fi
+        print "${BLUE}Settings:${NC} base + $("$SETTINGS_TOOL" overlays "$profile" | sed "s|^$SCRIPT_DIR/||" | tr '\n' ' ')"
+
+        if [ -f "$target" ] && "$SETTINGS_TOOL" check "$target_dir" "$profile" >/dev/null 2>&1; then
+            print "${GREEN}✓ $shown/settings.json already matches${NC}"
+            continue
+        fi
+        if ! ask_yes_no "Write $shown/settings.json for profile '$profile'? (backed up first)" "y"; then
+            print "${YELLOW}! Skipped $shown${NC}"
+            continue
+        fi
+
         # env.AGENTS_SHARED is this machine's checkout path, written by agents-shared's
-        # init-global.sh and stripped on export; carry the live value over the copy.
+        # init-global.sh and stripped on export; carry the live value over.
         local_shared=""
         if [ -f "$target" ]; then
             local_shared="$(jq -r '.env.AGENTS_SHARED // empty' "$target" 2>/dev/null || true)"
             cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
             print "${YELLOW}→ Backed up existing $target${NC}"
         fi
-        if [[ -n "$local_shared" ]] && jq --arg p "$local_shared" '.env.AGENTS_SHARED = $p' "$src" > "$target.tmp"; then
+        if print -r -- "$merged" | jq --arg p "$local_shared" 'if $p != "" then .env.AGENTS_SHARED = $p else . end' > "$target.tmp"; then
             mv "$target.tmp" "$target"
+            print "${GREEN}✓ Wrote $target (base + $profile)${NC}"
+            [[ -z "$local_shared" ]] && print "${YELLOW}  Run agents-shared/scripts/init-global.sh to set env.AGENTS_SHARED here${NC}"
         else
             rm -f "$target.tmp"
-            cp "$src" "$target"
-            [[ -z "$local_shared" ]] && print "${YELLOW}  Run agents-shared/scripts/init-global.sh to set env.AGENTS_SHARED here${NC}"
+            print "${RED}✗ Failed to write $target${NC}"
         fi
-        print "${GREEN}✓ Copied $src → $target${NC}"
     done
 fi
-
-# The guard hooks in settings.json resolve their checkout from a machine-local
-# paths.local.sh and exit 2 when they cannot, so a config dir without that file
-# refuses every Bash tool call.
-# Every config dir whose settings reference it needs its own copy.
-for claude_cfg in "${CLAUDE_DIR}" "${CLAUDE_PERSONAL_DIR}"; do
-    [ -f "$claude_cfg/settings.json" ] || continue
-    grep -q 'AGENTS_SHARED_DIR' "$claude_cfg/settings.json" || continue
-
-    if ! CLAUDE_DIR="$claude_cfg" "$SCRIPT_DIR/agents/claude/write-paths-local.sh"; then
-        print "${YELLOW}! No paths.local.sh in ${claude_cfg/#$HOME/~} — Claude Code will refuse Bash tool calls there until one exists${NC}"
-        print "${YELLOW}  Fix with: CLAUDE_DIR=${claude_cfg/#$HOME/~} agents/claude/write-paths-local.sh --path <agents-shared checkout>${NC}"
-    fi
-done
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════

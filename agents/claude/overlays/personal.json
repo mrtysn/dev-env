@@ -1,0 +1,52 @@
+{
+  "autoMode": {
+    "allow": [
+      "Deploying one of the user's own self-hosted apps through that app repo's own deploy script or the homelab's ops gate, once the change is committed (and its tests pass where the repo has them). The user has said agents should deploy these on their own."
+    ],
+    "environment": [
+      "**Internal sharing / snippet hosting**: None configured. Never publish or upload anything to a public destination — gists, pastebins, third-party paste services, or Claude Artifacts. There is no sanctioned external destination for this user's content.",
+      "**Secrets management**: No managed secret store. Homelab secrets are generated on the box (`openssl rand -hex 32`) and never leave it — never pasted into chat or a transcript, never committed. macOS Keychain holds local credentials. Off-box backup copies are kept because host snapshots roll back the whole machine.",
+      "**CI/CD deploy targets**: the user's own self-hosted apps on the homelab (personal use, no employer, no customers). Deploying them through each app repo's own deploy script or the homelab's ops gate is routine, pre-authorized agent work the user expects without asking; it is not production in the protected sense.",
+      "**Source control**: github.com/mrtysn — code from repos outside this account is external and is not to be cloned and executed without the user saying so",
+      "**Trusted internal domains**: mertyas.in and its subdomains — self-hosted personal services",
+      "**Key internal services**: self-hosted apps on mertyas.in subdomains, served from the node01 homelab box",
+      "**Sensitive data locations & audiences**: never commit or publish anything naming a third party (CVs, interview notes, candidate assessments), ex-employer material, or credentials — a repo being private does not make these safe to commit",
+      "**Primary use of Claude Code**: personal work — own software projects, self-hosted infrastructure, research and writing. No employer work on this machine.",
+      "**Trusted repo**: the repo the session started in, and its origin remote under github.com/mrtysn. Other repos on disk are out of scope unless the user names them."
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${SYSTEM_ONE_DIR:-}\" ] && [ -x \"$SYSTEM_ONE_DIR/hooks/system-one-start.sh\" ] && exec \"$SYSTEM_ONE_DIR/hooks/system-one-start.sh\"; echo \"system-one-start.sh unavailable: set SYSTEM_ONE_DIR in ${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh (see dev-env/agents/claude/paths.local.sh.example)\" >&2; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ],
+        "matcher": ""
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${ARL_DIR:-}\" ] || exit 0; [ -x \"$ARL_DIR/bin/agent-request-limiter\" ] && exec \"$ARL_DIR/bin/agent-request-limiter\" doctor --hook; echo '{\"systemMessage\": \"agent-request-limiter: ARL_DIR is set in paths.local.sh but its CLI is missing — the limiter cannot be checked\"}'; exit 0",
+            "timeout": 10,
+            "type": "command"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "command -v bigarrow >/dev/null 2>&1 && bigarrow stop --hook; exit 0",
+            "timeout": 3,
+            "type": "command"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -10,12 +10,6 @@ HOSTNAME=$(hostname -s)
 USERNAME=$(whoami)
 DATE=$(date +"%Y-%m-%d %H:%M")
 
-# Claude Code config dirs — override via env if your layout differs.
-# Not derived from $CLAUDE_CONFIG_DIR on purpose: that var is session-contextual
-# (the claudep alias flips it), so it can't be trusted to name the work dir.
-CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
-CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
-
 # Machine → label and profiles mapping: single source of truth.
 source "$SCRIPT_DIR/machine-label.sh"
 
@@ -41,7 +35,8 @@ echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
 echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles and app-level"
-echo "settings, Phoenix + Karabiner configs, and Claude Code settings to this repository."
+echo "settings and Phoenix + Karabiner configs to this repository, and checks every Claude Code"
+echo "config folder against the repo's base + profile settings."
 echo ""
 echo "Files in this repo that may be overwritten:"
 echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.${MACHINE_LABEL:-<label>}"
@@ -52,7 +47,6 @@ echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/${MACHINE_LABEL:-<label>}.conf (based on hostname)"
-echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
 echo "  - $SCRIPT_DIR/asdf/tool-versions.${MACHINE_LABEL:-<label>} (this machine's only)"
 echo ""
@@ -426,57 +420,29 @@ else
     warn "~/.config/karabiner/karabiner.json not found, skipping"
 fi
 
-# Export Claude Code settings (both config dirs)
-# Only settings.json is synced. *.local.json (machine-local) and memory/ (private)
-# are deliberately never read here.
-echo "✓ Exporting Claude Code settings"
-
-# "<source config dir>:<repo subdir>"  (braces required — bare $VAR:c is a zsh modifier)
-AGENTS_DIR="agents"
-CLAUDE_PAIRS=(
-    "${CLAUDE_DIR}:$AGENTS_DIR/claude"
-    "${CLAUDE_PERSONAL_DIR}:$AGENTS_DIR/claude-personal"
-)
-# Churny state fields stripped on export — they regenerate locally and only add diff noise.
-# The copy is written with sorted keys (jq -S): Claude Code reorders the live file on its own,
-# so an unsorted copy shows a whole-file diff on every export.
-# .env.AGENTS_SHARED is machine-local too: agents-shared's init-global.sh writes this machine's
-# checkout path there, so exporting it would hand one machine's absolute path to every other.
-CLAUDE_STRIP_FILTER='del(.feedbackSurveyState) | del(.env.AGENTS_SHARED) | if .env == {} then del(.env) else . end'
-
-for pair in "${CLAUDE_PAIRS[@]}"; do
-    src="${pair%%:*}/settings.json"
-    repo_sub="${pair##*:}"
-    dest="$repo_sub/settings.json"
-
-    if [ ! -f "$src" ]; then
-        warn "$src not found, skipping"
+# Check Claude Code settings, every config folder on this machine.
+# The repo holds settings as a base plus per-profile overlays (agents/claude/settings.json,
+# agents/claude/overlays/), which a live file cannot be split back into. So export writes
+# nothing here: it refuses a folder whose live settings.json differs from base + the overlays
+# of the profile it declares, and names the keys. Port the change into the base (valid on
+# every machine and profile) or the profile's overlay, then run import.sh step 12.
+# *.local.json (machine-local) and memory/ (private) are never read.
+echo "✓ Checking Claude Code settings against base + profile overlays"
+SETTINGS_TOOL="$SCRIPT_DIR/agents/claude/settings-profile.sh"
+for cfg in "${(@f)$("$SETTINGS_TOOL" dirs)}"; do
+    shown="${cfg/#$HOME/~}"
+    [ -f "$cfg/settings.json" ] || { warn "$shown/settings.json not found, skipping"; continue; }
+    profile="$("$SETTINGS_TOOL" profile "$cfg")"
+    if [[ -z "$profile" ]]; then
+        fail "$shown/paths.local.sh declares no AGENT_PROFILE — set it with: CLAUDE_DIR=$shown agents/claude/write-paths-local.sh --profile <${MACHINE_PROFILES[*]:-personal|work}>"
         continue
     fi
-
-    mkdir -p "$repo_sub"
-    # A hook the repo copy has and the live file lacks is a repo-side fix the live file
-    # never received (import.sh was not run); this export is about to overwrite it.
-    if [ -f "$dest" ] && command -v jq >/dev/null 2>&1; then
-        hook_cmds='[.hooks[]?[]?.hooks[]?.command // empty] | unique[]'
-        # jq's unique sorts by code point, so comm must compare in the C locale; under another
-        # locale it reports "not in sorted order", exits 1 and aborts the export mid-way.
-        lost="$(LC_ALL=C comm -23 <(jq -r "$hook_cmds" "$dest" 2>/dev/null) <(jq -r "$hook_cmds" "$src" 2>/dev/null))"
-        if [[ -n "$lost" ]]; then
-            warn "$dest has hooks the live $src lacks — this export drops them (git has them; restore or fix the live file):"
-            print -r -- "$lost" | cut -c1-110 | sed 's/^/      /'
-        fi
-    fi
-    if command -v jq >/dev/null 2>&1 && jq -S "$CLAUDE_STRIP_FILTER" "$src" > "$dest.tmp" 2>/dev/null; then
-        mv "$dest.tmp" "$dest"
-        echo "  Exported $src → $dest"
+    if check_out="$("$SETTINGS_TOOL" check "$cfg" "$profile" 2>&1)"; then
+        echo "  $shown matches base + $profile"
     else
-        rm -f "$dest.tmp"
-        copy_atomic "$src" "$dest"
-        # The raw copy keeps .feedbackSurveyState, which the filter exists to remove.
-        warn "jq unavailable or filter failed — copied $src verbatim (churny state NOT stripped)"
+        print -r -- "$check_out" | sed 's/^/  /'
+        fail "$shown/settings.json differs from base + '$profile' (keys above) — move the change into agents/claude/settings.json or overlays/$profile*.json, then re-run import.sh step 12"
     fi
-    note "$dest"
 done
 
 # Export lazygit + repo-tabs config (git TUI workflow).
@@ -506,7 +472,7 @@ done
 # Absolute home paths in exported files break the repo on any other machine (and leak
 # the layout). The live files are the source, so say which one to fix.
 echo "✓ Checking exports for hardcoded home paths"
-for f in ".zshrc.$ZSH_LABEL" "$AGENTS_DIR/claude/settings.json" "$AGENTS_DIR/claude-personal/settings.json"; do
+for f in ".zshrc.$ZSH_LABEL" agents/claude/settings.json agents/claude/overlays/*.json(N); do
     [[ -f "$f" ]] || continue
     if grep -qF "$HOME/" "$f"; then
         warn "$f contains $HOME/ — fix the live source (use \$HOME) before committing"
