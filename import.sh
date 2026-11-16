@@ -674,9 +674,17 @@ else
         fi
         print "${BLUE}Settings:${NC} base + $("$SETTINGS_TOOL" overlays "$profile" | sed "s|^$SCRIPT_DIR/||" | tr '\n' ' ')"
 
-        if [ -f "$target" ] && "$SETTINGS_TOOL" check "$target_dir" "$profile" >/dev/null 2>&1; then
-            print "${GREEN}✓ $shown/settings.json already matches${NC}"
-            continue
+        if [ -f "$target" ]; then
+            check_out="$("$SETTINGS_TOOL" check "$target_dir" "$profile" 2>&1)" && {
+                print "${GREEN}✓ $shown/settings.json already matches${NC}"
+                continue
+            }
+            # Matches, but a command reads a paths.local.sh variable this folder does not set:
+            # rewriting settings would not help, the variable is what is missing.
+            if [[ "$check_out" == *"does not set"* ]]; then
+                print "${RED}✗ $check_out${NC}"
+                continue
+            fi
         fi
         if ! ask_yes_no "Write $shown/settings.json for profile '$profile'? (backed up first)" "y"; then
             print "${YELLOW}! Skipped $shown${NC}"
@@ -695,6 +703,7 @@ else
             mv "$target.tmp" "$target"
             print "${GREEN}✓ Wrote $target (base + $profile)${NC}"
             [[ -z "$local_shared" ]] && print "${YELLOW}  Run agents-shared/scripts/init-global.sh to set env.AGENTS_SHARED here${NC}"
+            check_out="$("$SETTINGS_TOOL" check "$target_dir" "$profile" 2>&1)" || print "${RED}✗ $check_out${NC}"
         else
             rm -f "$target.tmp"
             print "${RED}✗ Failed to write $target${NC}"

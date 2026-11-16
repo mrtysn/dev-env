@@ -121,6 +121,27 @@ folder_profile() {
     print -r -- "$p"
 }
 
+# Every hook and status line command that sources paths.local.sh and reads ${NAME:-} must find
+# NAME set there, or it exits 0 and silently does nothing (the status line went blank this way
+# on 2026-11-16). Prints each missing NAME; exit 1 when any is missing.
+missing_local_vars() {
+    local dir=$1 settings=$2 name value missing=0
+    local -a names
+    names=(${(f)"$(jq -r '[.. | strings | select(test("paths\\.local\\.sh"))
+        | [scan("\\$\\{([A-Z][A-Z0-9_]*):-\\}")[0]] | .[]] | unique | .[]' "$settings")"})
+    # Unset by design where the tool is not installed (paths.local.sh.example says so for each).
+    local -a optional=(CLAUDE_CONFIG_DIR ARL_DIR CC_STATUS_PATH)
+    for name in $names; do
+        (( ${optional[(Ie)$name]} )) && continue
+        value=$(unset $name; [[ -r "$dir/paths.local.sh" ]] && . "$dir/paths.local.sh" >/dev/null 2>&1; print -r -- "${(P)name:-}")
+        if [[ -z "$value" ]]; then
+            print -r -- "$name"
+            missing=1
+        fi
+    done
+    return $missing
+}
+
 check() {
     local dir=$1 profile=${2:-} live="$1/settings.json" diffs
     [[ -f "$live" ]] || die "no settings.json in $dir"
@@ -144,6 +165,13 @@ check() {
             <(print -r -- "$expected" | jq -S --argjson k "$keys" "$STRIP | $CANON_JQ | with_entries(select(.key as \$x | \$k | index(\$x)))") \
             <(jq -S --argjson k "$keys" "$STRIP | $CANON_JQ | with_entries(select(.key as \$x | \$k | index(\$x)))" "$live") \
             | tail -n +3 | head -60 | cut -c1-160 | sed 's/^/    /' || true
+        return 1
+    fi
+    local unset_vars
+    if ! unset_vars=$(missing_local_vars "$dir" "$live"); then
+        print -r -- "$live matches base + '$profile' overlays, but its commands read variables $dir/paths.local.sh does not set, so they silently do nothing:"
+        print -r -- "$unset_vars" | sed 's/^/  /'
+        print -r -- "  Fix: CLAUDE_DIR=$dir ${SCRIPT_DIR#$REPO_ROOT/}/write-paths-local.sh (or add NAME=\"<path>\" lines to that file)"
         return 1
     fi
     print -r -- "$live matches base + '$profile' overlays"

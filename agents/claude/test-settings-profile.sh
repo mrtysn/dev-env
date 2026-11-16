@@ -54,6 +54,20 @@ for k in model autoMode.environment extra; do
     print -r -- "$out" | grep -qx "  $k" && ok || bad "drift output should name $k"
 done
 
+# A command reading a paths.local.sh variable the folder does not set fails check, naming it;
+# ARL_DIR is optional by design and never flagged.
+mkdir -p "$T/v/ov" "$T/v/cfg"
+print -r -- '{"statusLine": {"type": "command", "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; . \"$f\"; [ -n \"${FOO_DIR:-}\" ] && exec \"$FOO_DIR/x\"; [ -n \"${ARL_DIR:-}\" ]; exit 0"}}' > "$T/v/base.json"
+print -r -- '{}' > "$T/v/ov/p.json"
+cp "$T/v/base.json" "$T/v/cfg/settings.json"
+vrun() { SETTINGS_BASE="$T/v/base.json" SETTINGS_OVERLAY_DIR="$T/v/ov" "$TOOL" "$@" }
+print -r -- 'AGENT_PROFILE=p' > "$T/v/cfg/paths.local.sh"
+out=$(vrun check "$T/v/cfg" 2>&1) && bad "an unset paths.local.sh variable should fail check" || expect "unset variable exit" "$?" "1"
+print -r -- "$out" | grep -qx "  FOO_DIR" && ok || bad "check should name FOO_DIR"
+print -r -- "$out" | grep -q "ARL_DIR" && bad "ARL_DIR is optional and should not be named" || ok
+print -r -- 'FOO_DIR=/somewhere' >> "$T/v/cfg/paths.local.sh"
+vrun check "$T/v/cfg" >/dev/null 2>&1 && ok || bad "check should pass once FOO_DIR is set"
+
 # Error paths exit 2 with a message.
 run merge none >/dev/null 2>&1 && bad "missing overlay should fail" || expect "missing overlay exit" "$?" "2"
 out=$(run merge w 2>&1 || true)
