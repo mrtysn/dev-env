@@ -47,11 +47,19 @@ ask_yes_no() {
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
-# Whether an Apple ID is signed in to the App Store. `mas account` answers where it
-# exists (mas 6 and older); mas 7 removed it and has no replacement, and mas is not
-# installed yet on a fresh machine, so then the user is asked (default no).
+# Whether an Apple ID is signed in to the App Store. macOS keeps the App Store login as a
+# com.apple.account.iTunesStore account in the Accounts database; signed in means one is
+# both active and authenticated (a signed-out one stays with both flags 0). mas 7 has no
+# `mas account`, so this is read first; `mas account` (mas 6 and older) next; the user is
+# asked (default no) only when neither can answer.
 mas_signed_in() {
-    local out
+    local out db="$HOME/Library/Accounts/Accounts4.sqlite"
+    if [[ -r "$db" ]] && command_exists sqlite3 && out="$(sqlite3 -readonly "$db" \
+        "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
+         WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)"; then
+        (( out > 0 ))
+        return
+    fi
     if command_exists mas; then
         if out="$(mas account 2>&1)"; then
             return 0
