@@ -47,6 +47,21 @@ ask_yes_no() {
     [[ "$reply" =~ ^[Yy]$ ]]
 }
 
+# Whether an Apple ID is signed in to the App Store. `mas account` answers where it
+# exists (mas 6 and older); mas 7 removed it and has no replacement, and mas is not
+# installed yet on a fresh machine, so then the user is asked (default no).
+mas_signed_in() {
+    local out
+    if command_exists mas; then
+        if out="$(mas account 2>&1)"; then
+            return 0
+        elif [[ "$out" != *(Unexpected argument|unknown|Usage)* ]]; then
+            return 1
+        fi
+    fi
+    ask_yes_no "Is an Apple ID signed in to the App Store (for the mas apps)?" n
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1: Homebrew (required - other steps depend on it)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -83,9 +98,17 @@ if [ -f Brewfile ]; then
         print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask|mas) ' "$layer") entries"
     done
     if ask_yes_no "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
+        # `mas "<name>", id: <id>` lines need an Apple ID signed in to the App Store. Without
+        # one they are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) instead of failing.
+        MAS_IDS=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
+        if (( ${#MAS_IDS} )) && ! mas_signed_in; then
+            print "${YELLOW}! No Apple ID signed in to the App Store: skipping ${#MAS_IDS} mas app(s). Sign in, then re-run this step.${NC}"
+            export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
+        fi
         for layer in "${BREW_LAYERS[@]}"; do
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
         done
+        unset HOMEBREW_BUNDLE_MAS_SKIP
     else
         print "${YELLOW}! Skipped brew bundle${NC}"
     fi
