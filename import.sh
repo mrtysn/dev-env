@@ -790,6 +790,44 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 15: Push name guard for this repo (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 15: Push Name Guard ==="
+# This repo is public. agents-shared's githooks/pre-push reads every commit a push sends
+# and refuses it when an added line, path or message names an entry on a local, untracked
+# denylist (an employer, a client). Opting in points this clone's core.hooksPath at it.
+# By hand: git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
+GUARD_SHARED="${AGENTS_SHARED:-}"
+if [[ -z "$GUARD_SHARED" && -r "$HOME/.claude/paths.local.sh" ]]; then
+    GUARD_SHARED="$(AGENTS_SHARED_DIR=""; . "$HOME/.claude/paths.local.sh" >/dev/null 2>&1; print -r -- "${AGENTS_SHARED_DIR:-}")"
+fi
+[[ -z "$GUARD_SHARED" && -d "${SCRIPT_DIR:h}/agents-shared" ]] && GUARD_SHARED="${SCRIPT_DIR:h}/agents-shared"
+GUARD_HOOKS="${GUARD_SHARED:+$GUARD_SHARED/githooks}"
+GUARD_LIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
+
+if [[ -z "$GUARD_SHARED" ]]; then
+    print "${RED}✗ No agents-shared checkout found (\$AGENTS_SHARED, ~/.claude/paths.local.sh or a sibling of this repo) — name guard not installed${NC}"
+elif [[ ! -x "$GUARD_HOOKS/pre-push" ]]; then
+    print "${RED}✗ $GUARD_HOOKS/pre-push is missing or not executable — pull agents-shared, then re-run this step${NC}"
+elif [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "$GUARD_HOOKS" ]]; then
+    print "${GREEN}✓ Pushes from this clone already go through $GUARD_HOOKS/pre-push${NC}"
+else
+    existing_hooks="$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)"
+    [[ -n "$existing_hooks" ]] && print "${YELLOW}! core.hooksPath is currently $existing_hooks; it will be replaced${NC}"
+    if ask_yes_no "Route this clone's pushes through the name guard ($GUARD_HOOKS/pre-push)?"; then
+        git -C "$SCRIPT_DIR" config core.hooksPath "$GUARD_HOOKS"
+        print "${GREEN}✓ core.hooksPath → $GUARD_HOOKS${NC}"
+    else
+        print "${YELLOW}! Skipped the name guard${NC}"
+    fi
+fi
+if [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "${GUARD_HOOKS:-none}" && ! -r "$GUARD_LIST" ]]; then
+    print "${YELLOW}! $GUARD_LIST does not exist, so every push is refused until it does:${NC}"
+    print "${YELLOW}  copy $GUARD_HOOKS/push-denylist.txt.example there and add one name per line (an empty file blocks nothing)${NC}"
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Import Complete ==="
