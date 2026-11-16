@@ -1,4 +1,0 @@
-# C1 · Office — machine-specific dependencies.
-brew "redis"    # redisstart alias in .zshrc.c1
-brew "opencode" # *o project aliases and tmux_opencode picker in .zshrc.c1
-cask "codex"    # codex() wrapper in .zshrc.c1

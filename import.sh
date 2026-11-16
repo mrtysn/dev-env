@@ -5,7 +5,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
-# Machine → label (c01/c02) mapping: single source of truth.
+# Machine → label and profiles mapping: single source of truth.
 source "$SCRIPT_DIR/machine-label.sh"
 cd "$SCRIPT_DIR"
 
@@ -100,7 +100,7 @@ echo ""
 # Step 3: Nerd Font (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 3: asdf Runtimes ==="
-# Per-machine pins (asdf/tool-versions.c01|c2) — same one-sided convention as
+# Per-machine pins (asdf/tool-versions.<label>) — same one-sided convention as
 # .zshrc.<label>: this machine only ever reads its own file.
 if [[ -n "$BREW_LABEL" ]] && [ -f "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
     print "${BLUE}Runtimes ($BREW_LABEL):${NC} $(tr '\n' ' ' < "asdf/tool-versions.$BREW_LABEL")"
@@ -281,7 +281,7 @@ else
             BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
             print "${YELLOW}→ Backing up existing configs to $BACKUP_DIR${NC}"
             mkdir -p "$BACKUP_DIR"
-            for f in .zshrc .zshrc.base .zshrc.c01 .zshrc.c02 .zshrc.personal .p10k.zsh; do
+            for f in .zshrc .zshrc.base .zshrc.${ZSH_LABEL:-none} .zshrc.personal .p10k.zsh; do
                 [ -f ~/$f ] && cp ~/$f "$BACKUP_DIR/$f"
             done
             print "${GREEN}✓ Existing configs backed up${NC}"
@@ -314,6 +314,7 @@ else
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
   mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
+  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
 esac
 EOF
             fi
@@ -547,25 +548,20 @@ else
         TMUX_CONF="tmux/$MACHINE_LABEL.conf"
     else
         print "${BLUE}Unknown machine (see machine-label.sh)${NC}"
-        echo "  1) C01 — Office Mac (Ctrl-a prefix, blue status bar)"
-        echo "  2) C02 — Home Mac (Ctrl-s prefix, green status bar)"
-        echo "  3) Skip"
+        TMUX_CHOICES=(tmux/c[0-9][0-9].conf(N))
+        for (( i = 1; i <= ${#TMUX_CHOICES[@]}; i++ )); do
+            echo "  $i) ${TMUX_CHOICES[$i]:t:r}"
+        done
+        echo "  s) Skip"
         echo ""
-        read "tmux_choice?Select machine [1/2/3]: "
+        read "tmux_choice?Select machine config: "
 
-        case "$tmux_choice" in
-            1)
-                TMUX_CONF="tmux/c01.conf"
-                MACHINE_NAME="C01 (Office)"
-                ;;
-            2)
-                TMUX_CONF="tmux/c02.conf"
-                MACHINE_NAME="C02 (Home)"
-                ;;
-            *)
-                print "${YELLOW}! Skipped tmux configuration${NC}"
-                ;;
-        esac
+        if [[ "$tmux_choice" == <-> ]] && (( tmux_choice >= 1 && tmux_choice <= ${#TMUX_CHOICES[@]} )); then
+            TMUX_CONF="${TMUX_CHOICES[$tmux_choice]}"
+            MACHINE_NAME="${TMUX_CONF:t:r}"
+        else
+            print "${YELLOW}! Skipped tmux configuration${NC}"
+        fi
     fi
 
     if [[ -n "$TMUX_CONF" ]]; then
@@ -791,7 +787,7 @@ echo ""
 echo "Next steps:"
 echo "  1. Restart your terminal or run: source ~/.zshrc"
 echo "  2. Powerlevel10k config wizard will run on first start (if not configured)"
-echo "  3. Machine-specific aliases live in ~/.zshrc.c01 (Office) / ~/.zshrc.c02 (Home); shared config in ~/.zshrc.base"
+echo "  3. Machine-specific aliases live in ~/.zshrc.<label> (c02 Home, c03 Work); shared config in ~/.zshrc.base"
 echo ""
 if [ -n "$BACKUP_DIR" ] && [ -d "$BACKUP_DIR" ]; then
     echo "Your old configs are backed up at: $BACKUP_DIR"

@@ -1,15 +1,21 @@
-# Single source of truth for the machine → label mapping.
-#   c01 = Office     c02 = Home
+# Single source of truth for the machine → label → profiles mapping.
+#   c02 = Home Mac (personal)     c03 = Work Mac (work, plus a personal config folder)
 # Sourced by export.sh and import.sh; the label names every per-machine file:
 # .zshrc.<label>, Brewfile.<label>, tmux/<label>.conf, asdf/tool-versions.<label>.
+#
+# MACHINE_PROFILES lists the agent profiles this machine runs (see README, "Profiles").
+# The first entry is the machine's primary profile: it picks the Brewfile.<profile> layer
+# and the default profile for a new Claude config folder. Each config folder still declares
+# its own profile in its paths.local.sh (AGENT_PROFILE=...); this list only says which
+# profiles are expected here.
 #
 # LocalHostName, not `hostname -s`: the latter can resolve to a DHCP name
 # (e.g. "192") on some LANs and misroute per-machine files.
 #
 # Known exception: the ~/.zshrc loader (shipped by import.sh, exported back as
-# .zshrc.loader) carries its own copy of this mapping — shell startup must not
-# depend on this repo, whose path differs per machine.
-# One case per machine: add a LocalHostName here to bind it to a label.
+# .zshrc.loader) carries its own copy of the hostname → label mapping — shell startup
+# must not depend on this repo, whose path differs per machine.
+# One case per machine: add a LocalHostName here (and in .zshrc.loader) to bind it.
 #
 # "Unknown" is scutil's own not-set sentinel, but it's also what a sandboxed
 # shell prints when it can't reach configd — a silently wrong answer, not an
@@ -25,6 +31,8 @@ if [[ "$RESOLVED_HOST" == "Unknown" ]]; then
     exit 1
 fi
 case "$RESOLVED_HOST" in
-    mrtysn-mbp-m2max)  MACHINE_LABEL="c02"; MACHINE_NAME="C02 (Home)" ;;
-    *)                 MACHINE_LABEL="";   MACHINE_NAME="unknown" ;;
+    mrtysn-mbp-m2max)  MACHINE_LABEL="c02"; MACHINE_NAME="C02 (Home)"; MACHINE_PROFILES=(personal) ;;
+    mrtysn-mbp-m5)     MACHINE_LABEL="c03"; MACHINE_NAME="C03 (Work)"; MACHINE_PROFILES=(work personal) ;;
+    *)                 MACHINE_LABEL="";    MACHINE_NAME="unknown";    MACHINE_PROFILES=() ;;
 esac
+MACHINE_PRIMARY_PROFILE="${MACHINE_PROFILES[1]:-}"

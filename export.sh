@@ -16,7 +16,7 @@ DATE=$(date +"%Y-%m-%d %H:%M")
 CLAUDE_DIR="${CLAUDE_DIR:-$HOME/.claude}"
 CLAUDE_PERSONAL_DIR="${CLAUDE_PERSONAL_DIR:-$HOME/.claude-personal}"
 
-# Machine → label (c01/c02) mapping: single source of truth.
+# Machine → label and profiles mapping: single source of truth.
 source "$SCRIPT_DIR/machine-label.sh"
 
 # ── Bookkeeping ────────────────────────────────────────────────────────────────
@@ -44,17 +44,17 @@ echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles 
 echo "settings, Phoenix + Karabiner configs, and Claude Code settings to this repository."
 echo ""
 echo "Files in this repo that may be overwritten:"
-echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.c01|c02"
+echo "  - $SCRIPT_DIR/.zshrc.base, .zshrc.loader, and this machine's .zshrc.${MACHINE_LABEL:-<label>}"
 echo "  - $SCRIPT_DIR/.p10k.zsh"
 echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
-echo "  - $SCRIPT_DIR/tmux/c01.conf or c02.conf (based on hostname)"
+echo "  - $SCRIPT_DIR/tmux/${MACHINE_LABEL:-<label>}.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/agents/claude/settings.json, agents/claude-personal/settings.json"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
-echo "  - $SCRIPT_DIR/asdf/tool-versions.c01|c02 (this machine's only)"
+echo "  - $SCRIPT_DIR/asdf/tool-versions.${MACHINE_LABEL:-<label>} (this machine's only)"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -94,6 +94,14 @@ echo "✓ Exporting zsh configuration"
 if [ -f ~/.zshrc.base ]; then
     copy_atomic ~/.zshrc.base .zshrc.base
     note ".zshrc.base"
+    # The loader's hostname cases are edited in the repo when a machine is added, and the
+    # live ~/.zshrc only gets them on the next import. Exporting first would drop them.
+    lost_loader="$(comm -23 <(grep -E '^ +[A-Za-z0-9-]+\)' .zshrc.loader 2>/dev/null | LC_ALL=C sort) \
+                            <(grep -E '^ +[A-Za-z0-9-]+\)' ~/.zshrc | LC_ALL=C sort) || true)"
+    if [[ -n "$lost_loader" ]]; then
+        warn "the repo .zshrc.loader maps machines the live ~/.zshrc lacks — this export drops them (git has them; run import.sh step 8 or copy the cases into ~/.zshrc):"
+        print -r -- "$lost_loader" | sed 's/^/      /'
+    fi
     copy_atomic ~/.zshrc .zshrc.loader
     note ".zshrc.loader"
     if [[ -n "$ZSH_LABEL" ]] && [ -f ~/.zshrc.$ZSH_LABEL ]; then

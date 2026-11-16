@@ -2,7 +2,7 @@
 # Thin entrypoint. Sources the shared base, then this machine's config.
 # Managed by the dev-env repo (import.sh / export.sh).
 #   • Shared changes        → edit ~/.zshrc.base
-#   • Machine-specific ones → edit ~/.zshrc.c01 (Office) or ~/.zshrc.c02 (Home)
+#   • Machine-specific ones → edit ~/.zshrc.<label> (c02 Home, c03 Work)
 # Keep p10k's instant-prompt block (top of ~/.zshrc.base) first: nothing above it
 # may write to the console.
 
@@ -12,6 +12,7 @@
 # (it can resolve to a DHCP name like "192"). Falls back to hostname -s if unset.
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
   mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;  # C02 · Home
+  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;  # C03 · Work
 esac
 
 # Added by LM Studio CLI (lms)
