@@ -131,7 +131,8 @@ ignores `feedbackSurveyState`, `env.AGENTS_SHARED` and the order of hooks within
 This repo is public. `import.sh` step 15 points this clone's `core.hooksPath` at
 agents-shared's `githooks/`, whose `pre-push` refuses a push that adds a line, path or commit
 message naming an entry on a local, untracked denylist. It refuses every push while the
-denylist is missing. By hand:
+denylist is missing, and passes every push while it holds no entries, so step 15 warns when
+the file has only comments or blank lines. By hand:
 
 ```bash
 git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"

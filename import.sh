@@ -795,7 +795,7 @@ echo ""
 echo "=== Step 15: Push Name Guard ==="
 # This repo is public. agents-shared's githooks/pre-push reads every commit a push sends
 # and refuses it when an added line, path or message names an entry on a local, untracked
-# denylist (an employer, a client). Opting in points this clone's core.hooksPath at it.
+# denylist (an employer, a client); an empty denylist passes everything, so this step warns on one. Opting in points this clone's core.hooksPath at it.
 # By hand: git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
 GUARD_SHARED="${AGENTS_SHARED:-}"
 if [[ -z "$GUARD_SHARED" && -r "$HOME/.claude/paths.local.sh" ]]; then
@@ -821,9 +821,15 @@ else
         print "${YELLOW}! Skipped the name guard${NC}"
     fi
 fi
-if [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "${GUARD_HOOKS:-none}" && ! -r "$GUARD_LIST" ]]; then
-    print "${YELLOW}! $GUARD_LIST does not exist, so every push is refused until it does:${NC}"
-    print "${YELLOW}  copy $GUARD_HOOKS/push-denylist.txt.example there and add one name per line (an empty file blocks nothing)${NC}"
+if [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "${GUARD_HOOKS:-none}" ]]; then
+    if [[ ! -r "$GUARD_LIST" ]]; then
+        print "${YELLOW}! $GUARD_LIST does not exist, so every push is refused until it does:${NC}"
+        print "${YELLOW}  copy $GUARD_HOOKS/push-denylist.txt.example there and add one name per line${NC}"
+    elif [[ -z "$(grep -Ev '^[[:space:]]*(#|$)' "$GUARD_LIST" || true)" ]]; then
+        # The hook passes with an empty list, so the guard looks installed while it blocks nothing.
+        print "${RED}✗ $GUARD_LIST holds no entries (only comments or blank lines): the name guard blocks NOTHING.${NC}"
+        print "${RED}  Add one name per line (an employer, a client; see $GUARD_HOOKS/push-denylist.txt.example) before the next push.${NC}"
+    fi
 fi
 echo ""
 
