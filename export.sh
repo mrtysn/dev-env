@@ -458,7 +458,10 @@ LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
 if [ -f "$LAZYGIT_DIR/config.yml" ]; then
     mkdir -p lazygit/themes
     copy_atomic "$LAZYGIT_DIR/config.yml" lazygit/config.yml
-    note "lazygit/config.yml"
+    # The editor preset is per machine (import.sh step 14 sets it from the editor installed
+    # there); the repo copy keeps it empty, so $EDITOR applies wherever no known editor exists.
+    sed -E 's/^([[:space:]]*)editPreset:.*/\1editPreset: ""/' lazygit/config.yml > lazygit/config.yml.tmp && mv lazygit/config.yml.tmp lazygit/config.yml
+    note "lazygit/config.yml (editPreset reset: set per machine on import)"
     for t in "$LAZYGIT_DIR"/themes/*.yml(N); do
         copy_atomic "$t" "lazygit/themes/${t:t}"
         note "lazygit/themes/${t:t}"

@@ -2,7 +2,7 @@ disableStartupPopups: true
 git:
   autoFetch: false
 os:
-  editPreset: sublime
+  editPreset: ""
 gui:
   sidePanelWidth: 0.45
 # --- theme (managed by lg-theme) ---

@@ -770,6 +770,18 @@ else
                 print "${YELLOW}→ Backed up existing lazygit config.yml${NC}"
             fi
             cp lazygit/config.yml "$LAZYGIT_DIR/config.yml"
+            # lazygit's editPreset is per machine: the editor that is installed here, else empty,
+            # which makes lazygit use $EDITOR. The repo copy keeps it empty (export.sh resets it).
+            lg_preset=""
+            if (( $+commands[subl] )); then lg_preset="sublime"
+            elif (( $+commands[code] )); then lg_preset="vscode"; fi
+            if [[ -n "$lg_preset" ]]; then
+                sed -E "s/^([[:space:]]*)editPreset:.*/\\1editPreset: $lg_preset/" "$LAZYGIT_DIR/config.yml" > "$LAZYGIT_DIR/config.yml.tmp" \
+                    && mv "$LAZYGIT_DIR/config.yml.tmp" "$LAZYGIT_DIR/config.yml"
+                print "${GREEN}✓ lazygit editPreset: $lg_preset${NC}"
+            else
+                print "${YELLOW}! Neither subl nor code is installed: lazygit falls back to \$EDITOR${NC}"
+            fi
             for t in lazygit/themes/*.yml(N); do
                 cp "$t" "$LAZYGIT_DIR/themes/${t:t}"
             done
