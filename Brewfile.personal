@@ -3,3 +3,21 @@
 cask "karabiner-elements"       # keymaps (karabiner/karabiner.json synced; installs a driver extension)
 cask "phoenix"                  # window manager (.phoenix.js synced; needs Accessibility)
 cask "sourcetree"               # repo-tabs st mode
+
+# Picked 2026-11-17: games, media, VPNs, VMs and personal tooling
+cask "mullvad-vpn"
+cask "protonvpn"
+cask "steam"
+cask "roblox"
+cask "robloxstudio"
+cask "bambu-studio"             # 3D printing
+cask "lm-studio"
+cask "moonlight"                # game streaming
+cask "utm"                      # virtual machines
+cask "qbittorrent"
+cask "microsoft-teams"
+cask "shortcat"
+cask "docker-desktop"
+cask "discord"
+cask "mounty"                   # NTFS read-write
+cask "orangedrangon-android-messages"

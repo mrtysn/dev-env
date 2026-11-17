@@ -101,6 +101,17 @@ cask "image2icon"               # icon creator
 cask "upscayl"                  # AI image upscaler
 
 # ── Mac App Store (needs an Apple ID signed in; import.sh skips these otherwise)
+# Picked 2026-11-17 from the apps in use on the home Mac
+cask "opera"                    # browser
+cask "google-chrome"            # browser
+cask "tailscale-app"            # mesh VPN
+cask "oversight"                # mic and camera monitor
+cask "blender"                  # 3D
+cask "appcleaner"               # uninstaller
+cask "maccy"                    # clipboard history
+cask "claude"                   # Claude desktop
+cask "netiquette"               # network monitor
+
 mas "Aiko", id: 1672085276                # speech to text
 mas "Color Picker", id: 1545870783        # colour picker
 mas "Day Progress", id: 6450280202        # day progress in the menu bar
@@ -110,3 +121,4 @@ mas "Spaced", id: 1666327168              # break reminder
 mas "uBlock Origin Lite", id: 6745342698  # Safari content blocker
 mas "Unsplash Wallpapers", id: 1284863847 # wallpapers
 mas "Velja", id: 1607635845               # browser picker
+mas "Lightshot Screenshot", id: 526298438 # screenshots

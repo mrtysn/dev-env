@@ -5,3 +5,4 @@ brew "bun"                      # JavaScript runtime and package manager
 brew "mise"                     # runtime version manager
 # Editors
 cask "visual-studio-code"       # editor; this Mac only, Sublime is the editor elsewhere
+mas "Okta Verify", id: 490179405         # the employer's sign-in
