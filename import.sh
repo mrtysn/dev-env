@@ -583,13 +583,21 @@ if $CHECK; then
     if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys.plist" ]]; then
         check_skip 17 "no recorded macOS shortcuts"
     else
-        if ! out="$("$HOTKEYS" check 2>&1)"; then
+        if ! out="$("$HOTKEYS" check --label "${MACHINE_LABEL:-}" 2>&1)"; then
             for line in "${(@f)out}"; do
                 [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
             done
             (( ${#CHECK_CHANGES} )) || CHECK_CHANGES+=("macOS shortcuts (symbolic-hotkeys.py check failed)")
         fi
         check_report 17
+    fi
+
+    # Step 18
+    if [[ -d /Applications/Karabiner-Elements.app ]]; then
+        check_skip 18 "Karabiner-Elements maps Caps Lock here"
+    else
+        "$SCRIPT_DIR/macos/capslock-to-f18.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("Caps Lock to F18 login agent")
+        check_report 18
     fi
 
     echo ""
@@ -1292,15 +1300,33 @@ echo "=== Step 17: macOS Keyboard Shortcuts ==="
 # which are on or off and their keys, such as copy-selected-area on ⇧⌘4. An entry that matches is left alone.
 if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys.plist" ]]; then
     print "${YELLOW}! No recorded macOS shortcuts, skipping${NC}"
-elif "$HOTKEYS" check >/dev/null; then
+elif "$HOTKEYS" check --label "${MACHINE_LABEL:-}" >/dev/null; then
     print "${GREEN}✓ Recorded macOS shortcuts already match${NC}"
 else
-    "$HOTKEYS" check | sed 's/^/  /'
+    "$HOTKEYS" check --label "${MACHINE_LABEL:-}" | sed 's/^/  /'
     if ask_yes_no "Set these macOS shortcuts as recorded (System Settings > Keyboard > Keyboard Shortcuts)?"; then
-        "$HOTKEYS" import || print "${RED}✗ some shortcuts still differ${NC}"
+        "$HOTKEYS" import --label "${MACHINE_LABEL:-}" || print "${RED}✗ some shortcuts still differ${NC}"
     else
         print "${YELLOW}! Skipped macOS shortcuts${NC}"
     fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 18: Caps Lock as F18 where Karabiner is absent (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 18: Caps Lock to F18 ==="
+# Karabiner-Elements (personal profile) maps Caps Lock itself. Elsewhere a login agent maps it to F18
+# with hidutil, and the machine's shortcuts (step 17, symbolic-hotkeys.<label>.plist) bind F18.
+CAPSLOCK="$SCRIPT_DIR/macos/capslock-to-f18.zsh"
+if [[ -d /Applications/Karabiner-Elements.app ]]; then
+    print "${GREEN}✓ Karabiner-Elements maps Caps Lock here${NC}"
+elif "$CAPSLOCK" --check >/dev/null 2>&1; then
+    print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
+elif ask_yes_no "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
+    "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
+else
+    print "${YELLOW}! Skipped Caps Lock to F18${NC}"
 fi
 echo ""
 

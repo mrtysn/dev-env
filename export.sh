@@ -487,8 +487,8 @@ fi
 
 # macOS shortcuts as set in System Settings > Keyboard > Keyboard Shortcuts.
 echo "✓ Exporting macOS keyboard shortcuts"
-if "$SCRIPT_DIR/macos/symbolic-hotkeys.py" export; then
-    note "macos/symbolic-hotkeys.plist"
+if "$SCRIPT_DIR/macos/symbolic-hotkeys.py" export --label "${MACHINE_LABEL:-}"; then
+    note "macos/symbolic-hotkeys.plist (or symbolic-hotkeys.$MACHINE_LABEL.plist on a machine that is not its owner)"
 else
     warn "symbolic hotkeys export failed"
 fi

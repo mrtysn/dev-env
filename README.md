@@ -202,6 +202,11 @@ entries match on another machine, after asking, and applies them without a logou
 written keep macOS's defaults everywhere. `macos/symbolic-hotkeys.py check` lists recorded entries that
 differ here; `macos/test-symbolic-hotkeys.zsh` tests it on a copy of the settings.
 
+Per machine: `macos/symbolic-hotkeys.plist` belongs to the machine in its `_machine` key (c02). Export
+on any other machine writes only where it differs, to `macos/symbolic-hotkeys.<label>.plist`, and
+import applies that on top of the shared record. c03's file binds Show Launchpad to F18, the key
+step 18 maps Caps Lock to, where the home Mac has Karabiner doing it.
+
 ### App settings
 
 `app-settings/apps.json` lists the apps whose settings move between machines and, per app, an
@@ -328,6 +333,7 @@ What it does:
 15. Routes this clone's pushes through agents-shared's name guard
 16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
 17. Sets the macOS keyboard shortcuts as recorded (`macos/symbolic-hotkeys.plist`, written by `export.sh`): on or off, and their keys, asking first
+18. On a Mac without Karabiner-Elements, installs a login agent that maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`); the machine's shortcuts bind F18, as c03 binds it to Show Launchpad
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up
