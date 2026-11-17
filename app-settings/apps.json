@@ -44,10 +44,21 @@
       "keys": "/org/gtk/settings/file-chooser/(date-format|location-mode|show-hidden|show-size-column|show-type-column|sidebar-width|sort-column|sort-directories-first|sort-order|type-format)"
     },
     {
+      "name": "macshot",
+      "app": "/Applications/macshot.app",
+      "file": "Library/Preferences/com.sw33tlie.macshot.plist",
+      "keys": "hotkey\\w*|quickCaptureMode|quickCaptureOpenEditor|openEditorAfterSelection|closeEditorAfterCopy|historySize|historyUnlimited"
+    },
+    {
       "name": "sublime-text",
       "app": "/Applications/Sublime Text.app",
       "dir": "Library/Application Support/Sublime Text/Packages/User",
-      "files": ["Preferences.sublime-settings", "Default (OSX).sublime-keymap", "Distraction Free.sublime-settings", "Package Control.sublime-settings"]
+      "files": [
+        "Preferences.sublime-settings",
+        "Default (OSX).sublime-keymap",
+        "Distraction Free.sublime-settings",
+        "Package Control.sublime-settings"
+      ]
     }
   ]
 }
