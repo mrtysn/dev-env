@@ -151,35 +151,46 @@ def import_(apps, home, ignore_running):
         if not ignore_running and is_running(a["app"]):
             say(YELLOW, f"! {name} is running: quit it, then re-run this step ({len(diff)} to load)")
             continue
-        if "files" in a:
-            stamp = time.strftime("%Y%m%d-%H%M%S")
-            for fn in diff:
-                live = os.path.join(home, a["dir"], fn)
-                os.makedirs(os.path.dirname(live), exist_ok=True)
-                if os.path.exists(live):
-                    shutil.copy2(live, f"{live}.backup-{stamp}")
-                shutil.copyfile(os.path.join(HERE, name, fn), live)
-            say(GREEN, f"✓ {name}: loaded {', '.join(diff)}")
-            continue
-        path = os.path.join(home, a["file"])
-        with open(os.path.join(HERE, f"{name}.plist"), "rb") as f:
-            want = plistlib.load(f)
-        merged = read_plist(path)
-        merged.update(want)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        out = subprocess.run(["defaults", "import", path, "-"],
-                             input=plistlib.dumps(merged, fmt=plistlib.FMT_BINARY), capture_output=True)
-        if out.returncode != 0 or status(a, home)[0] != "match":
-            # `defaults import` exits 0 yet writes nothing into some paths (a group container
-            # outside the real home). The app is quit here, so the file itself is safe to write.
-            with open(path, "wb") as f:
-                plistlib.dump(merged, f, fmt=plistlib.FMT_BINARY)
-            subprocess.run(["killall", "-u", str(os.getuid()), "cfprefsd"], capture_output=True)
-            if status(a, home)[0] != "match":
-                say(RED, f"✗ {name}: could not write {path}")
-                continue
-        say(GREEN, f"✓ {name}: loaded {len(diff)} settings")
+        try:
+            load(a, home, diff)
+        except PermissionError as e:
+            # macOS lets only the app itself create its group container: an app that was
+            # installed but never opened has none, and makedirs there is refused.
+            say(YELLOW, f"! {name}: macOS refused {e.filename}: open {os.path.basename(a['app'])} once, "
+                        "quit it, then re-run this step")
     return 0
+
+
+def load(a, home, diff):
+    name = a["name"]
+    if "files" in a:
+        stamp = time.strftime("%Y%m%d-%H%M%S")
+        for fn in diff:
+            live = os.path.join(home, a["dir"], fn)
+            os.makedirs(os.path.dirname(live), exist_ok=True)
+            if os.path.exists(live):
+                shutil.copy2(live, f"{live}.backup-{stamp}")
+            shutil.copyfile(os.path.join(HERE, name, fn), live)
+        say(GREEN, f"✓ {name}: loaded {', '.join(diff)}")
+        return
+    path = os.path.join(home, a["file"])
+    with open(os.path.join(HERE, f"{name}.plist"), "rb") as f:
+        want = plistlib.load(f)
+    merged = read_plist(path)
+    merged.update(want)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    out = subprocess.run(["defaults", "import", path, "-"],
+                         input=plistlib.dumps(merged, fmt=plistlib.FMT_BINARY), capture_output=True)
+    if out.returncode != 0 or status(a, home)[0] != "match":
+        # `defaults import` exits 0 yet writes nothing into some paths (a group container
+        # outside the real home). The app is quit here, so the file itself is safe to write.
+        with open(path, "wb") as f:
+            plistlib.dump(merged, f, fmt=plistlib.FMT_BINARY)
+        subprocess.run(["killall", "-u", str(os.getuid()), "cfprefsd"], capture_output=True)
+        if status(a, home)[0] != "match":
+            say(RED, f"✗ {name}: could not write {path}")
+            return
+    say(GREEN, f"✓ {name}: loaded {len(diff)} settings")
 
 
 def check(apps, home):
