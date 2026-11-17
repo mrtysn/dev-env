@@ -118,7 +118,7 @@ section order, and a new label is appended.
 there (`write-paths-local.sh --profile`), and writes the merged settings. `export.sh` writes no
 Claude settings: it refuses a folder whose live file differs from the merge and names the keys,
 with a diff. Move the change into the base or the overlay, then re-run step 12. The comparison
-ignores `feedbackSurveyState`, `env.AGENTS_SHARED` and the order of hooks within an event
+ignores `feedbackSurveyState`, `theme` (the theme picker's choice; step 12 keeps it), `env.AGENTS_SHARED` and the order of hooks within an event
 (Claude Code runs them in parallel).
 
 ### Setting up a fresh config folder

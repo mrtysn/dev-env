@@ -18,7 +18,7 @@
 #     of the base is kept; overlay lines with a new label are appended.
 #
 # Comparing a live file ignores what is machine-local (feedbackSurveyState,
-# env.AGENTS_SHARED) and the order of hooks within an event, which Claude Code runs
+# env.AGENTS_SHARED, and theme, which Claude Code's theme picker writes) and the order of hooks within an event, which Claude Code runs
 # in parallel: each hook is compared as an (event, matcher, hook) triple.
 
 set -euo pipefail
@@ -51,7 +51,7 @@ USAGE
 die() { print -r -- "settings-profile.sh: $*" >&2; exit 2 }
 
 # What a live file carries that the repo never does.
-STRIP='del(.feedbackSurveyState) | del(.env.AGENTS_SHARED) | if .env == {} then del(.env) else . end'
+STRIP='del(.feedbackSurveyState) | del(.theme) | del(.env.AGENTS_SHARED) | if .env == {} then del(.env) else . end'
 
 MERGE_JQ='
 def lbl: if type == "string" then (capture("^\\*\\*(?<l>[^*]+)\\*\\*:").l // null) else null end;

@@ -750,14 +750,17 @@ else
         fi
 
         # env.AGENTS_SHARED is this machine's checkout path, written by agents-shared's
-        # init-global.sh and stripped on export; carry the live value over.
+        # init-global.sh and stripped on export; carry the live value over. So is theme, which
+        # Claude Code's theme picker writes: dropping it would bring the picker back.
         local_shared=""
+        local_theme=""
         if [ -f "$target" ]; then
             local_shared="$(jq -r '.env.AGENTS_SHARED // empty' "$target" 2>/dev/null || true)"
+            local_theme="$(jq -r '.theme // empty' "$target" 2>/dev/null || true)"
             cp "$target" "$target.backup-$(date +%Y%m%d-%H%M%S)"
             print "${YELLOW}→ Backed up existing $target${NC}"
         fi
-        if print -r -- "$merged" | jq --arg p "$local_shared" 'if $p != "" then .env.AGENTS_SHARED = $p else . end' > "$target.tmp"; then
+        if print -r -- "$merged" | jq --arg p "$local_shared" --arg t "$local_theme" 'if $p != "" then .env.AGENTS_SHARED = $p else . end | if $t != "" then .theme = $t else . end' > "$target.tmp"; then
             mv "$target.tmp" "$target"
             print "${GREEN}✓ Wrote $target (base + $profile)${NC}"
             [[ -z "$local_shared" ]] && print "${YELLOW}  Run agents-shared/scripts/init-global.sh to set env.AGENTS_SHARED here${NC}"
