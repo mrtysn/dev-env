@@ -62,6 +62,9 @@ done
 
 TARGET="$CLAUDE_DIR/paths.local.sh"
 SHOWN_TARGET="${TARGET/#$HOME/~}"
+# Whether the file was there before this run: a profile line written just below must not
+# make a new file look like an old one to report and back up.
+PRE_EXISTED=0; [ -f "$TARGET" ] && PRE_EXISTED=1
 
 # A candidate counts only if it really is an agents-shared checkout.
 is_checkout() {
@@ -123,7 +126,7 @@ if [ "$FORCE" -eq 0 ] && [ -r "$TARGET" ]; then
         ensure_statusline
         exit 0
     fi
-    print "! $SHOWN_TARGET exists but does not resolve to a checkout; rewriting"
+    (( PRE_EXISTED )) && print "! $SHOWN_TARGET exists but does not resolve to a checkout; rewriting"
 fi
 
 resolved=""
@@ -195,7 +198,7 @@ if [ "$ASSUME_YES" -eq 0 ] && [ -t 0 ] && [ "$source_of" != "your answer" ]; the
 fi
 
 mkdir -p "$CLAUDE_DIR"
-if [ -f "$TARGET" ]; then
+if (( PRE_EXISTED )) && [ -f "$TARGET" ]; then
     cp "$TARGET" "$TARGET.backup-$(date +%Y%m%d-%H%M%S)"
     print "→ Backed up existing $SHOWN_TARGET"
 fi
