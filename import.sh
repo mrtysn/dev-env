@@ -88,6 +88,16 @@ mas_signed_in() {
     ask_yes_no "Is an Apple ID signed in to the App Store (for the mas apps)?" n
 }
 
+# Taps the Brewfile layers list that Homebrew does not trust yet. Homebrew ignores an untrusted
+# third-party tap; a `tap` line in a Brewfile is already the owner's choice to use it.
+untrusted_taps() {
+    local trusted
+    trusted=" $(brew trust --json=v1 2>/dev/null | /usr/bin/python3 -I -c 'import json,sys; print(" ".join(json.load(sys.stdin).get("taps",[])))' 2>/dev/null) "
+    grep -hoE '^tap "[^"]+"' "$@" 2>/dev/null | sed -E 's/tap "([^"]+)"/\1/' | while read -r t; do
+        [[ "$trusted" == *" $t "* ]] || print -r -- "$t"
+    done
+}
+
 # Copy SRC to DEST unless DEST already holds the same bytes, so a re-run writes nothing.
 # In check mode (--check) it only records DEST in CHECK_CHANGES when it would change.
 # A DEST that differs is backed up first: into BACKUP_FOLDER when given, else beside itself.
@@ -385,6 +395,7 @@ if $CHECK; then
                 fi
             fi
         done
+        for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do CHECK_CHANGES+=("trust tap $t"); done
         unset HOMEBREW_BUNDLE_MAS_SKIP
         check_report 2
     fi
@@ -639,6 +650,10 @@ if [ -f Brewfile ]; then
     done
     if ask_yes_no "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
         skip_mas_without_login
+        for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do
+            print "${YELLOW}→ trusting the tap $t (listed in a Brewfile)${NC}"
+            brew trust --tap "$t" || print "${RED}✗ could not trust $t: brew trust --tap $t${NC}"
+        done
         # A cask whose app is already in /Applications but was installed without Homebrew
         # (a downloaded installer) makes brew bundle fail with "there is already an App".
         # Hand each such app to Homebrew first: --adopt keeps the copy on disk.
