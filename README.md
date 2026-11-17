@@ -331,11 +331,20 @@ What it does:
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up
-before it is replaced.
+before it is replaced. `./import.sh --check` proves it without a second run (see below).
 
 ```bash
 ./import.sh
+./import.sh --check   # compare only
 ```
+
+`--check` runs each step's own comparison and writes nothing: no file, backup, `defaults`, brew or
+asdf install, git config or `killall`; it asks nothing and opens nothing. It prints one line per
+step, `✓ step N: matches`, `✗ step N: would change <what>` or `- step N: not checked (<why>)` (such
+as iTerm2's app-level settings while iTerm2 runs), and exits 1 when any step would change. Step 2
+is `brew bundle check` per layer (the mas apps are skipped without an App Store login, and brew is
+kept from auto-updating, so the only network use is whatever `brew bundle check` itself does);
+step 3 compares the pins file and whether each pinned runtime is installed.
 
 ## Detailed Installation Steps
 

@@ -3,6 +3,16 @@
 
 set -e
 
+# --check: run each step's comparison and write nothing (see "Check mode" below).
+CHECK=false
+case "${1:-}" in
+    "") ;;
+    --check) CHECK=true ;;
+    -h|--help) print "usage: ./import.sh [--check]"; print "  --check  compare this machine with the repo step by step; asks nothing, writes nothing, exits 1 when anything would change"; exit 0 ;;
+    *) print -u2 "usage: ./import.sh [--check]"; exit 2 ;;
+esac
+(( $# <= 1 )) || { print -u2 "usage: ./import.sh [--check]"; exit 2; }
+
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
 # Machine → label and profiles mapping: single source of truth.
@@ -15,7 +25,11 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo "=== Dev Environment Import ==="
+if $CHECK; then
+    echo "=== Dev Environment Check (compares only, writes nothing) ==="
+else
+    echo "=== Dev Environment Import ==="
+fi
 echo ""
 
 # Check if running on macOS
@@ -60,6 +74,10 @@ mas_signed_in() {
         (( out > 0 ))
         return
     fi
+    # Check mode asks nothing and starts no extra mas call: an unknown login counts as signed out.
+    if $CHECK; then
+        return 1
+    fi
     if command_exists mas; then
         if out="$(mas account 2>&1)"; then
             return 0
@@ -71,12 +89,18 @@ mas_signed_in() {
 }
 
 # Copy SRC to DEST unless DEST already holds the same bytes, so a re-run writes nothing.
+# In check mode (--check) it only records DEST in CHECK_CHANGES when it would change.
 # A DEST that differs is backed up first: into BACKUP_FOLDER when given, else beside itself.
 # Usage: install_file SRC DEST [BACKUP_FOLDER]
 install_file() {
     local src=$1 dest=$2 backup_folder=${3:-} shown=${2/#$HOME/\~}
     if [[ -f "$dest" ]] && cmp -s "$src" "$dest"; then
-        print "${GREEN}✓ $shown already matches${NC}"
+        $CHECK || print "${GREEN}✓ $shown already matches${NC}"
+        return 0
+    fi
+    # Check mode: note the file that would change and write nothing (no backup, no copy).
+    if $CHECK; then
+        CHECK_CHANGES+=("$shown")
         return 0
     fi
     if [[ -f "$dest" ]]; then
@@ -91,6 +115,491 @@ install_file() {
     cp "$src" "$dest"
     print "${GREEN}✓ Installed $shown${NC}"
 }
+
+# Brew layers, each installed if present: the shared Brewfile, Brewfile.<primary profile>
+# (the first profile machine-label.sh lists for this machine), then Brewfile.<label>.
+BREW_LABEL="$MACHINE_LABEL"  # from machine-label.sh
+BREW_LAYERS=(Brewfile)
+[[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREW_LAYERS+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
+[[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && BREW_LAYERS+=("Brewfile.$BREW_LABEL")
+
+# `mas "<name>", id: <id>` lines need an Apple ID signed in to the App Store. Without
+# one they are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) instead of failing.
+skip_mas_without_login() {
+    MAS_IDS=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
+    if (( ${#MAS_IDS} )) && ! mas_signed_in; then
+        print "${YELLOW}! No Apple ID signed in to the App Store: skipping ${#MAS_IDS} mas app(s). Sign in, then re-run this step.${NC}"
+        export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
+    fi
+}
+
+# Step 8's installs, shared by the real run and --check (where install_file only records).
+zshrc_loader_inline() {
+    # NOTE: duplicates the machine-label.sh mapping by design —
+    # see that file's header (shell startup can't depend on the repo).
+    cat << 'EOF'
+[[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
+case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
+  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
+esac
+EOF
+}
+
+install_zsh_configs() {
+    # Determine which config files to use
+    if [ -f .zshrc.base ]; then
+        # Split layout: shared base + this machine's file + loader.
+        # The OTHER machine's .zshrc.<label> is deliberately never touched.
+        print "${YELLOW}→ Installing split zsh config${NC}"
+        install_file .zshrc.base ~/.zshrc.base "$BACKUP_DIR"
+
+        if [ -n "$ZSH_LABEL" ] && [ -f .zshrc.$ZSH_LABEL ]; then
+            install_file .zshrc.$ZSH_LABEL ~/.zshrc.$ZSH_LABEL "$BACKUP_DIR"
+        elif [ -z "$ZSH_LABEL" ]; then
+            print "${YELLOW}! Unknown machine — installed base only, no machine-specific file${NC}"
+        else
+            print "${YELLOW}! No .zshrc.$ZSH_LABEL in repo — base installed without machine file${NC}"
+        fi
+
+        # Install the loader as ~/.zshrc (prefer the repo copy; fall back to inline)
+        if [ -f .zshrc.loader ]; then
+            install_file .zshrc.loader ~/.zshrc "$BACKUP_DIR"
+        elif $CHECK; then
+            install_file <(zshrc_loader_inline) ~/.zshrc
+        else
+            loader_tmp="$(mktemp)"
+            zshrc_loader_inline > "$loader_tmp"
+            install_file "$loader_tmp" ~/.zshrc "$BACKUP_DIR"
+            rm -f "$loader_tmp"
+        fi
+
+    elif [ -f .zshrc.full ]; then
+        install_file .zshrc.full ~/.zshrc "$BACKUP_DIR"    # legacy monolith
+    elif [ -f .zshrc ]; then
+        install_file .zshrc ~/.zshrc "$BACKUP_DIR"         # legacy single file
+    fi
+
+    [ -f .p10k.zsh ] && install_file .p10k.zsh ~/.p10k.zsh "$BACKUP_DIR"
+    return 0
+}
+
+# Step 9's app-level settings: merge the export into the iTerm2 plist; with --check, only compare.
+iterm_settings_py() {
+    python3 - "$@" <<'PYTHON_EOF'
+import base64
+import json
+import os
+import plistlib
+import sys
+
+settings_file = sys.argv[1]
+plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
+
+
+def restore(obj):
+    """Inverse of export.sh's convert_for_json."""
+    if isinstance(obj, dict):
+        if obj.get("_type") == "data" and "value" in obj:
+            return base64.b64decode(obj["value"])
+        return {k: restore(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [restore(item) for item in obj]
+    return obj
+
+
+try:
+    with open(settings_file) as f:
+        settings = restore(json.load(f).get("settings", {}))
+except Exception as e:
+    print(f"  Could not read {settings_file}: {e}", file=sys.stderr)
+    sys.exit(1)
+
+if not settings:
+    print("  No settings found in the export, nothing to apply")
+    sys.exit(0)
+
+# Merge, don't replace: keys absent from the export (profiles, machine-local state)
+# must survive untouched.
+try:
+    with open(plist_path, "rb") as f:
+        plist = plistlib.load(f)
+except FileNotFoundError:
+    plist = {}
+except Exception as e:
+    print(f"  Could not read existing plist: {e}", file=sys.stderr)
+    sys.exit(1)
+
+changed = [k for k, v in settings.items() if plist.get(k) != v]
+if len(sys.argv) > 2 and sys.argv[2] == "--check":
+    print(f"  {len(changed)} of {len(settings)} settings differ")
+    sys.exit(1 if changed else 0)
+plist.update(settings)
+
+try:
+    tmp = plist_path + ".tmp"
+    with open(tmp, "wb") as f:
+        plistlib.dump(plist, f)
+    os.replace(tmp, plist_path)
+except Exception as e:
+    print(f"  Failed to write plist: {e}", file=sys.stderr)
+    sys.exit(1)
+
+print(f"  Applied {len(settings)} settings ({len(changed)} changed)")
+for k in changed[:10]:
+    print(f"    - {k}")
+if len(changed) > 10:
+    print(f"    ... and {len(changed) - 10} more")
+PYTHON_EOF
+}
+
+# Step 13: each config only where its app is installed (work-profile machines get neither).
+detect_window_configs() {
+    WANT_PHOENIX=false; WANT_KARABINER=false
+    [ -f .phoenix.js ] && [ -d /Applications/Phoenix.app ] && WANT_PHOENIX=true
+    [ -f karabiner/karabiner.json ] && [ -d /Applications/Karabiner-Elements.app ] && WANT_KARABINER=true
+    return 0
+}
+
+install_window_configs() {
+    [ "$WANT_PHOENIX" = true ] && install_file .phoenix.js ~/.phoenix.js
+    [ "$WANT_KARABINER" = true ] && install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
+    return 0
+}
+
+# Step 14's installs. lazygit's editPreset is per machine: the editor that is installed here,
+# else empty, which makes lazygit use $EDITOR. The repo copy keeps it empty (export.sh resets it).
+# The preset goes into a temp copy first, so an unchanged config is not rewritten (--check
+# compares through a process substitution instead and creates no file).
+lazygit_rendered() {
+    if [[ -n "$lg_preset" ]]; then
+        sed -E "s/^([[:space:]]*)editPreset:.*/\\1editPreset: $lg_preset/" lazygit/config.yml
+    else
+        cat lazygit/config.yml
+    fi
+}
+
+install_lazygit_repotabs() {
+    if [ -f lazygit/config.yml ]; then
+        lg_preset=""
+        if (( $+commands[subl] )); then lg_preset="sublime"
+        elif (( $+commands[code] )); then lg_preset="vscode"; fi
+        if [[ -n "$lg_preset" ]]; then
+            print "${GREEN}✓ lazygit editPreset: $lg_preset${NC}"
+        else
+            print "${YELLOW}! Neither subl nor code is installed: lazygit falls back to \$EDITOR${NC}"
+        fi
+        if $CHECK; then
+            install_file <(lazygit_rendered) "$LAZYGIT_DIR/config.yml"
+        else
+            lg_tmp="$(mktemp)"
+            lazygit_rendered > "$lg_tmp"
+            install_file "$lg_tmp" "$LAZYGIT_DIR/config.yml"
+            rm -f "$lg_tmp"
+        fi
+        for t in lazygit/themes/*.yml(N); do
+            install_file "$t" "$LAZYGIT_DIR/themes/${t:t}"
+        done
+    fi
+    if [ -d repo-tabs ]; then
+        for g in repo-tabs/theme-*(N); do
+            install_file "$g" ~/.config/repo-tabs/"${g:t}"
+        done
+        $CHECK || print "${BLUE}  repos.txt is machine-local — seed it with 'repo-tabs focus' on first run${NC}"
+    fi
+    return 0
+}
+
+# Step 15: where agents-shared's githooks and the push denylist are.
+resolve_name_guard() {
+    GUARD_SHARED="${AGENTS_SHARED:-}"
+    if [[ -z "$GUARD_SHARED" && -r "$HOME/.claude/paths.local.sh" ]]; then
+        GUARD_SHARED="$(AGENTS_SHARED_DIR=""; . "$HOME/.claude/paths.local.sh" >/dev/null 2>&1; print -r -- "${AGENTS_SHARED_DIR:-}")"
+    fi
+    [[ -z "$GUARD_SHARED" && -d "${SCRIPT_DIR:h}/agents-shared" ]] && GUARD_SHARED="${SCRIPT_DIR:h}/agents-shared"
+    GUARD_HOOKS="${GUARD_SHARED:+$GUARD_SHARED/githooks}"
+    GUARD_LIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
+    return 0
+}
+
+# Paths the steps and --check both use.
+ITERM_DYNAMIC_PROFILES_DIR="$HOME/Library/Application Support/iTerm2/DynamicProfiles"
+PROFILES_DIR="$SCRIPT_DIR/iterm-profiles"
+ITERM_SETTINGS="$SCRIPT_DIR/iterm-settings.json"
+SETTINGS_TOOL="$SCRIPT_DIR/agents/claude/settings-profile.sh"
+LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
+APP_SETTINGS="$SCRIPT_DIR/app-settings/app-settings.py"
+HOTKEYS="$SCRIPT_DIR/macos/symbolic-hotkeys.py"
+
+CHECK_CHANGES=()
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Check mode (--check): each step's comparison, nothing written
+# ═══════════════════════════════════════════════════════════════════════════════
+# Asks nothing, writes nothing (no file, backup, defaults, brew or asdf install, git config,
+# killall), opens nothing and makes no network request beyond what `brew bundle check` does.
+# One line per step: ✓ matches, ✗ would change <what>, or - not checked (<why>). Exits 1 when
+# any step would change. The comparisons are the real steps' own: install_file records instead
+# of copying, and the helpers (settings-profile.sh, app-settings.py, symbolic-hotkeys.py) have
+# `check` modes of their own.
+if $CHECK; then
+    export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_ENV_HINTS=1
+    CHECK_BAD=0
+
+    check_report() {  # step number; reads CHECK_CHANGES
+        if (( ${#CHECK_CHANGES} )); then
+            local more=""
+            (( ${#CHECK_CHANGES} > 5 )) && more=" (+$(( ${#CHECK_CHANGES} - 5 )) more)"
+            print "${RED}✗ step $1: would change ${(j:, :)CHECK_CHANGES[1,5]}$more${NC}"
+            CHECK_BAD=1
+        else
+            print "${GREEN}✓ step $1: matches${NC}"
+        fi
+        CHECK_CHANGES=()
+    }
+    check_skip() {  # step number, reason
+        print "${YELLOW}- step $1: not checked ($2)${NC}"
+        CHECK_CHANGES=()
+    }
+
+    # Step 1
+    command_exists brew || CHECK_CHANGES+=("Homebrew (not installed)")
+    check_report 1
+
+    # Step 2: brew bundle check per layer; mas apps are skipped without an App Store login
+    # (an unknown login counts as none), exactly as the real step does.
+    if ! command_exists brew; then
+        check_skip 2 "Homebrew not installed"
+    elif [ ! -f Brewfile ]; then
+        check_skip 2 "Brewfile not found"
+    else
+        skip_mas_without_login >/dev/null
+        for layer in "${BREW_LAYERS[@]}"; do
+            if ! out="$(brew bundle check --file="$layer" --verbose 2>&1)"; then
+                missing=(${(f)"$(print -r -- "$out" | sed -nE 's/^[^A-Za-z]*(.*) needs to be installed.*/\1/p')"})
+                if (( ${#missing} )); then
+                    extra=""; (( ${#missing} > 4 )) && extra=" (+$(( ${#missing} - 4 )) more)"
+                    CHECK_CHANGES+=("$layer: ${(j:, :)missing[1,4]}$extra")
+                else
+                    CHECK_CHANGES+=("$layer: brew bundle check failed")
+                fi
+            fi
+        done
+        unset HOMEBREW_BUNDLE_MAS_SKIP
+        check_report 2
+    fi
+
+    # Step 3: the pinned file, plus each pinned runtime installed (never installs anything)
+    if [[ -z "$BREW_LABEL" || ! -f "asdf/tool-versions.$BREW_LABEL" ]] || ! command_exists asdf; then
+        check_skip 3 "no asdf/tool-versions.<label> in the repo for this machine, or asdf missing"
+    else
+        install_file "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
+        plugins=" $(asdf plugin list 2>/dev/null | tr '\n' ' ') "
+        while read -r tool versions; do
+            [[ -z "$tool" || "$tool" == \#* ]] && continue
+            if [[ "$plugins" != *" $tool "* ]]; then
+                CHECK_CHANGES+=("asdf plugin $tool")
+                continue
+            fi
+            [[ "$versions" == system ]] && continue
+            have="$(cd ~ && asdf list "$tool" 2>/dev/null | sed -E 's/^[ *]+//')"
+            for v in ${=versions}; do
+                print -r -- "$have" | grep -qxF "$v" || CHECK_CHANGES+=("$tool $v (not installed)")
+            done
+        done < "asdf/tool-versions.$BREW_LABEL"
+        check_report 3
+    fi
+
+    # Steps 4 and 5
+    [ -d ~/.oh-my-zsh ] || CHECK_CHANGES+=("Oh-My-Zsh (not installed)")
+    check_report 4
+    if [ ! -d ~/.oh-my-zsh ]; then
+        check_skip 5 "Oh-My-Zsh not installed, see step 4"
+    elif [ ! -f plugins.list ]; then
+        check_skip 5 "plugins.list not found"
+    else
+        while IFS= read -r plugin; do
+            [[ -z "$plugin" ]] && continue
+            [ -d ~/.oh-my-zsh/custom/plugins/$plugin ] || CHECK_CHANGES+=("plugin $plugin")
+        done < plugins.list
+        check_report 5
+    fi
+
+    check_skip 6 "informational only"
+
+    # Step 7
+    if [ -f ~/.fzf.zsh ]; then
+        check_report 7
+    elif command_exists brew && [ -f "$(brew --prefix 2>/dev/null)/opt/fzf/install" ]; then
+        CHECK_CHANGES+=("~/.fzf.zsh (FZF integration not set up)")
+        check_report 7
+    else
+        check_skip 7 "fzf not installed"
+    fi
+
+    # Step 8
+    ZSH_LABEL="$MACHINE_LABEL"
+    if [ -f .zshrc.base ] || [ -f .zshrc.full ] || [ -f .zshrc ]; then
+        install_zsh_configs >/dev/null
+        check_report 8
+    else
+        check_skip 8 "no .zshrc config in the repo"
+    fi
+
+    # Step 9: profiles by file comparison; the app-level settings only while iTerm2 is not running
+    if [ ! -d "$PROFILES_DIR" ]; then
+        check_skip 9 "iterm-profiles directory not found"
+    elif ! command_exists defaults || ! defaults read com.googlecode.iterm2 &>/dev/null; then
+        check_skip 9 "iTerm2 not installed or never opened"
+    else
+        profile_files=("$PROFILES_DIR"/*.json(N))
+        profile_files=(${profile_files:#*font-only.json})
+        # The font-only choice is the one installed when its file is there and no full profile is.
+        installed_full=false
+        for pf in $profile_files; do [[ -f "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}" ]] && installed_full=true; done
+        if [[ -f "$PROFILES_DIR/font-only.json" && -f "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-font-only.json" && $installed_full == false ]]; then
+            profile_files=("$PROFILES_DIR/font-only.json")
+        fi
+        for pf in $profile_files; do
+            cmp -s "$pf" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
+        done
+        iterm_note=""
+        if [ ! -f "$ITERM_SETTINGS" ]; then
+            iterm_note="iterm-settings.json not found"
+        elif ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
+            iterm_note="app-level settings not compared while iTerm2 is running"
+        elif ! out="$(iterm_settings_py "$ITERM_SETTINGS" --check 2>&1)"; then
+            if [[ "$out" == *differ* ]]; then
+                CHECK_CHANGES+=("iTerm2 app-level settings")
+            else
+                iterm_note="app-level settings unreadable"
+            fi
+        fi
+        if (( ${#CHECK_CHANGES} )) || [[ -z "$iterm_note" ]]; then
+            check_report 9
+        else
+            check_skip 9 "profiles match; $iterm_note"
+        fi
+    fi
+
+    # Step 10
+    [ "$SHELL" = "/bin/zsh" ] || CHECK_CHANGES+=("default shell (now ${SHELL:-unset})")
+    check_report 10
+
+    # Step 11: the ~/.tmux.conf link (the ssh snippet is a separate, optional ask)
+    if ! command_exists tmux; then
+        check_skip 11 "tmux not installed"
+    elif [[ -z "$MACHINE_LABEL" ]]; then
+        check_skip 11 "unknown machine: the tmux config is chosen interactively"
+    else
+        { [ -L ~/.tmux.conf ] && [ "$(readlink ~/.tmux.conf)" = "$SCRIPT_DIR/tmux/$MACHINE_LABEL.conf" ]; } \
+            || CHECK_CHANGES+=("~/.tmux.conf link to tmux/$MACHINE_LABEL.conf")
+        check_report 11
+    fi
+
+    # Step 12: settings-profile.sh check per config folder. A folder that does not exist is left
+    # alone (the real step asks, default no, before creating it).
+    if ! command_exists jq; then
+        check_skip 12 "jq not installed"
+    else
+        compared=0; notes=()
+        for target_dir in "${(@f)$("$SETTINGS_TOOL" dirs)}"; do
+            shown="${target_dir/#$HOME/~}"
+            [ -d "$target_dir" ] || continue
+            profile="$("$SETTINGS_TOOL" profile "$target_dir")"
+            if [[ -z "$profile" ]]; then
+                CHECK_CHANGES+=("$shown/paths.local.sh (no profile recorded)")
+            elif [ ! -f "$target_dir/settings.json" ]; then
+                CHECK_CHANGES+=("$shown/settings.json (missing)")
+            else
+                out="$("$SETTINGS_TOOL" check "$target_dir" "$profile" 2>&1)" && rc=0 || rc=$?
+                compared=1
+                if (( rc == 0 )); then
+                    :
+                elif (( rc == 1 )) && [[ "$out" == *"does not set"* ]]; then
+                    CHECK_CHANGES+=("$shown/paths.local.sh (variables its commands read are unset)")
+                elif (( rc == 1 )); then
+                    CHECK_CHANGES+=("$shown/settings.json")
+                else
+                    compared=0; notes+=("$shown: ${out%%$'\n'*}")
+                fi
+            fi
+        done
+        if (( ${#CHECK_CHANGES} )) || (( compared )); then
+            check_report 12
+        elif (( ${#notes} )); then
+            check_skip 12 "${(j:; :)notes}"
+        else
+            check_skip 12 "no Claude config folder exists here"
+        fi
+    fi
+
+    # Step 13
+    detect_window_configs
+    if [ "$WANT_PHOENIX" = false ] && [ "$WANT_KARABINER" = false ]; then
+        check_skip 13 "neither Phoenix nor Karabiner-Elements is installed"
+    else
+        install_window_configs
+        check_report 13
+    fi
+
+    # Step 14
+    if [ ! -f lazygit/config.yml ] && [ ! -d repo-tabs ]; then
+        check_skip 14 "no lazygit/repo-tabs configs in the repo"
+    else
+        install_lazygit_repotabs >/dev/null
+        check_report 14
+    fi
+
+    # Step 15
+    resolve_name_guard
+    if [[ -z "$GUARD_SHARED" ]]; then
+        check_skip 15 "no agents-shared checkout found"
+    elif [[ ! -x "$GUARD_HOOKS/pre-push" ]]; then
+        check_skip 15 "$GUARD_HOOKS/pre-push is missing or not executable"
+    else
+        [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "$GUARD_HOOKS" ]] \
+            || CHECK_CHANGES+=("core.hooksPath of this clone")
+        check_report 15
+    fi
+
+    # Step 16
+    if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
+        check_skip 16 "app-settings/app-settings.py or /usr/bin/python3 missing"
+    else
+        if ! out="$("$APP_SETTINGS" check 2>&1)"; then
+            for line in "${(@f)out}"; do
+                case "$line" in
+                    "✗ "*) n="${line#✗ }"; CHECK_CHANGES+=("${n%%:*} settings") ;;
+                    *": differs"*|*": unreadable"*) CHECK_CHANGES+=("${line%%:*} settings") ;;
+                esac
+            done
+            (( ${#CHECK_CHANGES} )) || CHECK_CHANGES+=("app settings (app-settings.py check failed)")
+        fi
+        check_report 16
+    fi
+
+    # Step 17
+    if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys.plist" ]]; then
+        check_skip 17 "no recorded macOS shortcuts"
+    else
+        if ! out="$("$HOTKEYS" check 2>&1)"; then
+            for line in "${(@f)out}"; do
+                [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
+            done
+            (( ${#CHECK_CHANGES} )) || CHECK_CHANGES+=("macOS shortcuts (symbolic-hotkeys.py check failed)")
+        fi
+        check_report 17
+    fi
+
+    echo ""
+    if (( CHECK_BAD )); then
+        print "${RED}✗ import.sh would change something (nothing was written)${NC}"
+    else
+        print "${GREEN}✓ nothing would change${NC}"
+    fi
+    exit $CHECK_BAD
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1: Homebrew (required - other steps depend on it)
@@ -114,27 +623,14 @@ echo ""
 # Step 2: Brew Packages (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 2: Brew Bundle ==="
-# Layers, each installed if present: the shared Brewfile, Brewfile.<primary profile>
-# (the first profile machine-label.sh lists for this machine), then Brewfile.<label>.
 # brew bundle is natively idempotent (skips installed, reports per-item).
-BREW_LABEL="$MACHINE_LABEL"  # from machine-label.sh
-BREW_LAYERS=(Brewfile)
-[[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREW_LAYERS+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
-[[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && BREW_LAYERS+=("Brewfile.$BREW_LABEL")
-
 if [ -f Brewfile ]; then
     [[ -z "$MACHINE_PRIMARY_PROFILE" ]] && print "${YELLOW}! Unknown machine — no profile or machine Brewfile, shared layer only${NC}"
     for layer in "${BREW_LAYERS[@]}"; do
         print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask|mas) ' "$layer") entries"
     done
     if ask_yes_no "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
-        # `mas "<name>", id: <id>` lines need an Apple ID signed in to the App Store. Without
-        # one they are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) instead of failing.
-        MAS_IDS=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
-        if (( ${#MAS_IDS} )) && ! mas_signed_in; then
-            print "${YELLOW}! No Apple ID signed in to the App Store: skipping ${#MAS_IDS} mas app(s). Sign in, then re-run this step.${NC}"
-            export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
-        fi
+        skip_mas_without_login
         # A cask whose app is already in /Applications but was installed without Homebrew
         # (a downloaded installer) makes brew bundle fail with "there is already an App".
         # Hand each such app to Homebrew first: --adopt keeps the copy on disk.
@@ -352,46 +848,7 @@ else
         # A file that differs from the repo's copy is backed up here; the folder is made only then.
         BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
 
-        # Determine which config files to use
-        if [ -f .zshrc.base ]; then
-            # Split layout: shared base + this machine's file + loader.
-            # The OTHER machine's .zshrc.<label> is deliberately never touched.
-            print "${YELLOW}→ Installing split zsh config${NC}"
-            install_file .zshrc.base ~/.zshrc.base "$BACKUP_DIR"
-
-            if [ -n "$ZSH_LABEL" ] && [ -f .zshrc.$ZSH_LABEL ]; then
-                install_file .zshrc.$ZSH_LABEL ~/.zshrc.$ZSH_LABEL "$BACKUP_DIR"
-            elif [ -z "$ZSH_LABEL" ]; then
-                print "${YELLOW}! Unknown machine — installed base only, no machine-specific file${NC}"
-            else
-                print "${YELLOW}! No .zshrc.$ZSH_LABEL in repo — base installed without machine file${NC}"
-            fi
-
-            # Install the loader as ~/.zshrc (prefer the repo copy; fall back to inline)
-            if [ -f .zshrc.loader ]; then
-                install_file .zshrc.loader ~/.zshrc "$BACKUP_DIR"
-            else
-                # NOTE: duplicates the machine-label.sh mapping by design —
-                # see that file's header (shell startup can't depend on the repo).
-                loader_tmp="$(mktemp)"
-                cat > "$loader_tmp" << 'EOF'
-[[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
-  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
-esac
-EOF
-                install_file "$loader_tmp" ~/.zshrc "$BACKUP_DIR"
-                rm -f "$loader_tmp"
-            fi
-
-        elif [ -f .zshrc.full ]; then
-            install_file .zshrc.full ~/.zshrc "$BACKUP_DIR"    # legacy monolith
-        elif [ -f .zshrc ]; then
-            install_file .zshrc ~/.zshrc "$BACKUP_DIR"         # legacy single file
-        fi
-
-        [ -f .p10k.zsh ] && install_file .p10k.zsh ~/.p10k.zsh "$BACKUP_DIR"
+        install_zsh_configs
     else
         print "${YELLOW}! Skipped configuration files${NC}"
     fi
@@ -402,8 +859,6 @@ echo ""
 # Step 9: iTerm2 Profiles & Settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 9: iTerm2 Profiles & Settings ==="
-ITERM_DYNAMIC_PROFILES_DIR="$HOME/Library/Application Support/iTerm2/DynamicProfiles"
-PROFILES_DIR="$SCRIPT_DIR/iterm-profiles"
 
 if [ ! -d "$PROFILES_DIR" ]; then
     print "${RED}✗ iterm-profiles directory not found${NC}"
@@ -478,7 +933,6 @@ else
     # ── App-level settings ─────────────────────────────────────────────────────
     # Profiles only cover per-profile state. Theme, tab bar geometry, the Minimal
     # tuning knobs, global keymaps and pointer actions are top-level plist keys.
-    ITERM_SETTINGS="$SCRIPT_DIR/iterm-settings.json"
 
     if [ ! -f "$ITERM_SETTINGS" ]; then
         print "${YELLOW}! iterm-settings.json not found, skipping app-level settings${NC}"
@@ -493,68 +947,7 @@ else
         echo ""
         if ask_yes_no "Apply iTerm2 app-level settings (theme, tab bar, keymaps, pointer actions)?"; then
             print "${YELLOW}→ Applying iTerm2 app-level settings...${NC}"
-            if python3 - "$ITERM_SETTINGS" <<'PYTHON_EOF'
-import base64
-import json
-import os
-import plistlib
-import sys
-
-settings_file = sys.argv[1]
-plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
-
-
-def restore(obj):
-    """Inverse of export.sh's convert_for_json."""
-    if isinstance(obj, dict):
-        if obj.get("_type") == "data" and "value" in obj:
-            return base64.b64decode(obj["value"])
-        return {k: restore(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [restore(item) for item in obj]
-    return obj
-
-
-try:
-    with open(settings_file) as f:
-        settings = restore(json.load(f).get("settings", {}))
-except Exception as e:
-    print(f"  Could not read {settings_file}: {e}", file=sys.stderr)
-    sys.exit(1)
-
-if not settings:
-    print("  No settings found in the export, nothing to apply")
-    sys.exit(0)
-
-# Merge, don't replace: keys absent from the export (profiles, machine-local state)
-# must survive untouched.
-try:
-    with open(plist_path, "rb") as f:
-        plist = plistlib.load(f)
-except FileNotFoundError:
-    plist = {}
-except Exception as e:
-    print(f"  Could not read existing plist: {e}", file=sys.stderr)
-    sys.exit(1)
-
-changed = [k for k, v in settings.items() if plist.get(k) != v]
-plist.update(settings)
-
-try:
-    tmp = plist_path + ".tmp"
-    with open(tmp, "wb") as f:
-        plistlib.dump(plist, f)
-    os.replace(tmp, plist_path)
-except Exception as e:
-    print(f"  Failed to write plist: {e}", file=sys.stderr)
-    sys.exit(1)
-
-print(f"  Applied {len(settings)} settings ({len(changed)} changed)")
-for k in changed[:10]:
-    print(f"    - {k}")
-if len(changed) > 10:
-    print(f"    ... and {len(changed) - 10} more")
-PYTHON_EOF
+            if iterm_settings_py "$ITERM_SETTINGS"
             then
                 # cfprefsd caches the domain; without this it can rewrite the old
                 # values over the ones just written.
@@ -671,7 +1064,6 @@ echo "=== Step 12: Claude Code Settings ==="
 # Each config folder gets base settings.json + the overlays of the profile it declares in
 # its paths.local.sh (AGENT_PROFILE). Folders come from settings-profile.sh dirs:
 # $CLAUDE_CONFIG_DIRS when set, else ~/.claude and every ~/.claude-* holding settings.
-SETTINGS_TOOL="$SCRIPT_DIR/agents/claude/settings-profile.sh"
 WRITE_PATHS="$SCRIPT_DIR/agents/claude/write-paths-local.sh"
 
 if ! command_exists jq; then
@@ -784,9 +1176,7 @@ echo "=== Step 13: Window & Keyboard Configs ==="
 
 # Each config only where its app is installed: both apps are in Brewfile.personal, so a
 # work-profile machine gets neither app nor config.
-WANT_PHOENIX=false; WANT_KARABINER=false
-[ -f .phoenix.js ] && [ -d /Applications/Phoenix.app ] && WANT_PHOENIX=true
-[ -f karabiner/karabiner.json ] && [ -d /Applications/Karabiner-Elements.app ] && WANT_KARABINER=true
+detect_window_configs
 
 if [ "$WANT_PHOENIX" = false ] && [ "$WANT_KARABINER" = false ]; then
     print "${YELLOW}! Neither Phoenix nor Karabiner-Elements is installed, skipping their configs${NC}"
@@ -796,8 +1186,7 @@ else
     [ "$WANT_KARABINER" = true ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
 
     if ask_yes_no "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
-        [ "$WANT_PHOENIX" = true ] && install_file .phoenix.js ~/.phoenix.js
-        [ "$WANT_KARABINER" = true ] && install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
+        install_window_configs
     else
         print "${YELLOW}! Skipped window & keyboard configs${NC}"
     fi
@@ -809,7 +1198,6 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 14: lazygit + repo-tabs Configuration ==="
 
-LAZYGIT_DIR="$HOME/Library/Application Support/lazygit"
 HAS_LG=false
 [ -f lazygit/config.yml ] && HAS_LG=true
 [ -d repo-tabs ] && HAS_LG=true
@@ -822,33 +1210,7 @@ else
     [ -d repo-tabs ] && echo "  - repo-tabs/theme-* → ~/.config/repo-tabs/ (group themes for repo-tabs lazy)"
 
     if ask_yes_no "Copy lazygit & repo-tabs configs? (existing files that differ will be backed up)"; then
-        if [ -f lazygit/config.yml ]; then
-            # lazygit's editPreset is per machine: the editor that is installed here, else empty,
-            # which makes lazygit use $EDITOR. The repo copy keeps it empty (export.sh resets it).
-            # The preset goes into a temp copy first, so an unchanged config is not rewritten.
-            lg_preset=""
-            if (( $+commands[subl] )); then lg_preset="sublime"
-            elif (( $+commands[code] )); then lg_preset="vscode"; fi
-            lg_tmp="$(mktemp)"
-            if [[ -n "$lg_preset" ]]; then
-                sed -E "s/^([[:space:]]*)editPreset:.*/\\1editPreset: $lg_preset/" lazygit/config.yml > "$lg_tmp"
-                print "${GREEN}✓ lazygit editPreset: $lg_preset${NC}"
-            else
-                cp lazygit/config.yml "$lg_tmp"
-                print "${YELLOW}! Neither subl nor code is installed: lazygit falls back to \$EDITOR${NC}"
-            fi
-            install_file "$lg_tmp" "$LAZYGIT_DIR/config.yml"
-            rm -f "$lg_tmp"
-            for t in lazygit/themes/*.yml(N); do
-                install_file "$t" "$LAZYGIT_DIR/themes/${t:t}"
-            done
-        fi
-        if [ -d repo-tabs ]; then
-            for g in repo-tabs/theme-*(N); do
-                install_file "$g" ~/.config/repo-tabs/"${g:t}"
-            done
-            print "${BLUE}  repos.txt is machine-local — seed it with 'repo-tabs focus' on first run${NC}"
-        fi
+        install_lazygit_repotabs
     else
         print "${YELLOW}! Skipped lazygit & repo-tabs configs${NC}"
     fi
@@ -868,13 +1230,7 @@ echo "=== Step 15: Push Name Guard ==="
 # the employer's own names and internal terms, never a copy of the home machine's list.
 # On a personal machine, enabling it globally is the recommended setup.
 # By hand: git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
-GUARD_SHARED="${AGENTS_SHARED:-}"
-if [[ -z "$GUARD_SHARED" && -r "$HOME/.claude/paths.local.sh" ]]; then
-    GUARD_SHARED="$(AGENTS_SHARED_DIR=""; . "$HOME/.claude/paths.local.sh" >/dev/null 2>&1; print -r -- "${AGENTS_SHARED_DIR:-}")"
-fi
-[[ -z "$GUARD_SHARED" && -d "${SCRIPT_DIR:h}/agents-shared" ]] && GUARD_SHARED="${SCRIPT_DIR:h}/agents-shared"
-GUARD_HOOKS="${GUARD_SHARED:+$GUARD_SHARED/githooks}"
-GUARD_LIST="${AGENTS_PUSH_DENYLIST:-${XDG_CONFIG_HOME:-$HOME/.config}/agents-shared/push-denylist.txt}"
+resolve_name_guard
 
 if [[ -z "$GUARD_SHARED" ]]; then
     print "${RED}✗ No agents-shared checkout found (\$AGENTS_SHARED, ~/.claude/paths.local.sh or a sibling of this repo) — name guard not installed${NC}"
@@ -914,7 +1270,6 @@ echo ""
 echo "=== Step 16: App Settings ==="
 # The allowlisted settings of the apps in app-settings/apps.json, for each that is installed.
 # Only differing keys are written; a running app is skipped with a note to quit it first.
-APP_SETTINGS="$SCRIPT_DIR/app-settings/app-settings.py"
 # macOS's own python3 (Xcode command-line tools), not a version manager's shim: a shim
 # fails until ~/.tool-versions exists, which a fresh machine may not have yet.
 if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
@@ -935,7 +1290,6 @@ echo ""
 echo "=== Step 17: macOS Keyboard Shortcuts ==="
 # The shortcut entries recorded on the machine that last exported (macos/symbolic-hotkeys.plist):
 # which are on or off and their keys, such as copy-selected-area on ⇧⌘4. An entry that matches is left alone.
-HOTKEYS="$SCRIPT_DIR/macos/symbolic-hotkeys.py"
 if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys.plist" ]]; then
     print "${YELLOW}! No recorded macOS shortcuts, skipping${NC}"
 elif "$HOTKEYS" check >/dev/null; then
