@@ -754,25 +754,22 @@ echo ""
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 13: Window & Keyboard Configs ==="
 
-HAS_WK=false
-[ -f .phoenix.js ] && HAS_WK=true
-[ -f karabiner/karabiner.json ] && HAS_WK=true
+# Each config only where its app is installed: both apps are in Brewfile.personal, so a
+# work-profile machine gets neither app nor config.
+WANT_PHOENIX=false; WANT_KARABINER=false
+[ -f .phoenix.js ] && [ -d /Applications/Phoenix.app ] && WANT_PHOENIX=true
+[ -f karabiner/karabiner.json ] && [ -d /Applications/Karabiner-Elements.app ] && WANT_KARABINER=true
 
-if [ "$HAS_WK" = false ]; then
-    print "${YELLOW}! No Phoenix/Karabiner configs in repo, skipping${NC}"
+if [ "$WANT_PHOENIX" = false ] && [ "$WANT_KARABINER" = false ]; then
+    print "${YELLOW}! Neither Phoenix nor Karabiner-Elements is installed, skipping their configs${NC}"
 else
     print "${BLUE}Available configs:${NC}"
-    [ -f .phoenix.js ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
-    [ -f karabiner/karabiner.json ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
+    [ "$WANT_PHOENIX" = true ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
+    [ "$WANT_KARABINER" = true ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
 
     if ask_yes_no "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
-        if [ -f .phoenix.js ]; then
-            install_file .phoenix.js ~/.phoenix.js
-        fi
-
-        if [ -f karabiner/karabiner.json ]; then
-            install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
-        fi
+        [ "$WANT_PHOENIX" = true ] && install_file .phoenix.js ~/.phoenix.js
+        [ "$WANT_KARABINER" = true ] && install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
     else
         print "${YELLOW}! Skipped window & keyboard configs${NC}"
     fi
