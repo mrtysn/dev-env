@@ -9,7 +9,13 @@
 macOS writes an entry once a shortcut is changed or switched off, and some on its own; entries it
 has not written keep their defaults, here and on the other machine alike. An entry that already
 matches is left alone, so a re-run changes nothing.
-Option: --domain PATH reads and writes a plist file instead of the user's domain (tests).
+
+Per machine: symbolic-hotkeys.plist is the shared record, written by the machine named in its
+"_machine" key. Any other machine (--label, from machine-label.sh) records only where it differs, in
+symbolic-hotkeys.<label>.plist, and import applies that on top of the shared record. So the work
+Mac can keep Show Launchpad on F18 while the home Mac has it off.
+Options: --label LABEL (this machine's label); --domain PATH reads and writes a plist file instead
+of the user's domain (tests).
 """
 import os, plistlib, subprocess, sys
 
@@ -40,30 +46,63 @@ def name(key):
     return NAMES.get(key, f"shortcut {key}")
 
 
-def export(domain):
-    data = plistlib.dumps(entries(domain), fmt=plistlib.FMT_XML, sort_keys=True)
-    old = open(RECORD, "rb").read() if os.path.exists(RECORD) else None
-    count = len(plistlib.loads(data))
-    if old == data:
-        print(f"✓ keyboard shortcuts already match the repo ({count} entries)")
+def load(path):
+    if not os.path.exists(path):
+        return {}
+    with open(path, "rb") as f:
+        return plistlib.load(f)
+
+
+def overlay_path(label):
+    return os.path.join(os.path.dirname(RECORD), f"symbolic-hotkeys.{label}.plist")
+
+
+def shared():
+    """The shared record's entries, without its "_machine" key."""
+    return {k: v for k, v in load(RECORD).items() if not k.startswith("_")}
+
+
+def owner():
+    return load(RECORD).get("_machine", "")
+
+
+def write(path, data, what):
+    blob = plistlib.dumps(data, fmt=plistlib.FMT_XML, sort_keys=True)
+    old = open(path, "rb").read() if os.path.exists(path) else None
+    if old == blob:
+        print(f"✓ {what} already match the repo")
+        return
+    with open(path, "wb") as f:
+        f.write(blob)
+    print(f"✓ exported {what} to macos/{os.path.basename(path)}")
+
+
+def export(domain, label):
+    live = entries(domain)
+    if not os.path.exists(RECORD) or not owner() or owner() == label:
+        write(RECORD, dict(live, _machine=label or "unknown"), f"{len(live)} keyboard shortcut entries")
         return 0
-    with open(RECORD, "wb") as f:
-        f.write(data)
-    print(f"✓ exported {count} keyboard shortcut entries to macos/symbolic-hotkeys.plist")
+    base = shared()
+    diff = {k: v for k, v in live.items() if base.get(k) != v}
+    write(overlay_path(label), diff, f"{len(diff)} shortcut entries where {label} differs")
     return 0
 
 
-def differing(domain):
-    if not os.path.exists(RECORD):
-        return {}, {}
-    with open(RECORD, "rb") as f:
-        want = plistlib.load(f)
+def wanted(label):
+    want = shared()
+    if label and label != owner():
+        want.update(load(overlay_path(label)))
+    return want
+
+
+def differing(domain, label=""):
+    want = wanted(label)
     have = entries(domain)
     return want, {k: v for k, v in want.items() if have.get(k) != v}
 
 
-def import_(domain):
-    want, todo = differing(domain)
+def import_(domain, label):
+    want, todo = differing(domain, label)
     if not todo:
         print(f"✓ the {len(want)} recorded shortcut entries already match")
         return 0
@@ -79,7 +118,7 @@ def import_(domain):
     if domain == DOMAIN and os.access(ACTIVATE, os.X_OK):
         # Applies the new shortcuts now; without it they take effect at the next login.
         subprocess.run([ACTIVATE, "-u"], capture_output=True)
-    left = differing(domain)[1]
+    left = differing(domain, label)[1]
     if left:
         print(f"✗ still different: {', '.join(name(k) for k in left)}")
         return 1
@@ -87,8 +126,8 @@ def import_(domain):
     return 0
 
 
-def check(domain):
-    want, todo = differing(domain)
+def check(domain, label):
+    want, todo = differing(domain, label)
     for k in todo:
         print(f"differs here: {name(k)}")
     if not todo:
@@ -103,7 +142,8 @@ def main(argv):
     domain = DOMAIN
     if "--domain" in argv:
         domain = os.path.realpath(argv[argv.index("--domain") + 1])
-    return {"export": export, "import": import_, "check": check}[argv[0]](domain)
+    label = argv[argv.index("--label") + 1] if "--label" in argv else ""
+    return {"export": export, "import": import_, "check": check}[argv[0]](domain, label)
 
 
 if __name__ == "__main__":

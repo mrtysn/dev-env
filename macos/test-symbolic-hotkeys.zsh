@@ -33,5 +33,26 @@ out=$($tool import --domain $domain); [[ $out == *"already match"* ]] && ok || b
 others=$(/usr/bin/python3 -I -c 'import plistlib,sys; a=plistlib.load(open(sys.argv[1],"rb"))["AppleSymbolicHotKeys"]; print(len(a))' $domain)
 (( others > 2 )) && ok || bad "other entries were lost ($others left)"
 
+# Per machine: the record belongs to c02; c03's overlay turns 160 on, on F18.
+/usr/bin/python3 -I - "$tmp/record.plist" "$tmp/symbolic-hotkeys.c03.plist" <<'PY'
+import plistlib, sys
+r = plistlib.load(open(sys.argv[1], "rb"))
+r["_machine"] = "c02"
+r["160"] = {"enabled": False, "value": {"parameters": [65535, 65535, 0], "type": "standard"}}
+plistlib.dump(r, open(sys.argv[1], "wb"))
+plistlib.dump({"160": {"enabled": True, "value": {"parameters": [65535, 79, 8388608], "type": "standard"}}},
+              open(sys.argv[2], "wb"))
+PY
+out=$($tool import --domain $domain --label c03); [[ $out == *"Show Launchpad (on)"* ]] && ok || bad "c03 import did not turn Show Launchpad on: $out"
+$tool check --domain $domain --label c03 >/dev/null && ok || bad "c03 check differs after import"
+$tool check --domain $domain --label c02 >/dev/null && bad "c02 check passed with 160 on" || ok
+# Export on c03 writes only where it differs from c02's record, and leaves the record alone.
+before=$(shasum "$tmp/record.plist")
+rm -f -- "$tmp/symbolic-hotkeys.c03.plist"
+$tool export --domain $domain --label c03 >/dev/null
+[[ "$(shasum "$tmp/record.plist")" == "$before" ]] && ok || bad "c03 export changed the shared record"
+n=$(/usr/bin/python3 -I -c 'import plistlib,sys; print(len(plistlib.load(open(sys.argv[1],"rb"))))' "$tmp/symbolic-hotkeys.c03.plist")
+(( n >= 1 )) && ok || bad "c03 export wrote no overlay"
+
 print "symbolic-hotkeys: $pass passed, $fail failed"
 (( fail == 0 ))

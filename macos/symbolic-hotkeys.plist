@@ -343,5 +343,7 @@
 		<key>enabled</key>
 		<true/>
 	</dict>
+	<key>_machine</key>
+	<string>c02</string>
 </dict>
 </plist>
