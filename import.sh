@@ -70,6 +70,28 @@ mas_signed_in() {
     ask_yes_no "Is an Apple ID signed in to the App Store (for the mas apps)?" n
 }
 
+# Copy SRC to DEST unless DEST already holds the same bytes, so a re-run writes nothing.
+# A DEST that differs is backed up first: into BACKUP_FOLDER when given, else beside itself.
+# Usage: install_file SRC DEST [BACKUP_FOLDER]
+install_file() {
+    local src=$1 dest=$2 backup_folder=${3:-} shown=${2/#$HOME/\~}
+    if [[ -f "$dest" ]] && cmp -s "$src" "$dest"; then
+        print "${GREEN}✓ $shown already matches${NC}"
+        return 0
+    fi
+    if [[ -f "$dest" ]]; then
+        if [[ -n "$backup_folder" ]]; then
+            mkdir -p "$backup_folder" && cp "$dest" "$backup_folder/${dest:t}"
+        else
+            cp "$dest" "$dest.backup-$(date +%Y%m%d-%H%M%S)"
+        fi
+        print "${YELLOW}→ Backed up the old $shown${NC}"
+    fi
+    mkdir -p "${dest:h}"
+    cp "$src" "$dest"
+    print "${GREEN}✓ Installed $shown${NC}"
+}
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1: Homebrew (required - other steps depend on it)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -303,30 +325,19 @@ else
     [ -f .zshrc.full ] && echo "  - .zshrc.full  (legacy monolith)"
     [ -f .p10k.zsh ] && echo "  - .p10k.zsh"
 
-    if ask_yes_no "Copy configuration files? (existing files will be backed up)"; then
-        # Backup existing configs
-        BACKUP_DIR=""
-        if [ -f ~/.zshrc ] || [ -f ~/.zshrc.base ] || [ -f ~/.p10k.zsh ]; then
-            BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
-            print "${YELLOW}→ Backing up existing configs to $BACKUP_DIR${NC}"
-            mkdir -p "$BACKUP_DIR"
-            for f in .zshrc .zshrc.base .zshrc.${ZSH_LABEL:-none} .zshrc.personal .p10k.zsh; do
-                [ -f ~/$f ] && cp ~/$f "$BACKUP_DIR/$f"
-            done
-            print "${GREEN}✓ Existing configs backed up${NC}"
-        fi
+    if ask_yes_no "Copy configuration files? (existing files that differ will be backed up)"; then
+        # A file that differs from the repo's copy is backed up here; the folder is made only then.
+        BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
 
         # Determine which config files to use
         if [ -f .zshrc.base ]; then
             # Split layout: shared base + this machine's file + loader.
             # The OTHER machine's .zshrc.<label> is deliberately never touched.
             print "${YELLOW}→ Installing split zsh config${NC}"
-            cp .zshrc.base ~/.zshrc.base
-            print "${GREEN}✓ Copied ~/.zshrc.base${NC}"
+            install_file .zshrc.base ~/.zshrc.base "$BACKUP_DIR"
 
             if [ -n "$ZSH_LABEL" ] && [ -f .zshrc.$ZSH_LABEL ]; then
-                cp .zshrc.$ZSH_LABEL ~/.zshrc.$ZSH_LABEL
-                print "${GREEN}✓ Copied ~/.zshrc.$ZSH_LABEL (this machine)${NC}"
+                install_file .zshrc.$ZSH_LABEL ~/.zshrc.$ZSH_LABEL "$BACKUP_DIR"
             elif [ -z "$ZSH_LABEL" ]; then
                 print "${YELLOW}! Unknown machine — installed base only, no machine-specific file${NC}"
             else
@@ -335,39 +346,29 @@ else
 
             # Install the loader as ~/.zshrc (prefer the repo copy; fall back to inline)
             if [ -f .zshrc.loader ]; then
-                cp .zshrc.loader ~/.zshrc
+                install_file .zshrc.loader ~/.zshrc "$BACKUP_DIR"
             else
                 # NOTE: duplicates the machine-label.sh mapping by design —
                 # see that file's header (shell startup can't depend on the repo).
-                cat > ~/.zshrc << 'EOF'
+                loader_tmp="$(mktemp)"
+                cat > "$loader_tmp" << 'EOF'
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
 case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
   mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
   mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
 esac
 EOF
+                install_file "$loader_tmp" ~/.zshrc "$BACKUP_DIR"
+                rm -f "$loader_tmp"
             fi
-            print "${GREEN}✓ Installed ~/.zshrc loader${NC}"
 
         elif [ -f .zshrc.full ]; then
-            # Legacy monolith
-            print "${YELLOW}→ Copying .zshrc.full${NC}"
-            cp .zshrc.full ~/.zshrc
-            print "${GREEN}✓ Copied .zshrc${NC}"
-
+            install_file .zshrc.full ~/.zshrc "$BACKUP_DIR"    # legacy monolith
         elif [ -f .zshrc ]; then
-            # Legacy single file mode
-            print "${YELLOW}→ Copying .zshrc${NC}"
-            cp .zshrc ~/.zshrc
-            print "${GREEN}✓ Copied .zshrc${NC}"
+            install_file .zshrc ~/.zshrc "$BACKUP_DIR"         # legacy single file
         fi
 
-        # Copy .p10k.zsh
-        if [ -f .p10k.zsh ]; then
-            print "${YELLOW}→ Copying .p10k.zsh${NC}"
-            cp .p10k.zsh ~/.p10k.zsh
-            print "${GREEN}✓ Copied .p10k.zsh${NC}"
-        fi
+        [ -f .p10k.zsh ] && install_file .p10k.zsh ~/.p10k.zsh "$BACKUP_DIR"
     else
         print "${YELLOW}! Skipped configuration files${NC}"
     fi
@@ -421,8 +422,13 @@ else
                     mkdir -p "$ITERM_DYNAMIC_PROFILES_DIR"
                     for profile in "${FULL_PROFILES[@]}"; do
                         filename=$(basename "$profile")
-                        cp "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"
-                        print "${GREEN}✓ Installed ${filename%.json}${NC}"
+                        # No backup here: iTerm2 loads every file in this folder as a profile.
+                        if cmp -s "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"; then
+                            print "${GREEN}✓ ${filename%.json} already matches${NC}"
+                        else
+                            cp "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"
+                            print "${GREEN}✓ Installed ${filename%.json}${NC}"
+                        fi
                     done
                     print "${BLUE}  Restart iTerm2 and select your preferred profile${NC}"
                 else
@@ -751,25 +757,13 @@ else
     [ -f .phoenix.js ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
     [ -f karabiner/karabiner.json ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
 
-    if ask_yes_no "Copy window & keyboard configs? (existing files will be backed up)"; then
+    if ask_yes_no "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
         if [ -f .phoenix.js ]; then
-            if [ -f ~/.phoenix.js ]; then
-                cp ~/.phoenix.js ~/.phoenix.js.backup-$(date +%Y%m%d-%H%M%S)
-                print "${YELLOW}→ Backed up existing ~/.phoenix.js${NC}"
-            fi
-            cp .phoenix.js ~/.phoenix.js
-            print "${GREEN}✓ Copied ~/.phoenix.js${NC}"
+            install_file .phoenix.js ~/.phoenix.js
         fi
 
         if [ -f karabiner/karabiner.json ]; then
-            mkdir -p ~/.config/karabiner
-            if [ -f ~/.config/karabiner/karabiner.json ]; then
-                cp ~/.config/karabiner/karabiner.json ~/.config/karabiner/karabiner.json.backup-$(date +%Y%m%d-%H%M%S)
-                print "${YELLOW}→ Backed up existing ~/.config/karabiner/karabiner.json${NC}"
-            fi
-            cp karabiner/karabiner.json ~/.config/karabiner/karabiner.json
-            print "${GREEN}✓ Copied ~/.config/karabiner/karabiner.json${NC}"
-            print "${BLUE}  Restart Karabiner-Elements to apply${NC}"
+            install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
         fi
     else
         print "${YELLOW}! Skipped window & keyboard configs${NC}"
@@ -794,37 +788,32 @@ else
     [ -f lazygit/config.yml ] && echo "  - lazygit/config.yml + themes → $LAZYGIT_DIR/"
     [ -d repo-tabs ] && echo "  - repo-tabs/theme-* → ~/.config/repo-tabs/ (group themes for repo-tabs lazy)"
 
-    if ask_yes_no "Copy lazygit & repo-tabs configs? (existing files will be backed up)"; then
+    if ask_yes_no "Copy lazygit & repo-tabs configs? (existing files that differ will be backed up)"; then
         if [ -f lazygit/config.yml ]; then
-            mkdir -p "$LAZYGIT_DIR/themes"
-            if [ -f "$LAZYGIT_DIR/config.yml" ]; then
-                cp "$LAZYGIT_DIR/config.yml" "$LAZYGIT_DIR/config.yml.backup-$(date +%Y%m%d-%H%M%S)"
-                print "${YELLOW}→ Backed up existing lazygit config.yml${NC}"
-            fi
-            cp lazygit/config.yml "$LAZYGIT_DIR/config.yml"
             # lazygit's editPreset is per machine: the editor that is installed here, else empty,
             # which makes lazygit use $EDITOR. The repo copy keeps it empty (export.sh resets it).
+            # The preset goes into a temp copy first, so an unchanged config is not rewritten.
             lg_preset=""
             if (( $+commands[subl] )); then lg_preset="sublime"
             elif (( $+commands[code] )); then lg_preset="vscode"; fi
+            lg_tmp="$(mktemp)"
             if [[ -n "$lg_preset" ]]; then
-                sed -E "s/^([[:space:]]*)editPreset:.*/\\1editPreset: $lg_preset/" "$LAZYGIT_DIR/config.yml" > "$LAZYGIT_DIR/config.yml.tmp" \
-                    && mv "$LAZYGIT_DIR/config.yml.tmp" "$LAZYGIT_DIR/config.yml"
+                sed -E "s/^([[:space:]]*)editPreset:.*/\\1editPreset: $lg_preset/" lazygit/config.yml > "$lg_tmp"
                 print "${GREEN}✓ lazygit editPreset: $lg_preset${NC}"
             else
+                cp lazygit/config.yml "$lg_tmp"
                 print "${YELLOW}! Neither subl nor code is installed: lazygit falls back to \$EDITOR${NC}"
             fi
+            install_file "$lg_tmp" "$LAZYGIT_DIR/config.yml"
+            rm -f "$lg_tmp"
             for t in lazygit/themes/*.yml(N); do
-                cp "$t" "$LAZYGIT_DIR/themes/${t:t}"
+                install_file "$t" "$LAZYGIT_DIR/themes/${t:t}"
             done
-            print "${GREEN}✓ Copied lazygit config + themes${NC}"
         fi
         if [ -d repo-tabs ]; then
-            mkdir -p ~/.config/repo-tabs
             for g in repo-tabs/theme-*(N); do
-                cp "$g" ~/.config/repo-tabs/"${g:t}"
+                install_file "$g" ~/.config/repo-tabs/"${g:t}"
             done
-            print "${GREEN}✓ Copied repo-tabs group themes${NC}"
             print "${BLUE}  repos.txt is machine-local — seed it with 'repo-tabs focus' on first run${NC}"
         fi
     else
