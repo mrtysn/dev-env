@@ -485,10 +485,10 @@ else
     warn "app-settings export failed"
 fi
 
-# macOS shortcuts switched off in System Settings > Keyboard > Keyboard Shortcuts.
-echo "✓ Exporting switched-off macOS shortcuts"
+# macOS shortcuts as set in System Settings > Keyboard > Keyboard Shortcuts.
+echo "✓ Exporting macOS keyboard shortcuts"
 if "$SCRIPT_DIR/macos/symbolic-hotkeys.py" export; then
-    note "macos/symbolic-hotkeys-off.plist"
+    note "macos/symbolic-hotkeys.plist"
 else
     warn "symbolic hotkeys export failed"
 fi

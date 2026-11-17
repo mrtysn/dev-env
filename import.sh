@@ -930,17 +930,17 @@ echo ""
 # Step 17: macOS keyboard shortcuts (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Step 17: macOS Keyboard Shortcuts ==="
-# The shortcuts switched off on the machine that last exported (macos/symbolic-hotkeys-off.plist),
-# such as ⇧⌘4 that macshot takes over. Only switches off; an entry already off is left alone.
+# The shortcut entries recorded on the machine that last exported (macos/symbolic-hotkeys.plist):
+# which are on or off and their keys, such as copy-selected-area on ⇧⌘4. An entry that matches is left alone.
 HOTKEYS="$SCRIPT_DIR/macos/symbolic-hotkeys.py"
-if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys-off.plist" ]]; then
+if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys.plist" ]]; then
     print "${YELLOW}! No recorded macOS shortcuts, skipping${NC}"
 elif "$HOTKEYS" check >/dev/null; then
-    print "${GREEN}✓ Recorded macOS shortcuts already off${NC}"
+    print "${GREEN}✓ Recorded macOS shortcuts already match${NC}"
 else
     "$HOTKEYS" check | sed 's/^/  /'
-    if ask_yes_no "Switch these macOS shortcuts off (System Settings > Keyboard > Keyboard Shortcuts)?"; then
-        "$HOTKEYS" import || print "${RED}✗ some shortcuts are still on${NC}"
+    if ask_yes_no "Set these macOS shortcuts as recorded (System Settings > Keyboard > Keyboard Shortcuts)?"; then
+        "$HOTKEYS" import || print "${RED}✗ some shortcuts still differ${NC}"
     else
         print "${YELLOW}! Skipped macOS shortcuts${NC}"
     fi
