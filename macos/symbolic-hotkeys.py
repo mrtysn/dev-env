@@ -28,7 +28,7 @@ NAMES = {"28": "Save picture of screen as a file", "29": "Copy picture of screen
          "30": "Save picture of selected area as a file", "31": "Copy picture of selected area to the clipboard",
          "184": "Screenshot and recording options", "60": "Select the previous input source",
          "61": "Select next source in Input menu", "64": "Show Spotlight search",
-         "160": "Show Launchpad", "32": "Mission Control", "33": "Application windows", "36": "Show Desktop"}
+         "160": "Show Launchpad (Show Apps on macOS 27)", "32": "Mission Control", "33": "Application windows", "36": "Show Desktop"}
 
 
 def read(domain):

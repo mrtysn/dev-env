@@ -43,7 +43,7 @@ plistlib.dump(r, open(sys.argv[1], "wb"))
 plistlib.dump({"160": {"enabled": True, "value": {"parameters": [65535, 79, 8388608], "type": "standard"}}},
               open(sys.argv[2], "wb"))
 PY
-out=$($tool import --domain $domain --label c03); [[ $out == *"Show Launchpad (on)"* ]] && ok || bad "c03 import did not turn Show Launchpad on: $out"
+out=$($tool import --domain $domain --label c03); [[ $out == *"Show Launchpad"*"(on)"* ]] && ok || bad "c03 import did not turn Show Launchpad on: $out"
 $tool check --domain $domain --label c03 >/dev/null && ok || bad "c03 check differs after import"
 $tool check --domain $domain --label c02 >/dev/null && bad "c02 check passed with 160 on" || ok
 # Export on c03 writes only where it differs from c02's record, and leaves the record alone.
