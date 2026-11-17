@@ -79,8 +79,8 @@ per-machine files it needs.
 3. `Brewfile.<label>`: this machine only.
 
 An entry is listed once, in the layer that owns it. The `mas` lines need an Apple ID signed in
-to the App Store: step 2 checks (`mas account` where mas has it, otherwise it asks) and, with
-no Apple ID, skips every `mas` entry with a message instead of failing; re-run the step once
+to the App Store: step 2 checks (macOS's Accounts database, then `mas account` where mas has it,
+otherwise it asks) and, with no Apple ID, skips every `mas` entry with a message instead of failing; re-run the step once
 signed in.
 
 Only the primary profile's layer is installed, so the work Mac's personal config folder does
@@ -291,16 +291,18 @@ What it does:
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
 7. Configures FZF integration
-8. Backs up existing configs and copies repo configs to home directory
+8. Copies the zsh configs to the home directory, backing up any that differ
 9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
 12. For each Claude config folder (`~/.claude`, every `~/.claude-*`, and any you add when asked): records its profile and agents-shared checkout in `paths.local.sh` via `agents/claude/write-paths-local.sh` (the guard hooks refuse every Bash tool call until it resolves), then backs up and writes `settings.json` as base + that profile's overlays
-13. Copies Phoenix and Karabiner configs
+13. Copies the Phoenix and Karabiner configs, each only where its app is installed
 14. Copies lazygit and repo-tabs configs
 15. Routes this clone's pushes through agents-shared's name guard
 
-The script is idempotent - it checks what's already installed and skips those steps.
+The script is idempotent: a second run installs nothing and writes nothing. A file that already
+matches the repo is left alone (`already matches`), and only a file that differs is backed up
+before it is replaced.
 
 ```bash
 ./import.sh
