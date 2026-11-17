@@ -2,6 +2,30 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>hotkeyDisabled_1</key>
+	<true/>
+	<key>hotkeyDisabled_10</key>
+	<true/>
+	<key>hotkeyDisabled_11</key>
+	<true/>
+	<key>hotkeyDisabled_12</key>
+	<true/>
+	<key>hotkeyDisabled_13</key>
+	<true/>
+	<key>hotkeyDisabled_2</key>
+	<true/>
+	<key>hotkeyDisabled_3</key>
+	<true/>
+	<key>hotkeyDisabled_4</key>
+	<true/>
+	<key>hotkeyDisabled_5</key>
+	<true/>
+	<key>hotkeyDisabled_6</key>
+	<true/>
+	<key>hotkeyDisabled_8</key>
+	<true/>
+	<key>hotkeyDisabled_9</key>
+	<true/>
 	<key>hotkeyQuickCaptureKeyCode</key>
 	<integer>21</integer>
 	<key>hotkeyQuickCaptureModifiers</key>
