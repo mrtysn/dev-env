@@ -46,7 +46,7 @@
     {
       "name": "macshot",
       "app": "/Applications/macshot.app",
-      "file": "Library/Preferences/com.sw33tlie.macshot.plist",
+      "file": "Library/Containers/com.sw33tlie.macshot.macshot/Data/Library/Preferences/com.sw33tlie.macshot.macshot.plist",
       "keys": "hotkey\\w*|quickCaptureMode|quickCaptureOpenEditor|openEditorAfterSelection|closeEditorAfterCopy|historySize|historyUnlimited"
     },
     {

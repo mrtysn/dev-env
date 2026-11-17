@@ -28,6 +28,20 @@ def load_apps():
         return json.load(f)["apps"]
 
 
+def wrong_file(a):
+    """Why a plist app's `file` is not the one the installed app reads, or None. An app reads the
+    preferences named after its bundle id (a sandboxed one inside its container), so a file whose
+    path lacks that id is written for nothing: the app keeps its defaults and nothing says so."""
+    info = os.path.join(a["app"], "Contents", "Info.plist")
+    if "file" not in a or not os.path.exists(info):
+        return None
+    with open(info, "rb") as f:
+        bid = plistlib.load(f).get("CFBundleIdentifier", "")
+    if bid and bid not in a["file"]:
+        return f"its file is not under its bundle id {bid}: fix the path in apps.json"
+    return None
+
+
 def read_plist(path):
     """The live values, through cfprefsd (a file read can miss unsaved changes)."""
     if not os.path.exists(path):
@@ -264,12 +278,19 @@ def main(argv):
     home = os.path.expanduser("~")
     if "--home" in argv:
         home = os.path.realpath(argv[argv.index("--home") + 1])  # defaults treats /var and /private/var as two files
-    apps = load_apps()
+    apps, refused = [], 0
+    for a in load_apps():
+        why = wrong_file(a)
+        if why:
+            say(RED, f"✗ {a['name']}: {why}")
+            refused = 1
+        else:
+            apps.append(a)
     if argv[0] == "export":
-        return export(apps, home)
+        return export(apps, home) or refused
     if argv[0] == "import":
-        return import_(apps, home, "--ignore-running" in argv)
-    return check(apps, home)
+        return import_(apps, home, "--ignore-running" in argv) or refused
+    return check(apps, home) or refused
 
 
 if __name__ == "__main__":
