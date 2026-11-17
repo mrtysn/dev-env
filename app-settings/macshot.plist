@@ -27,7 +27,7 @@
 	<key>hotkeyDisabled_9</key>
 	<true/>
 	<key>hotkeyQuickCaptureKeyCode</key>
-	<integer>21</integer>
+	<integer>25</integer>
 	<key>hotkeyQuickCaptureModifiers</key>
 	<integer>768</integer>
 	<key>quickCaptureMode</key>
