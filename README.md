@@ -145,8 +145,8 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
 ### Setting up the work Mac
 
 1. Set its hostname: `sudo scutil --set LocalHostName mrtysn-mbp-m5`.
-2. Clone this repo, agents-shared, tools and cc-statusline into the dev root. tools and
-   cc-statusline are private, so the clone needs a GitHub login that can read them.
+2. Clone this repo, agents-shared, tools and cc-statusline into the dev root. tools is
+   private, so its clone needs a GitHub login that can read it; the others are public.
 3. Copy `agents/claude/overlays/work.json.example` to `agents/claude/overlays/work.local.json`
    and fill in every placeholder.
 4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. The `mas`
