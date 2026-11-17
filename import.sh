@@ -612,16 +612,24 @@ if $CHECK; then
     if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
         check_skip 16 "app-settings/app-settings.py or /usr/bin/python3 missing"
     else
+        # An app whose settings this terminal cannot read (a group container without the "access
+        # data from other apps" grant) is not checked, rather than counted as a change.
+        unreadable=()
         if ! out="$("$APP_SETTINGS" check 2>&1)"; then
             for line in "${(@f)out}"; do
                 case "$line" in
                     "✗ "*) n="${line#✗ }"; CHECK_CHANGES+=("${n%%:*} settings") ;;
-                    *": differs"*|*": unreadable"*) CHECK_CHANGES+=("${line%%:*} settings") ;;
+                    *": differs"*) CHECK_CHANGES+=("${line%%:*} settings") ;;
+                    *": unreadable"*) unreadable+=("${line%%:*}") ;;
                 esac
             done
-            (( ${#CHECK_CHANGES} )) || CHECK_CHANGES+=("app settings (app-settings.py check failed)")
+            (( ${#CHECK_CHANGES} || ${#unreadable} )) || CHECK_CHANGES+=("app settings (app-settings.py check failed)")
         fi
-        check_report 16
+        if (( ! ${#CHECK_CHANGES} && ${#unreadable} )); then
+            check_skip 16 "${(j:, :)unreadable} unreadable from this terminal (grant it access to other apps' data)"
+        else
+            check_report 16
+        fi
     fi
 
     # Step 17
