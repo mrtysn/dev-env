@@ -60,7 +60,7 @@ cask "rectangle"                # window snapping
 cask "alt-tab"                  # window switcher
 cask "itsycal"                  # menu bar calendar
 cask "keepingyouawake"          # keep the Mac awake
-cask "shottr"                   # screenshots
+cask "macshot"                  # screenshots: open source, no telemetry, upload off unless set up
 cask "mos"                      # smooth scrolling, scroll direction per device
 cask "lunar"                    # brightness for external displays
 cask "balance-lock"             # stops audio balance drifting
@@ -121,4 +121,3 @@ mas "Spaced", id: 1666327168              # break reminder
 mas "uBlock Origin Lite", id: 6745342698  # Safari content blocker
 mas "Unsplash Wallpapers", id: 1284863847 # wallpapers
 mas "Velja", id: 1607635845               # browser picker
-mas "Lightshot Screenshot", id: 526298438 # screenshots
