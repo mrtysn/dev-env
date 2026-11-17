@@ -1,2 +1,3 @@
 # Work profile — installed on machines whose primary profile is work (machine-label.sh).
 # Only what every work machine wants; one machine's list goes in Brewfile.<label>.
+brew "node"                     # the status line (cc-statusline.js); home Macs get it from asdf

@@ -768,6 +768,10 @@ else
         fi
     done
 fi
+# The status line is a node script: without node it draws nothing and says nothing.
+if ! command_exists node; then
+    print "${RED}✗ node is not installed, so the status line (cc-statusline.js) cannot draw: brew install node${NC}"
+fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
