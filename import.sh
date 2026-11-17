@@ -135,6 +135,21 @@ if [ -f Brewfile ]; then
             print "${YELLOW}! No Apple ID signed in to the App Store: skipping ${#MAS_IDS} mas app(s). Sign in, then re-run this step.${NC}"
             export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
         fi
+        # A cask whose app is already in /Applications but was installed without Homebrew
+        # (a downloaded installer) makes brew bundle fail with "there is already an App".
+        # Hand each such app to Homebrew first: --adopt keeps the copy on disk.
+        listed_casks=($(grep -hoE '^cask "[^"]+"' "${BREW_LAYERS[@]}" | sed -E 's/cask "([^"]+)"/\1/'))
+        installed_casks=" $(brew list --cask -1 2>/dev/null | tr '\n' ' ') "
+        for c in $listed_casks; do
+            [[ "$installed_casks" == *" $c "* ]] && continue
+            apps=("${(@f)$(brew info --cask --json=v2 "$c" 2>/dev/null | /usr/bin/python3 -I -c '
+import json,sys
+for a in json.load(sys.stdin)["casks"][0].get("artifacts",[]):
+    if isinstance(a,dict) and "app" in a: print(*[x for x in a["app"] if isinstance(x,str)], sep="\n")' 2>/dev/null)}")
+            [[ -n "${apps[1]:-}" && -d "/Applications/${apps[1]}" ]] || continue
+            print "${YELLOW}→ $c: /Applications/${apps[1]} was installed without Homebrew, adopting it${NC}"
+            brew install --cask --adopt "$c" || print "${RED}✗ could not adopt $c; remove /Applications/${apps[1]} and re-run${NC}"
+        done
         for layer in "${BREW_LAYERS[@]}"; do
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
         done
