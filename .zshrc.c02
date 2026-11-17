@@ -62,3 +62,6 @@ codex() {
 # Peon-ping mute/unmute (c01 also touches ~/.openpeon; not installed here)
 alias peon-ping-mute="touch $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
 alias peon-ping-unmute="rm -f $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
+
+# Unity CLI (its installer appends this to ~/.zshrc, which import.sh owns)
+[ -f "$HOME/.unity/env" ] && . "$HOME/.unity/env"
