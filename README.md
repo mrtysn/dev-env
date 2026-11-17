@@ -336,6 +336,7 @@ What it does:
 18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; the machine's shortcuts bind F18, as c03 binds it to Show Apps), and each keyboard gets the modifier swaps `karabiner/karabiner.json` makes for it (`macos/modifier-keys.py`; applies when the keyboard reconnects or at the next login)
 
 `./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
+A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them. Step 3 skips a machine whose `asdf/tool-versions.<label>` is empty.
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up

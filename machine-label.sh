@@ -35,4 +35,10 @@ case "$RESOLVED_HOST" in
     mrtysn-mbp-m5)     MACHINE_LABEL="c03"; MACHINE_NAME="C03 (Work)"; MACHINE_PROFILES=(work personal) ;;
     *)                 MACHINE_LABEL="";    MACHINE_NAME="unknown";    MACHINE_PROFILES=() ;;
 esac
+# The optional import.sh steps a machine always declines: neither the run nor --check takes them
+# there, unless --steps names them. c03 keeps no lazygit or repo-tabs configs (step 14).
+case "$MACHINE_LABEL" in
+    c03) MACHINE_SKIP_STEPS=(14) ;;
+    *)   MACHINE_SKIP_STEPS=() ;;
+esac
 MACHINE_PRIMARY_PROFILE="${MACHINE_PROFILES[1]:-}"

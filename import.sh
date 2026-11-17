@@ -27,8 +27,14 @@ while (( $# )); do
     esac
     shift
 done
-# Whether step $1 runs: every step without --steps, else only the listed ones.
-want_step() { (( ${#STEPS} == 0 || ${STEPS[(Ie)$1]} )); }
+# Whether step $1 runs: with --steps, only the listed ones; without, every step but those this
+# machine declines (MACHINE_SKIP_STEPS in machine-label.sh, set once that file is sourced).
+want_step() {
+    (( ${#STEPS} )) && { (( ${STEPS[(Ie)$1]} )); return; }
+    (( ! ${MACHINE_SKIP_STEPS[(Ie)$1]} ))
+}
+# Says why a step that would otherwise run is left out on this machine.
+machine_skips() { (( ! ${#STEPS} )) && (( ${MACHINE_SKIP_STEPS[(Ie)$1]} )); }
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
@@ -102,6 +108,9 @@ mas_signed_in() {
             return 1
         fi
     fi
+    # No terminal (an agent's shell, piped answers): unknown counts as signed out, as --check does,
+    # so the mas lines are skipped instead of a stray answer trying them.
+    [[ -t 0 ]] || return 1
     ask_yes_no "Is an Apple ID signed in to the App Store (for the mas apps)?" n
 }
 
@@ -374,7 +383,10 @@ if $CHECK; then
     CHECK_BAD=0
 
     check_report() {  # step number; reads CHECK_CHANGES
-        want_step "$1" || { CHECK_CHANGES=(); return 0; }
+        if ! want_step "$1"; then
+            machine_skips "$1" && print "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
+            CHECK_CHANGES=(); return 0
+        fi
         if (( ${#CHECK_CHANGES} )); then
             local more=""
             (( ${#CHECK_CHANGES} > 5 )) && more=" (+$(( ${#CHECK_CHANGES} - 5 )) more)"
@@ -386,7 +398,10 @@ if $CHECK; then
         CHECK_CHANGES=()
     }
     check_skip() {  # step number, reason
-        want_step "$1" || { CHECK_CHANGES=(); return 0; }
+        if ! want_step "$1"; then
+            machine_skips "$1" && print "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
+            CHECK_CHANGES=(); return 0
+        fi
         print "${YELLOW}- step $1: not checked ($2)${NC}"
         CHECK_CHANGES=()
     }
@@ -420,7 +435,7 @@ if $CHECK; then
     fi
 
     # Step 3: the pinned file, plus each pinned runtime installed (never installs anything)
-    if [[ -z "$BREW_LABEL" || ! -f "asdf/tool-versions.$BREW_LABEL" ]] || ! command_exists asdf; then
+    if [[ -z "$BREW_LABEL" || ! -s "asdf/tool-versions.$BREW_LABEL" ]] || ! command_exists asdf; then
         check_skip 3 "no asdf/tool-versions.<label> in the repo for this machine, or asdf missing"
     else
         install_file "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
@@ -716,7 +731,7 @@ if want_step 3; then
 echo "=== Step 3: asdf Runtimes ==="
 # Per-machine pins (asdf/tool-versions.<label>) — same one-sided convention as
 # .zshrc.<label>: this machine only ever reads its own file.
-if [[ -n "$BREW_LABEL" ]] && [ -f "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
+if [[ -n "$BREW_LABEL" ]] && [ -s "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
     print "${BLUE}Runtimes ($BREW_LABEL):${NC} $(tr '\n' ' ' < "asdf/tool-versions.$BREW_LABEL")"
     if ask_yes_no "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
         # Pins older than what this machine runs mean export.sh has not run since an upgrade:
