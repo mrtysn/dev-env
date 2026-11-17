@@ -3,3 +3,5 @@
 # Development
 brew "bun"                      # JavaScript runtime and package manager
 brew "mise"                     # runtime version manager
+# Editors
+cask "visual-studio-code"       # editor; this Mac only, Sublime is the editor elsewhere

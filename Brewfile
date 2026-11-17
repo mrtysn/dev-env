@@ -49,7 +49,6 @@ cask "iterm2"                   # terminal (settings + profiles synced)
 cask "font-fira-code"           # Fira Code
 cask "font-fira-code-nerd-font" # terminal font assumed by the p10k config
 cask "sublime-text"             # $EDITOR 'subl --wait' and lazygit editPreset (personal licence)
-cask "visual-studio-code"       # editor
 cask "dbeaver-community"        # database client
 cask "hoppscotch"               # API client
 cask "meld"                     # diff and merge
