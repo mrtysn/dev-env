@@ -88,6 +88,12 @@ def same(a, b):
     a string with its entries reordered, which is the same setting."""
     if a == b:
         return True
+    # Mos keeps JSON in data (bytes) values rather than strings; compare those as data too.
+    if isinstance(a, bytes) and isinstance(b, bytes):
+        try:
+            a, b = a.decode(), b.decode()
+        except UnicodeDecodeError:
+            return False
     if isinstance(a, str) and isinstance(b, str):
         try:
             return unordered(json.loads(a)) == unordered(json.loads(b))
