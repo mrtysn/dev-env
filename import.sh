@@ -156,11 +156,14 @@ echo "=== Step 3: asdf Runtimes ==="
 if [[ -n "$BREW_LABEL" ]] && [ -f "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
     print "${BLUE}Runtimes ($BREW_LABEL):${NC} $(tr '\n' ' ' < "asdf/tool-versions.$BREW_LABEL")"
     if ask_yes_no "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
-        if [ -f ~/.tool-versions ]; then
-            cp ~/.tool-versions ~/.tool-versions.backup-$(date +%Y%m%d-%H%M%S)
-            print "${YELLOW}→ Backed up existing ~/.tool-versions${NC}"
+        # Pins older than what this machine runs mean export.sh has not run since an upgrade:
+        # importing them would switch every runtime back.
+        if [ -f ~/.tool-versions ] && ! cmp -s "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions; then
+            print "${YELLOW}! ~/.tool-versions differs from the repo's pins (< repo, > this machine):${NC}"
+            diff "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions | grep '^[<>]' || true
+            print "${YELLOW}  If this machine's versions are the newer ones, run export.sh first instead.${NC}"
         fi
-        cp "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
+        install_file "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
         while read -r tool _version; do
             [[ -z "$tool" || "$tool" == \#* ]] && continue
             if asdf plugin list 2>/dev/null | grep -qx "$tool"; then
