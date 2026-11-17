@@ -24,3 +24,6 @@ Temporary Items
 
 # Machine-local Claude settings overlays (the work overlay holds the employer's names: never commit)
 agents/claude/overlays/*.local.json
+
+# Python bytecode cache
+__pycache__/

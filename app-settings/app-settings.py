@@ -69,6 +69,32 @@ def write_if_changed(path, data):
     return True
 
 
+def same(a, b):
+    """Equal values; a string holding JSON compares as data, since apps (Rectangle) rewrite such
+    a string with its entries reordered, which is the same setting."""
+    if a == b:
+        return True
+    if isinstance(a, str) and isinstance(b, str):
+        try:
+            return unordered(json.loads(a)) == unordered(json.loads(b))
+        except ValueError:
+            return False
+    return False
+
+
+def unordered(x):
+    """A flat [key, value, key, value, ...] list, which is how Swift encodes a dictionary, as a
+    dict, so the same pairs in another order compare equal; lists and dicts inside likewise."""
+    if isinstance(x, dict):
+        return {k: unordered(v) for k, v in x.items()}
+    if isinstance(x, list):
+        keys = x[0::2]
+        if x and len(x) % 2 == 0 and all(isinstance(k, (int, str)) for k in keys) and len(set(keys)) == len(keys):
+            return {k: unordered(v) for k, v in zip(keys, x[1::2])}
+        return [unordered(v) for v in x]
+    return x
+
+
 def export(apps, home):
     changed = 0
     for a in apps:
@@ -102,6 +128,14 @@ def export(apps, home):
                 say(RED, f"✗ {name}: key {k} holds a home path or an address, not exported")
                 continue
             kept[k] = v
+        # Keep the repo's copy of a value that is only reordered, so an export writes nothing.
+        repo_file = os.path.join(HERE, f"{name}.plist")
+        if os.path.exists(repo_file):
+            with open(repo_file, "rb") as f:
+                stored = plistlib.load(f)
+            for k, v in kept.items():
+                if k in stored and same(stored[k], v):
+                    kept[k] = stored[k]
         data = plistlib.dumps(kept, fmt=plistlib.FMT_XML, sort_keys=True)
         if write_if_changed(os.path.join(HERE, f"{name}.plist"), data):
             changed += 1
@@ -134,7 +168,7 @@ def status(a, home):
     with open(repo, "rb") as f:
         want = plistlib.load(f)
     have = read_plist(os.path.join(home, a["file"]))
-    diff = sorted(k for k, v in want.items() if have.get(k) != v)
+    diff = sorted(k for k, v in want.items() if not same(have.get(k), v))
     return ("differs", diff) if diff else ("match", None)
 
 
