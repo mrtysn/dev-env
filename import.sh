@@ -173,7 +173,12 @@ if [[ -n "$BREW_LABEL" ]] && [ -f "asdf/tool-versions.$BREW_LABEL" ] && command 
                 asdf plugin add "$tool" || print "${RED}✗ plugin $tool failed${NC}"
             fi
         done < "asdf/tool-versions.$BREW_LABEL"
-        (cd ~ && asdf install) || print "${RED}✗ some runtimes failed to install${NC}"
+        # Per tool: a bare `asdf install` exits non-zero on a `system` pin (the OS's own java),
+        # which it cannot install, so every run reported a failure.
+        while read -r tool version; do
+            [[ -z "$tool" || "$tool" == \#* || "$version" == system ]] && continue
+            (cd ~ && asdf install "$tool" "$version") || print "${RED}✗ $tool $version failed to install${NC}"
+        done < "asdf/tool-versions.$BREW_LABEL"
     else
         print "${YELLOW}! Skipped asdf runtimes${NC}"
     fi
