@@ -193,6 +193,14 @@ git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
   denylist is written there by hand and holds only the employer's own names and internal terms.
   It is never a copy of the home machine's list, which names private projects and people.
 
+### macOS keyboard shortcuts
+
+`export.sh` records every shortcut switched off in System Settings > Keyboard > Keyboard Shortcuts
+(`com.apple.symbolichotkeys`) in `macos/symbolic-hotkeys-off.plist`; `import.sh` step 17 switches the
+same ones off on another machine, after asking, and applies them without a logout. Only "off" moves:
+nothing is switched on. `macos/symbolic-hotkeys.py check` lists recorded ones still on here;
+`macos/test-symbolic-hotkeys.zsh` tests it on a copy of the settings.
+
 ### App settings
 
 `app-settings/apps.json` lists the apps whose settings move between machines and, per app, an
@@ -318,6 +326,7 @@ What it does:
 14. Copies lazygit and repo-tabs configs
 15. Routes this clone's pushes through agents-shared's name guard
 16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
+17. Switches off the macOS keyboard shortcuts recorded as off (`macos/symbolic-hotkeys-off.plist`, written by `export.sh`), asking first
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up

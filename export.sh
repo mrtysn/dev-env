@@ -485,6 +485,14 @@ else
     warn "app-settings export failed"
 fi
 
+# macOS shortcuts switched off in System Settings > Keyboard > Keyboard Shortcuts.
+echo "✓ Exporting switched-off macOS shortcuts"
+if "$SCRIPT_DIR/macos/symbolic-hotkeys.py" export; then
+    note "macos/symbolic-hotkeys-off.plist"
+else
+    warn "symbolic hotkeys export failed"
+fi
+
 # Absolute home paths in exported files break the repo on any other machine (and leak
 # the layout). The live files are the source, so say which one to fix.
 echo "✓ Checking exports for hardcoded home paths"

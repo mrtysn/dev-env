@@ -927,6 +927,27 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 17: macOS keyboard shortcuts (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 17: macOS Keyboard Shortcuts ==="
+# The shortcuts switched off on the machine that last exported (macos/symbolic-hotkeys-off.plist),
+# such as ⇧⌘4 that macshot takes over. Only switches off; an entry already off is left alone.
+HOTKEYS="$SCRIPT_DIR/macos/symbolic-hotkeys.py"
+if [[ ! -x "$HOTKEYS" ]] || [[ ! -x /usr/bin/python3 ]] || [[ ! -f "$SCRIPT_DIR/macos/symbolic-hotkeys-off.plist" ]]; then
+    print "${YELLOW}! No recorded macOS shortcuts, skipping${NC}"
+elif "$HOTKEYS" check >/dev/null; then
+    print "${GREEN}✓ Recorded macOS shortcuts already off${NC}"
+else
+    "$HOTKEYS" check | sed 's/^/  /'
+    if ask_yes_no "Switch these macOS shortcuts off (System Settings > Keyboard > Keyboard Shortcuts)?"; then
+        "$HOTKEYS" import || print "${RED}✗ some shortcuts are still on${NC}"
+    else
+        print "${YELLOW}! Skipped macOS shortcuts${NC}"
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Import Complete ==="
