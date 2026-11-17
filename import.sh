@@ -683,6 +683,12 @@ else
     while ask_yes_no "Add another Claude config folder (one per account)?" "n"; do
         read "extra_dir?Path, e.g. ~/.claude-work or ~/.claude-personal: "
         extra_dir="${extra_dir/#\~/$HOME}"
+        # A relative answer ("claude-personal") would land in the cwd, which is this
+        # public repo: only ~/... or an absolute path is a config folder.
+        if [[ -n "$extra_dir" && "$extra_dir" != /* ]]; then
+            print "${RED}✗ $extra_dir is not a full path: give ~/.claude-<name> or /full/path${NC}"
+            continue
+        fi
         [[ -n "$extra_dir" ]] && CLAUDE_DIRS+=("${extra_dir%/}")
     done
 
