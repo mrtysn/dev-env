@@ -138,10 +138,26 @@ def status(a, home):
     return ("differs", diff) if diff else ("match", None)
 
 
+def refused(a, e):
+    """Name what macOS wants when it refuses an app's group container."""
+    if os.path.exists(os.path.dirname(e.filename or "")):
+        # The container exists, so the app made it; the shell's app is what is refused.
+        return (f"! {a['name']}: macOS refused {e.filename}: allow this terminal to access data "
+                "from other apps (System Settings > Privacy & Security), then re-run this step")
+    # macOS lets only the app itself create its group container: an app that was
+    # installed but never opened has none, and makedirs there is refused.
+    return (f"! {a['name']}: macOS refused {e.filename}: open {os.path.basename(a['app'])} once, "
+            "quit it, then re-run this step")
+
+
 def import_(apps, home, ignore_running):
     for a in apps:
         name = a["name"]
-        state, diff = status(a, home)
+        try:
+            state, diff = status(a, home)
+        except PermissionError as e:
+            say(YELLOW, refused(a, e))
+            continue
         if state == "absent":
             say(YELLOW, f"! {name}: not installed, skipped")
             continue
@@ -154,10 +170,7 @@ def import_(apps, home, ignore_running):
         try:
             load(a, home, diff)
         except PermissionError as e:
-            # macOS lets only the app itself create its group container: an app that was
-            # installed but never opened has none, and makedirs there is refused.
-            say(YELLOW, f"! {name}: macOS refused {e.filename}: open {os.path.basename(a['app'])} once, "
-                        "quit it, then re-run this step")
+            say(YELLOW, refused(a, e))
     return 0
 
 
@@ -196,7 +209,12 @@ def load(a, home, diff):
 def check(apps, home):
     bad = 0
     for a in apps:
-        state, diff = status(a, home)
+        try:
+            state, diff = status(a, home)
+        except PermissionError as e:
+            bad = 1
+            print(f"{a['name']}: unreadable ({e.filename}: macOS refused this terminal)")
+            continue
         if state == "differs":
             bad = 1
             print(f"{a['name']}: differs ({', '.join(diff[:6])}{'…' if len(diff) > 6 else ''})")
