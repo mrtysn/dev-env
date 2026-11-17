@@ -333,7 +333,9 @@ What it does:
 15. Routes this clone's pushes through agents-shared's name guard
 16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). Launch each app once before its first import: Lunar, for one, switches its own brightness mode on first launch and would overwrite what step 16 loaded. An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
 17. Sets the macOS keyboard shortcuts as recorded (`macos/symbolic-hotkeys.plist`, written by `export.sh`): on or off, and their keys, asking first
-18. On a Mac without Karabiner-Elements, installs a login agent that maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`); the machine's shortcuts bind F18, as c03 binds it to Show Launchpad
+18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; the machine's shortcuts bind F18, as c03 binds it to Show Apps), and each keyboard gets the modifier swaps `karabiner/karabiner.json` makes for it (`macos/modifier-keys.py`; applies when the keyboard reconnects or at the next login)
+
+`./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up

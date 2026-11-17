@@ -4,14 +4,31 @@
 set -e
 
 # --check: run each step's comparison and write nothing (see "Check mode" below).
+# --steps LIST: run (or with --check, compare) only those steps, e.g. 16,17 or 2-5,16.
+USAGE="usage: ./import.sh [--check] [--steps LIST]
+  --check        compare this machine with the repo step by step; asks nothing, writes nothing,
+                 exits 1 when anything would change
+  --steps LIST   only these steps, by number: 16,17 or 2-5,16 (the step numbers are in the README)"
 CHECK=false
-case "${1:-}" in
-    "") ;;
-    --check) CHECK=true ;;
-    -h|--help) print "usage: ./import.sh [--check]"; print "  --check  compare this machine with the repo step by step; asks nothing, writes nothing, exits 1 when anything would change"; exit 0 ;;
-    *) print -u2 "usage: ./import.sh [--check]"; exit 2 ;;
-esac
-(( $# <= 1 )) || { print -u2 "usage: ./import.sh [--check]"; exit 2; }
+STEPS=()
+while (( $# )); do
+    case "$1" in
+        --check) CHECK=true ;;
+        --steps)
+            (( $# >= 2 )) || { print -u2 "$USAGE"; exit 2; }
+            for part in ${(s:,:)2}; do
+                if [[ "$part" == <->-<-> ]]; then STEPS+=({${part%-*}..${part#*-}})
+                elif [[ "$part" == <-> ]]; then STEPS+=($part)
+                else print -u2 "--steps: '$part' is not a step number or range"; exit 2; fi
+            done
+            shift ;;
+        -h|--help) print "$USAGE"; exit 0 ;;
+        *) print -u2 "$USAGE"; exit 2 ;;
+    esac
+    shift
+done
+# Whether step $1 runs: every step without --steps, else only the listed ones.
+want_step() { (( ${#STEPS} == 0 || ${STEPS[(Ie)$1]} )); }
 
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 
@@ -357,6 +374,7 @@ if $CHECK; then
     CHECK_BAD=0
 
     check_report() {  # step number; reads CHECK_CHANGES
+        want_step "$1" || { CHECK_CHANGES=(); return 0; }
         if (( ${#CHECK_CHANGES} )); then
             local more=""
             (( ${#CHECK_CHANGES} > 5 )) && more=" (+$(( ${#CHECK_CHANGES} - 5 )) more)"
@@ -368,6 +386,7 @@ if $CHECK; then
         CHECK_CHANGES=()
     }
     check_skip() {  # step number, reason
+        want_step "$1" || { CHECK_CHANGES=(); return 0; }
         print "${YELLOW}- step $1: not checked ($2)${NC}"
         CHECK_CHANGES=()
     }
@@ -605,9 +624,14 @@ if $CHECK; then
 
     # Step 18
     if [[ -d /Applications/Karabiner-Elements.app ]]; then
-        check_skip 18 "Karabiner-Elements maps Caps Lock here"
+        check_skip 18 "Karabiner-Elements maps the keys here"
     else
         "$SCRIPT_DIR/macos/capslock-to-f18.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("Caps Lock to F18 login agent")
+        if ! out="$("$SCRIPT_DIR/macos/modifier-keys.py" check 2>&1)"; then
+            for line in "${(@f)out}"; do
+                [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
+            done
+        fi
         check_report 18
     fi
 
@@ -623,6 +647,7 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 1: Homebrew (required - other steps depend on it)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 1; then
 echo "=== Step 1: Homebrew ==="
 if command_exists brew; then
     print "${GREEN}✓ Homebrew already installed${NC}"
@@ -637,10 +662,12 @@ else
     print "${GREEN}✓ Homebrew installed${NC}"
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 2: Brew Packages (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 2; then
 echo "=== Step 2: Brew Bundle ==="
 # brew bundle is natively idempotent (skips installed, reports per-item).
 if [ -f Brewfile ]; then
@@ -680,10 +707,12 @@ else
     print "${RED}✗ Brewfile not found${NC}"
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 3: Nerd Font (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 3; then
 echo "=== Step 3: asdf Runtimes ==="
 # Per-machine pins (asdf/tool-versions.<label>) — same one-sided convention as
 # .zshrc.<label>: this machine only ever reads its own file.
@@ -720,10 +749,12 @@ else
     print "${YELLOW}! No asdf/tool-versions.$BREW_LABEL in repo (or asdf missing), skipping${NC}"
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 4: Oh-My-Zsh (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 4; then
 echo "=== Step 4: Oh-My-Zsh ==="
 if [ -d ~/.oh-my-zsh ]; then
     print "${GREEN}✓ Oh-My-Zsh already installed${NC}"
@@ -744,10 +775,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 5: Custom Plugins (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 5; then
 echo "=== Step 5: Custom Plugins ==="
 if [ ! -d ~/.oh-my-zsh ]; then
     print "${YELLOW}! Oh-My-Zsh not installed, skipping plugins${NC}"
@@ -807,17 +840,21 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 6: Homebrew command-not-found (informational only)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 6; then
 echo "=== Step 6: Homebrew command-not-found ==="
 print "${GREEN}✓ command-not-found is now built into Homebrew (no tap required)${NC}"
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 7: FZF Integration (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 7; then
 echo "=== Step 7: FZF Integration ==="
 if [ -f ~/.fzf.zsh ]; then
     print "${GREEN}✓ FZF already configured${NC}"
@@ -839,10 +876,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 8: Configuration Files (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 8; then
 echo "=== Step 8: Configuration Files ==="
 
 # Zsh split label comes from the shared mapping (machine-label.sh).
@@ -877,10 +916,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 9: iTerm2 Profiles & Settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 9; then
 echo "=== Step 9: iTerm2 Profiles & Settings ==="
 
 if [ ! -d "$PROFILES_DIR" ]; then
@@ -986,10 +1027,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 10: Default Shell (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 10; then
 echo "=== Step 10: Default Shell ==="
 if [ "$SHELL" = "/bin/zsh" ]; then
     print "${GREEN}✓ zsh is already the default shell${NC}"
@@ -1006,10 +1049,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 11: Tmux Configuration (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 11; then
 echo "=== Step 11: Tmux Configuration ==="
 
 if ! command_exists tmux; then
@@ -1078,10 +1123,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 12: Claude Code Settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 12; then
 echo "=== Step 12: Claude Code Settings ==="
 
 # Each config folder gets base settings.json + the overlays of the profile it declares in
@@ -1191,10 +1238,12 @@ if ! command_exists node; then
     print "${RED}✗ node is not installed, so the status line (cc-statusline.js) cannot draw: brew install node${NC}"
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 13: Window & Keyboard Configs (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 13; then
 echo "=== Step 13: Window & Keyboard Configs ==="
 
 # Each config only where its app is installed: both apps are in Brewfile.personal, so a
@@ -1215,10 +1264,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 14: lazygit + repo-tabs Configuration (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 14; then
 echo "=== Step 14: lazygit + repo-tabs Configuration ==="
 
 HAS_LG=false
@@ -1239,10 +1290,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 15: Push name guard for this repo (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 15; then
 echo "=== Step 15: Push Name Guard ==="
 # This repo is public. agents-shared's githooks/pre-push reads every commit a push sends
 # and refuses it when an added line, path or message names an entry on a local, untracked
@@ -1286,10 +1339,12 @@ if [[ "$(git -C "$SCRIPT_DIR" config --get core.hooksPath || true)" == "${GUARD_
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 16: App settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 16; then
 echo "=== Step 16: App Settings ==="
 # The allowlisted settings of the apps in app-settings/apps.json, for each that is installed.
 # Only differing keys are written; a running app is skipped with a note to quit it first.
@@ -1306,10 +1361,12 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Step 17: macOS keyboard shortcuts (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
+if want_step 17; then
 echo "=== Step 17: macOS Keyboard Shortcuts ==="
 # The shortcut entries recorded on the machine that last exported (macos/symbolic-hotkeys.plist):
 # which are on or off and their keys, such as copy-selected-area on ⇧⌘4. An entry that matches is left alone.
@@ -1326,24 +1383,41 @@ else
     fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 18: Caps Lock as F18 where Karabiner is absent (optional)
+# Step 18: the keyboard where Karabiner is absent (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
-echo "=== Step 18: Caps Lock to F18 ==="
-# Karabiner-Elements (personal profile) maps Caps Lock itself. Elsewhere a login agent maps it to F18
-# with hidutil, and the machine's shortcuts (step 17, symbolic-hotkeys.<label>.plist) bind F18.
+if want_step 18; then
+echo "=== Step 18: Keyboard without Karabiner ==="
+# Karabiner-Elements (personal profile) maps the keys itself. Elsewhere macOS's own settings do:
+# a login agent maps Caps Lock to F18 with hidutil (the machine's shortcuts, step 17, bind F18),
+# and each keyboard gets the modifier swaps karabiner/karabiner.json makes for it.
 CAPSLOCK="$SCRIPT_DIR/macos/capslock-to-f18.zsh"
+MODKEYS="$SCRIPT_DIR/macos/modifier-keys.py"
 if [[ -d /Applications/Karabiner-Elements.app ]]; then
-    print "${GREEN}✓ Karabiner-Elements maps Caps Lock here${NC}"
-elif "$CAPSLOCK" --check >/dev/null 2>&1; then
-    print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
-elif ask_yes_no "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
-    "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
+    print "${GREEN}✓ Karabiner-Elements maps the keys here${NC}"
 else
-    print "${YELLOW}! Skipped Caps Lock to F18${NC}"
+    if "$CAPSLOCK" --check >/dev/null 2>&1; then
+        print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
+    elif ask_yes_no "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
+        "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
+    else
+        print "${YELLOW}! Skipped Caps Lock to F18${NC}"
+    fi
+    if "$MODKEYS" check >/dev/null 2>&1; then
+        print "${GREEN}✓ modifier keys already match Karabiner's config${NC}"
+    else
+        "$MODKEYS" check | sed 's/^/  /'
+        if ask_yes_no "Set these keyboards' modifier keys as Karabiner's config has them?"; then
+            "$MODKEYS" import || print "${RED}✗ some modifier keys still differ${NC}"
+        else
+            print "${YELLOW}! Skipped modifier keys${NC}"
+        fi
+    fi
 fi
 echo ""
+fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Complete
