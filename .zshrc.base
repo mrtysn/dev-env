@@ -791,7 +791,7 @@ update-all() {
   for stage in $stages; do
     [[ -f "$run_dir/$stage.log" ]] || continue
     e="$(sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$run_dir/$stage.log" \
-      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM|Action needed)')"
+      | grep -E "^[[:space:]]*(Error|error|ERR_PNPM|Action needed|Warning: Application '.*' did not quit)")"
     [[ -n "$e" ]] && errors+="  [$stage]"$'\n'"$(print -r -- "$e" | sed 's/^/    /')"$'\n'
   done
   [[ -n "$errors" ]] && { print; print -P "%B==> Needs attention%b"; print -rn -- "$errors" }
