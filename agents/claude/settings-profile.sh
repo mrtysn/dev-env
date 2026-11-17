@@ -130,7 +130,7 @@ missing_local_vars() {
     names=(${(f)"$(jq -r '[.. | strings | select(test("paths\\.local\\.sh"))
         | [scan("\\$\\{([A-Z][A-Z0-9_]*):-\\}")[0]] | .[]] | unique | .[]' "$settings")"})
     # Unset by design where the tool is not installed (paths.local.sh.example says so for each).
-    local -a optional=(CLAUDE_CONFIG_DIR ARL_DIR CC_STATUS_PATH)
+    local -a optional=(CLAUDE_CONFIG_DIR ARL_DIR CC_STATUS_PATH SYSTEM_ONE_DIR)  # their hooks exit 0 when unset
     for name in $names; do
         (( ${optional[(Ie)$name]} )) && continue
         value=$(unset $name; [[ -r "$dir/paths.local.sh" ]] && . "$dir/paths.local.sh" >/dev/null 2>&1; print -r -- "${(P)name:-}")
