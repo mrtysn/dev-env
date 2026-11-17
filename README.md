@@ -310,14 +310,14 @@ What it does:
 6. Sets up Homebrew command-not-found
 7. Configures FZF integration
 8. Copies the zsh configs to the home directory, backing up any that differ
-9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings
+9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings; those apply only while iTerm2 is not running, so run `import.sh` from Terminal.app for them, or quit iTerm2 and re-run
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
 12. For each Claude config folder (`~/.claude`, every `~/.claude-*`, and any you add when asked): records its profile and agents-shared checkout in `paths.local.sh` via `agents/claude/write-paths-local.sh` (the guard hooks refuse every Bash tool call until it resolves), then backs up and writes `settings.json` as base + that profile's overlays
 13. Copies the Phoenix and Karabiner configs, each only where its app is installed
 14. Copies lazygit and repo-tabs configs
 15. Routes this clone's pushes through agents-shared's name guard
-16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings")
+16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up
