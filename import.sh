@@ -384,7 +384,7 @@ if $CHECK; then
 
     check_report() {  # step number; reads CHECK_CHANGES
         if ! want_step "$1"; then
-            machine_skips "$1" && print "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
+            machine_skips "$1" && print -r -- "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
             CHECK_CHANGES=(); return 0
         fi
         if (( ${#CHECK_CHANGES} )); then
@@ -399,7 +399,7 @@ if $CHECK; then
     }
     check_skip() {  # step number, reason
         if ! want_step "$1"; then
-            machine_skips "$1" && print "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
+            machine_skips "$1" && print -r -- "- step $1: declined on this machine (MACHINE_SKIP_STEPS)"
             CHECK_CHANGES=(); return 0
         fi
         print "${YELLOW}- step $1: not checked ($2)${NC}"
