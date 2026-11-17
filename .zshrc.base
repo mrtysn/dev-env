@@ -465,7 +465,7 @@ _update-all-spicetify-reapply() {
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
-    brew) brew update && _update-all-brew-upgrade && _unquarantine-notarized-casks ;;
+    brew) brew update && _update-all-brew-upgrade && _update-all-upgrade-manual-update-casks && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
@@ -548,21 +548,35 @@ _update-all-local-builds() {
   return $rc
 }
 
-# Packages whose update needs a step by hand, each with that step. Report only: uall
-# never runs it. A row shows when the package is outdated (casks that update themselves
-# included) or brew upgraded it in this run. Add a row to watch another package.
+# Packages whose update needs a step by hand afterwards, each as "token<TAB>step". They
+# are casks that update themselves, so plain `brew upgrade` skips them: uall upgrades
+# them (--greedy) and reports the step; upgrading needs no restart, the step comes after.
+# Add a row to handle another package.
+_update-all-manual-update-steps() {
+  print -r -- $'macfuse\treboot, then allow the macFUSE system extension under System Settings > Privacy & Security'
+  print -r -- $'karabiner-elements\tre-approve its driver extension if macOS asks (System Settings > Privacy & Security)'
+}
+
+# Upgrade the outdated ones among those packages, which `brew upgrade` leaves alone.
+_update-all-upgrade-manual-update-casks() {
+  local -a outdated=(${${(f)"$(brew outdated --greedy --quiet 2>/dev/null)"}:t}) todo=()
+  local line
+  for line in "${(@f)$(_update-all-manual-update-steps)}"; do
+    (( ${outdated[(Ie)${line%%$'\t'*}]} )) && todo+=(${line%%$'\t'*})
+  done
+  (( ${#todo} )) || return 0
+  brew upgrade --cask --greedy $todo
+}
+
 _update-all-report-manual-updates() {
-  local -A steps=(
-    macfuse            "reboot, then allow the macFUSE system extension under System Settings > Privacy & Security"
-    karabiner-elements "re-approve its driver extension if macOS asks (System Settings > Privacy & Security)"
-  )
-  local brew_log="$1" token
+  local brew_log="$1" line token
   local -a outdated=(${${(f)"$(brew outdated --greedy --quiet 2>/dev/null)"}:t})
-  for token in ${(ko)steps}; do
+  for line in "${(@f)$(_update-all-manual-update-steps)}"; do
+    token=${line%%$'\t'*}
     if (( ${outdated[(Ie)$token]} )); then
-      echo "$token is outdated; update it, then ${steps[$token]}"
+      echo "$token is outdated; update it, then ${line#*$'\t'}"
     elif [[ -f "$brew_log" ]] && grep -qE "^==> Upgrading ${token}"$'\r'"?\$" "$brew_log"; then
-      echo "$token was upgraded this run; ${steps[$token]}"
+      echo "$token was upgraded this run; ${line#*$'\t'}"
     fi
   done
 }
@@ -733,7 +747,7 @@ update-all() {
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
