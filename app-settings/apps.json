@@ -1,0 +1,53 @@
+{
+  "_comment": "Apps whose settings dev-env carries. A plist app carries only the keys its `keys` regex matches in full: an allowlist, because this repo is public and an app's preferences also hold locations, licence data, device IDs and window state. `file` is relative to the home folder. `files` apps carry whole files from `dir`. `app` is the bundle that must be installed for import to load them.",
+  "apps": [
+    {
+      "name": "alt-tab",
+      "app": "/Applications/AltTab.app",
+      "file": "Library/Preferences/com.lwouis.alt-tab-macos.plist",
+      "keys": "appearanceSize|appearanceStyle|appearanceVisibility|exceptions|fontHeight|hide[A-Z]\\w*|holdShortcut\\d*|iconSize|menubarIcon|menubarIconShown|\\w*[Ss]hortcut\\w*|showOnScreen|showWindowlessApps\\d*|showTabsAsWindows|theme|titleTruncation|updatePolicy|crashPolicy|windowMaxWidthInRow|windowOrder|appsToShow\\d*|spacesToShow\\d*|screensToShow\\d*|showMinimizedWindows\\d*|showHiddenWindows\\d*|showFullscreenWindows\\d*|windowDisplayDelay|mouseHoverEnabled|cursorFollowFocusEnabled|preferencesVersion"
+    },
+    {
+      "name": "mos",
+      "app": "/Applications/Mos.app",
+      "file": "Library/Preferences/com.caldis.Mos.plist",
+      "keys": "allowlist|applications|block|buttonBindings|dash|toggle|deadZone|duration|hideStatusItem|optionsExist|precision|reverse\\w*|smooth\\w*|speed|step|updateCheckOnAppStart|updateIncludingBetaVersion"
+    },
+    {
+      "name": "rectangle",
+      "app": "/Applications/Rectangle.app",
+      "file": "Library/Preferences/com.knollsoft.Rectangle.plist",
+      "keys": "(?!lastVersion$|internalTilingNotified$)[a-z]\\w*"
+    },
+    {
+      "name": "itsycal",
+      "app": "/Applications/Itsycal.app",
+      "file": "Library/Preferences/com.mowglii.ItsycalApp.plist",
+      "keys": "ClockFormat|HideIcon|HighlightedDOWs|MenuBarIconType|PinItsycal|ShowDayOfWeekInIcon|ShowDaysWithNoEventsInAgenda|ShowEventDays|ShowMonthInIcon|ShowWeeks|ShowLocation|SizePreference|ThemePreference|UseOutlineIcon|WeekStartDOW"
+    },
+    {
+      "name": "lunar",
+      "app": "/Applications/Lunar.app",
+      "file": "Library/Preferences/fyi.lunar.Lunar.plist",
+      "keys": "KeyboardShortcuts_\\w+|hotkeys|adaptiveBrightnessMode|overrideAdaptiveMode|nonManualMode|brightnessMode|brightnessKeysControl|brightnessKeysSyncControl|curveMode|clockMode|syncMode|autoBlackoutBuiltin|autoSubzero|subzeroActivation|xdrActivation|newXDRMode|newBlackOutDisconnect|neverShowBlackoutPopover|menuBarClosed|showOptionsMenu|enableSentry|SUAutomaticallyUpdate|SUEnableAutomaticChecks|SUSendProfileInfo"
+    },
+    {
+      "name": "coconutbattery",
+      "app": "/Applications/coconutBattery.app",
+      "file": "Library/Group Containers/R5SC3K86L5.com.coconut-flavour.coconutBattery/Library/Preferences/R5SC3K86L5.com.coconut-flavour.coconutBattery.plist",
+      "keys": "capacityDisplaySource|customStatusBar|customStatusBarString|menuBarBatteryImagePosition|showIconsInMenuBar"
+    },
+    {
+      "name": "inkscape",
+      "app": "/Applications/Inkscape.app",
+      "file": "Library/Preferences/org.inkscape.Inkscape.plist",
+      "keys": "/org/gtk/settings/file-chooser/(date-format|location-mode|show-hidden|show-size-column|show-type-column|sidebar-width|sort-column|sort-directories-first|sort-order|type-format)"
+    },
+    {
+      "name": "sublime-text",
+      "app": "/Applications/Sublime Text.app",
+      "dir": "Library/Application Support/Sublime Text/Packages/User",
+      "files": ["Preferences.sublime-settings", "Default (OSX).sublime-keymap", "Distraction Free.sublime-settings", "Package Control.sublime-settings"]
+    }
+  ]
+}

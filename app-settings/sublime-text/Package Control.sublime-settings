@@ -1,0 +1,14 @@
+{
+	"bootstrapped": true,
+	"in_process_packages":
+	[
+	],
+	"installed_packages":
+	[
+		"ActivityWatch Watcher",
+		"Formatter",
+		"MarkdownLivePreview",
+		"MarkdownPreview",
+		"Package Control",
+	],
+}

@@ -477,6 +477,14 @@ for g in work personal; do
     fi
 done
 
+# App settings: only the keys each app's allowlist in app-settings/apps.json names.
+echo "✓ Exporting app settings"
+if "$SCRIPT_DIR/app-settings/app-settings.py" export; then
+    note "app-settings/ (allowlisted keys)"
+else
+    warn "app-settings export failed"
+fi
+
 # Absolute home paths in exported files break the repo on any other machine (and leak
 # the layout). The live files are the source, so say which one to fix.
 echo "✓ Checking exports for hardcoded home paths"

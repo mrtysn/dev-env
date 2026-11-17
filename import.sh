@@ -881,6 +881,27 @@ fi
 echo ""
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# Step 16: App settings (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+echo "=== Step 16: App Settings ==="
+# The allowlisted settings of the apps in app-settings/apps.json, for each that is installed.
+# Only differing keys are written; a running app is skipped with a note to quit it first.
+APP_SETTINGS="$SCRIPT_DIR/app-settings/app-settings.py"
+# macOS's own python3 (Xcode command-line tools), not a version manager's shim: a shim
+# fails until ~/.tool-versions exists, which a fresh machine may not have yet.
+if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
+    print "${YELLOW}! app-settings/app-settings.py or /usr/bin/python3 missing, skipping${NC}"
+else
+    print "${BLUE}Apps:${NC} $(/usr/bin/python3 -I -c 'import json,sys; print(" ".join(a["name"] for a in json.load(open(sys.argv[1]))["apps"]))' "$SCRIPT_DIR/app-settings/apps.json")"
+    if ask_yes_no "Load these apps' settings (only keys that differ)?"; then
+        "$APP_SETTINGS" import || print "${RED}✗ app settings import failed${NC}"
+    else
+        print "${YELLOW}! Skipped app settings${NC}"
+    fi
+fi
+echo ""
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Complete
 # ═══════════════════════════════════════════════════════════════════════════════
 echo "=== Import Complete ==="

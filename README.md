@@ -193,6 +193,24 @@ git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
   denylist is written there by hand and holds only the employer's own names and internal terms.
   It is never a copy of the home machine's list, which names private projects and people.
 
+### App settings
+
+`app-settings/apps.json` lists the apps whose settings move between machines and, per app, an
+**allowlist** of the preference keys that may: this repo is public, and an app's preferences
+also hold locations, licence data, device IDs and window positions, which a list of keys to
+drop would miss. Sublime Text carries its `Packages/User` settings files instead of keys.
+
+    app-settings/app-settings.py export   # this machine's allowlisted settings into app-settings/
+    app-settings/app-settings.py import   # into this machine, for installed apps (import.sh step 16)
+    app-settings/app-settings.py check    # per app: matches or differs
+
+Both directions write only what differs, so re-runs change nothing. Import skips a running app
+(it would write its old values back on quit) and says to quit it first. Export refuses a value
+that holds the home folder's path or an email address. `export.sh` runs the export;
+`app-settings/test-app-settings.zsh` imports into an empty home twice and checks the second run
+loads nothing. To carry another app, add it to `apps.json` with the keys that are settings, run
+the export, and read the new file before committing.
+
 ## Configuration Structure
 
 ### Base Configuration (`.zshrc.base`)
@@ -299,6 +317,7 @@ What it does:
 13. Copies the Phoenix and Karabiner configs, each only where its app is installed
 14. Copies lazygit and repo-tabs configs
 15. Routes this clone's pushes through agents-shared's name guard
+16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings")
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up

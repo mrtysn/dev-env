@@ -1,0 +1,18 @@
+{
+	"color_scheme": "Mariana.sublime-color-scheme",
+	"open_files_in_new_window": false,
+	"font_face": "Fira Code Medium",
+	"font_options":
+	[
+	    "gray_antialias",
+	    "subpixel_antialias"
+	],
+	"font_size": 26,
+	"theme_font_options": [ "gray_antialias"],
+	"ignored_packages":
+	[
+		"Vintage",
+	],
+	"index_files": false,
+	"show_full_path": true,
+}
