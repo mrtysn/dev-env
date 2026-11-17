@@ -145,12 +145,13 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
 ### Setting up the work Mac
 
 1. Set its hostname: `sudo scutil --set LocalHostName mrtysn-mbp-m5`.
-2. Clone this repo and agents-shared.
+2. Clone this repo, agents-shared, tools and cc-statusline into the dev root. tools and
+   cc-statusline are private, so the clone needs a GitHub login that can read them.
 3. Copy `agents/claude/overlays/work.json.example` to `agents/claude/overlays/work.local.json`
    and fill in every placeholder.
 4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. The `mas`
-   apps in `Brewfile` wait for the work Mac's own Apple ID: answer no when step 2 asks whether
-   one is signed in, then sign in to the App Store and re-run step 2 later. Step 12
+   apps in `Brewfile` wait for the work Mac's own Apple ID: step 2 detects that no App Store
+   account is signed in and skips them; sign in, then re-run step 2. Step 12
    asks the profile of `~/.claude` (work) and offers to add a folder for the personal account
    (for example `~/.claude-personal`, personal).
 5. For each config folder, follow "Setting up a fresh config folder" (cc-statusline's
