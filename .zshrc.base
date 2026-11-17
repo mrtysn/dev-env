@@ -412,6 +412,16 @@ _update-all-asdf-plugins() {
   mkdir -p "${stamp:h}" && touch "$stamp"
 }
 
+# Whether an Apple ID is signed in to the App Store: an active, authenticated iTunesStore account
+# in macOS's Accounts database (a count only). Unreadable means no.
+_mas-signed-in() {
+  local db="$HOME/Library/Accounts/Accounts4.sqlite" n
+  [[ -r "$db" ]] || return 1
+  n=$(sqlite3 -readonly "$db" "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
+      WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)
+  (( ${n:-0} > 0 ))
+}
+
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
 # HEAD of every custom plugin/theme repo, to tell whether an update changed anything.
@@ -469,7 +479,10 @@ _update-all-stage() {
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
-    mas)  mas upgrade ;;
+    mas)
+      # Without an App Store account, mas tries the preinstalled Apple apps and the App Store
+      # opens a sign-in window (ISErrorDomain -128). Same check as import.sh step 2.
+      if _mas-signed-in; then mas upgrade; else echo "no App Store account signed in: mas skipped"; fi ;;
     spicetify) _update-all-spicetify-reapply ;;
     local-builds) _update-all-local-builds ;;
     omz)
@@ -524,9 +537,14 @@ _update-all-local-builds() {
   local -A builds=(
     hiddenbar-mirror scripts/build-install.zsh
   )
+  # The dev root as tools/install.sh finds it: DEV_ROOT (init-global.sh exports it), else the
+  # folder holding the tools checkout that ~/bin links into, else ~/dev.
+  local root="${DEV_ROOT:-}" link="$HOME/bin/toolbelt"
+  [[ -z "$root" && -L "$link" ]] && root="${link:A:h:h:h}"
+  root="${root:-$HOME/dev}"
   local name repo before branch rc=0
   for name in ${(ko)builds}; do
-    repo="$HOME/dev/$name"
+    repo="$root/$name"
     [[ -d "$repo/.git" ]] || { echo "$name: no repo at $repo, skipping"; continue; }
     branch=$(git -C "$repo" symbolic-ref --short -q HEAD)
     if [[ "$branch" != main ]]; then
@@ -747,7 +765,7 @@ update-all() {
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _mas-signed-in _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
