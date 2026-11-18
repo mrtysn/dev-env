@@ -234,7 +234,7 @@ if [ ! -f "$ITERM_PLIST" ]; then
     warn "iTerm2 not installed, skipping profiles and settings"
 elif ! defaults read com.googlecode.iterm2 &>/dev/null; then
     warn "iTerm2 preferences not readable, skipping profiles and settings"
-elif python3 << 'PYTHON_EOF'
+elif DEV_ENV_DIR="$SCRIPT_DIR" python3 << 'PYTHON_EOF'
 import base64
 import json
 import os
@@ -246,34 +246,8 @@ plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.pli
 profiles_dir = "iterm-profiles"
 settings_path = "iterm-settings.json"
 
-# Machine-local / volatile state that must never reach the repo.
-# Spaces are written as [ ] — a trailing "\ " before a newline escapes the newline
-# in re.VERBOSE, which silently disables the pattern.
-DENY = re.compile(r"""^(
-      NoSync
-    | NSWindow[ ]Frame[ ]
-    | NSSplitView[ ]
-    | NSToolbar[ ]
-    | SU[A-Z]
-    | NSNavLastRootDirectory$
-    | NSNavPanelExpandedSize
-    | NeverWarnAboutShortLivedSessions_
-    | findMode_iTerm$
-    | kCPK
-    | iTerm\ Version$
-    | New\ Bookmarks$
-    | Bookmarks$
-)""", re.VERBOSE)
-
-# The repo is public. Anything credential-shaped is withheld and reported.
-# "token" is only credential-shaped when qualified — a bare match also hits
-# AiMaxTokens / AiResponseMaxTokens, which are integer limits, not secrets.
-SECRET = re.compile(
-    r"secret|password|passphrase|credential|api[-_]?key"
-    r"|(access|refresh|auth|bearer|session|id)[-_]?token"
-    r"|oauth|bearer",
-    re.I,
-)
+# The denylist and the secrets gate (DENY, SECRET) live in iterm-filter.py, shared with import.sh --check.
+exec(open(os.path.join(os.environ["DEV_ENV_DIR"], "iterm-filter.py")).read())
 
 
 def convert_for_json(obj):

@@ -269,7 +269,15 @@ except Exception as e:
 changed = [k for k, v in settings.items() if plist.get(k) != v]
 if len(sys.argv) > 2 and sys.argv[2] == "--check":
     print(f"  {len(changed)} of {len(settings)} settings differ")
-    sys.exit(1 if changed else 0)
+    # The other direction: a setting changed by hand in iTerm and never exported. export.sh keeps
+    # every top-level key its denylist and secrets gate let through, so such a key is one it would
+    # add. Without this, it stays on this machine and the next machine never gets it.
+    import re
+    exec(open(os.path.join(os.environ["DEV_ENV_DIR"], "iterm-filter.py")).read())
+    unexported = sorted(k for k in plist if k not in settings and not DENY.match(k) and not SECRET.search(k))
+    if unexported:
+        print(f"  {len(unexported)} unexported: " + ", ".join(unexported))
+    sys.exit(1 if changed or unexported else 0)
 plist.update(settings)
 
 try:
@@ -516,9 +524,11 @@ if $CHECK; then
             iterm_note="iterm-settings.json not found"
         elif ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
             iterm_note="app-level settings not compared while iTerm2 is running"
-        elif ! out="$(iterm_settings_py "$ITERM_SETTINGS" --check 2>&1)"; then
-            if [[ "$out" == *differ* ]]; then
-                CHECK_CHANGES+=("iTerm2 app-level settings")
+        elif ! out="$(DEV_ENV_DIR="$SCRIPT_DIR" iterm_settings_py "$ITERM_SETTINGS" --check 2>&1)"; then
+            if [[ "$out" == *unexported* || "$out" == *differ* ]]; then
+                # "N of M settings differ" is always printed; a count above 0 is the change.
+                [[ "$out" =~ ' '([0-9]+)' of ' && ${match[1]} != 0 ]] && CHECK_CHANGES+=("iTerm2 app-level settings")
+                [[ "$out" == *unexported* ]] && CHECK_CHANGES+=("iTerm2 settings changed here and not in iterm-settings.json, run export.sh: ${out##*unexported: }")
             else
                 iterm_note="app-level settings unreadable"
             fi
