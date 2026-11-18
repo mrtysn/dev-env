@@ -19,6 +19,7 @@
     "AppleScrollAnimationEnabled": 0,
     "AppleSmoothFixedFontsSizeThreshold": 1,
     "AppleWindowTabbingMode": "manual",
+    "AutoHideTmuxClientSession": true,
     "ClickToSelectCommand": false,
     "CodeReviewSavedPrompts": {
       "_type": "data",
@@ -815,7 +816,7 @@
     },
     "CustomTabBarFontSize": 13.0,
     "Default Bookmark Guid": "3A51C357-5F46-4D3F-A7A5-FFF6FEA6A637",
-    "Default Browser Profile Guid": "5CDA766D-61B6-4233-A195-C312EDE0F083",
+    "Default Browser Profile Guid": "E5EB40BF-06DD-4B27-9024-236A10783449",
     "DimBackgroundWindows": false,
     "DimInactiveSplitPanes": true,
     "DimOnlyText": true,
@@ -825,35 +826,35 @@
     "EnableAPIServer": true,
     "EnableDivisionView": true,
     "GlobalKeyMap": {
-      "0x19-0x60000-0x30": {
+      "0x19-0x60000-0x30-0x1": {
         "Action": 2,
         "Apply Mode": 0,
         "Escaping": 1,
         "Text": "",
         "Version": 2
       },
-      "0x42-0x1a0000-0xb": {
+      "0x42-0x1a0000-0xb-0x1": {
         "Action": 13,
         "Apply Mode": 0,
         "Escaping": 2,
         "Text": "",
         "Version": 2
       },
-      "0x4e-0x120000-0x2d": {
+      "0x4e-0x120000-0x2d-0x1": {
         "Action": 61,
         "Apply Mode": 0,
         "Escaping": 2,
         "Text": "",
         "Version": 2
       },
-      "0x9-0x40000-0x30": {
+      "0x9-0x40000-0x30-0x1": {
         "Action": 0,
         "Apply Mode": 0,
         "Escaping": 1,
         "Text": "",
         "Version": 2
       },
-      "0xd-0x20000-0x24": {
+      "0xd-0x20000-0x24-0x1": {
         "Action": 12,
         "Keycode": 13,
         "Modifiers": 131072,
@@ -868,7 +869,7 @@
         "Action": 6,
         "Text": ""
       },
-      "0xf702-0x300000-0x7b": {
+      "0xf702-0x300000-0x7b-0x1": {
         "Action": 39,
         "Apply Mode": 0,
         "Escaping": 1,
@@ -879,7 +880,7 @@
         "Action": 33,
         "Text": ""
       },
-      "0xf703-0x300000-0x7c": {
+      "0xf703-0x300000-0x7c-0x1": {
         "Action": 32,
         "Apply Mode": 0,
         "Escaping": 1,
@@ -923,7 +924,7 @@
     "HideTabNumber": false,
     "HotkeyMigratedFromSingleToMulti": true,
     "IRMemory": 4,
-    "LeftTabBarWidth": 214.0,
+    "LeftTabBarWidth": 288.0,
     "LoadPrefsFromCustomFolder": false,
     "MinimalDeslectedColoredTabAlpha": 0.25,
     "MinimalSelectedTabUnderlineProminence": 0.0,
@@ -934,6 +935,7 @@
     "NSAutomaticPeriodSubstitutionEnabled": false,
     "NSAutomaticQuoteSubstitutionEnabled": false,
     "NSAutomaticSpellingCorrectionEnabled": false,
+    "NSEnableWindowTabIndexing": false,
     "NSOverlayScrollersFallBackForAccessoryViews": false,
     "NSQuotedKeystrokeBinding": "",
     "NSRepeatCountBinding": "",
@@ -941,6 +943,7 @@
     "NSScrollViewShouldScrollUnderTitlebar": false,
     "OpenArrangementAtStartup": false,
     "OpenNoWindowsAtStartup": false,
+    "OpenTmuxWindowsIn": 2,
     "PointerActions": {
       "Button,1,1,,": {
         "Action": "kContextMenuPointerAction"
@@ -987,7 +990,7 @@
     "WindowNumber": true,
     "Workgroups": {
       "_type": "data",
-      "value": "W3sic2Vzc2lvbnMiOlt7InVybFN0cmluZyI6IiIsInBlckZpbGVDb21tYW5kIjoiIiwiZGlzcGxheU5hbWUiOiJDaGF0IiwibW9kZSI6InJlZ3VsYXIiLCJ0b29sYmFySXRlbXMiOlt7ImtpbmQiOiJtb2RlU3dpdGNoZXIifSx7ImtpbmQiOiJnaXRTdGF0dXMifSx7ImtpbmQiOiJhdXRvUmVxdWVzdFJldmlld1doZW5JZGxlIn1dLCJraW5kIjp7ImtpbmQiOiJyb290In0sImNvbW1hbmQiOiIiLCJ1bmlxdWVJZGVudGlmaWVyIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4ifSx7ImNvbW1hbmQiOiJnaXQgZGlmZnRvb2wgLXkgLXggdmltZGlmZiBcXChnaXRCYXNlKSIsInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4iLCJ1cmxTdHJpbmciOiIiLCJ0b29sYmFySXRlbXMiOlt7ImtpbmQiOiJtb2RlU3dpdGNoZXIifSx7ImtpbmQiOiJjaGFuZ2VkRmlsZVNlbGVjdG9yIn0seyJraW5kIjoiZ2l0QmFzZVNlbGVjdG9yIn0seyJmb3J3YXJkU2hvcnRjdXQiOnsic2VyaWFsaXplZCI6IjB4ZjcwMy0weDM0MDAwMC0weDdjIn0sImJhY2tTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHhmNzAyLTB4MzQwMDAwLTB4N2IifSwia2luZCI6Im5hdmlnYXRpb24iLCJyZWxvYWRTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHg3Mi0weDEwMDAwMC0weGYifX1dLCJ1bmlxdWVJZGVudGlmaWVyIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLmRpZmYiLCJkaXNwbGF5TmFtZSI6IkRpZmYiLCJwZXJGaWxlQ29tbWFuZCI6ImdpdCBkaWZmdG9vbCAteSAteCB2aW1kaWZmIFxcKGdpdEJhc2UpIC0tIFxcKGZpbGUpIiwibW9kZSI6ImRpZmYiLCJraW5kIjp7ImtpbmQiOiJwZWVyIn19LHsidW5pcXVlSWRlbnRpZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5yZXZpZXciLCJraW5kIjp7ImtpbmQiOiJwZWVyIn0sImRpc3BsYXlOYW1lIjoiQ29kZSBSZXZpZXciLCJwZXJGaWxlQ29tbWFuZCI6IiIsInRvb2xiYXJJdGVtcyI6W3sia2luZCI6Im1vZGVTd2l0Y2hlciJ9LHsic2hvcnRjdXQiOnsic2VyaWFsaXplZCI6IjB4NzItMHgxMDAwMDAtMHhmIn0sImtpbmQiOiJyZWxvYWQifSx7ImtpbmQiOiJhdXRvU2VuZENsaXBwaW5nc1doZW5JZGxlIn1dLCJjb21tYW5kIjoiY2xhdWRlIFxcKGNvZGVSZXZpZXdQcm9tcHQpIC0tYXBwZW5kLXN5c3RlbS1wcm9tcHQtZmlsZSAnXFwoY29kZVJldmlld1N5c3RlbVByb21wdEZpbGUpJyAtLXNldHRpbmdzICdcXChpdGVybTIuYXBwQnVuZGxlUGF0aClcL0NvbnRlbnRzXC9SZXNvdXJjZXNcL2NvZGUtcmV2aWV3LXNldHRpbmdzLnR4dCciLCJwYXJlbnRJRCI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5tYWluIiwidXJsU3RyaW5nIjoiIiwibW9kZSI6ImNvZGVSZXZpZXcifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVkZUNvZGUiLCJuYW1lIjoiQ2xhdWRlIENvZGUifV0="
+      "value": "W3sibmFtZSI6IkNsYXVkZSBDb2RlIiwic2Vzc2lvbnMiOlt7ImRpc3BsYXlOYW1lIjoiQ2hhdCIsIm1vZGUiOiJyZWd1bGFyIiwidXJsU3RyaW5nIjoiIiwidW5pcXVlSWRlbnRpZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5tYWluIiwiY29tbWFuZCI6IiIsInRvb2xiYXJJdGVtcyI6W3sia2luZCI6Im1vZGVTd2l0Y2hlciJ9LHsia2luZCI6ImdpdFN0YXR1cyJ9LHsia2luZCI6ImF1dG9SZXF1ZXN0UmV2aWV3V2hlbklkbGUifV0sImtpbmQiOnsia2luZCI6InJvb3QifSwicGVyRmlsZUNvbW1hbmQiOiIifSx7InBlckZpbGVDb21tYW5kIjoiZ2l0IGRpZmZ0b29sIC15IC14IHZpbWRpZmYgXFwoZ2l0QmFzZSkgLS0gXFwoZmlsZSkiLCJtb2RlIjoiZGlmZiIsInRvb2xiYXJJdGVtcyI6W3sia2luZCI6Im1vZGVTd2l0Y2hlciJ9LHsia2luZCI6ImNoYW5nZWRGaWxlU2VsZWN0b3IifSx7ImtpbmQiOiJnaXRCYXNlU2VsZWN0b3IifSx7ImZvcndhcmRTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHhmNzAzLTB4MzQwMDAwLTB4N2MifSwicmVsb2FkU2hvcnRjdXQiOnsic2VyaWFsaXplZCI6IjB4NzItMHgxMDAwMDAtMHhmIn0sImJhY2tTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHhmNzAyLTB4MzQwMDAwLTB4N2IifSwia2luZCI6Im5hdmlnYXRpb24ifV0sInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4iLCJ1bmlxdWVJZGVudGlmaWVyIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLmRpZmYiLCJ1cmxTdHJpbmciOiIiLCJjb21tYW5kIjoiZ2l0IGRpZmZ0b29sIC15IC14IHZpbWRpZmYgXFwoZ2l0QmFzZSkiLCJraW5kIjp7ImtpbmQiOiJwZWVyIn0sImRpc3BsYXlOYW1lIjoiRGlmZiJ9LHsidG9vbGJhckl0ZW1zIjpbeyJraW5kIjoibW9kZVN3aXRjaGVyIn0seyJzaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHg3Mi0weDEwMDAwMC0weGYifSwia2luZCI6InJlbG9hZCJ9LHsia2luZCI6ImF1dG9TZW5kQ2xpcHBpbmdzV2hlbklkbGUifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVkZUNvZGUucmV2aWV3IiwiZGlzcGxheU5hbWUiOiJDb2RlIFJldmlldyIsInVybFN0cmluZyI6IiIsInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4iLCJraW5kIjp7ImtpbmQiOiJwZWVyIn0sIm1vZGUiOiJjb2RlUmV2aWV3IiwiY29tbWFuZCI6ImNsYXVkZSBcXChjb2RlUmV2aWV3UHJvbXB0KSAtLWFwcGVuZC1zeXN0ZW0tcHJvbXB0LWZpbGUgJ1xcKGNvZGVSZXZpZXdTeXN0ZW1Qcm9tcHRGaWxlKScgLS1zZXR0aW5ncyAnXFwoY29kZVJldmlld1NldHRpbmdzRmlsZSknIiwicGVyRmlsZUNvbW1hbmQiOiIifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVkZUNvZGUifV0="
     }
   }
 }
