@@ -5,5 +5,8 @@ brew "bun"                      # JavaScript runtime and package manager
 brew "mise"                     # runtime version manager
 # Access
 cask "teleport-connect"         # Teleport client (bundles tsh) for server and database access
+cask "gcloud-cli"               # Google Cloud CLI
+# Meetings
+cask "granola"                  # meeting notes
 # Editors
 cask "visual-studio-code"       # editor; this Mac only, Sublime is the editor elsewhere
