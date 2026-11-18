@@ -354,6 +354,8 @@ as iTerm2's app-level settings while iTerm2 runs), and exits 1 when any step wou
 is `brew bundle check` per layer (the mas apps are skipped without an App Store login, and brew is
 kept from auto-updating, so the only network use is whatever `brew bundle check` itself does);
 step 3 compares the pins file and whether each pinned runtime is installed.
+Step 9 also reports iTerm2's tmux prefs (`OpenTmuxWindowsIn`, `AutoHideTmuxClientSession`,
+`TmuxUsesDedicatedProfile`) as a change when unset, and `export.sh` warns for the same keys; `clo` needs them.
 
 ## Detailed Installation Steps
 

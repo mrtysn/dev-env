@@ -508,6 +508,9 @@ if $CHECK; then
         for pf in $profile_files; do
             cmp -s "$pf" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
         done
+        for tmux_key in OpenTmuxWindowsIn AutoHideTmuxClientSession TmuxUsesDedicatedProfile; do
+            defaults read com.googlecode.iterm2 "$tmux_key" &>/dev/null || CHECK_CHANGES+=("iTerm2 tmux pref $tmux_key unset (clo warns about it; export it on a machine that has it)")
+        done
         iterm_note=""
         if [ ! -f "$ITERM_SETTINGS" ]; then
             iterm_note="iterm-settings.json not found"

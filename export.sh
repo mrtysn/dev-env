@@ -383,6 +383,15 @@ else
     fail "iTerm2 export failed — profiles and settings may be stale or incomplete"
 fi
 
+# clo (agents-shared) expects iTerm to open tmux windows as tabs and bury the tmux client.
+# Those prefs are only in the live plist, so a machine that never set them exports nothing
+# and every other machine inherits the gap. Say so here, not as a warning from clo later.
+for tmux_key in OpenTmuxWindowsIn AutoHideTmuxClientSession TmuxUsesDedicatedProfile; do
+    if command -v defaults >/dev/null 2>&1 && ! defaults read com.googlecode.iterm2 "$tmux_key" &>/dev/null; then
+        warn "iTerm2 tmux pref $tmux_key is unset on this machine, so iterm-settings.json cannot carry it (set it in iTerm Settings > General > tmux, then re-run export.sh)"
+    fi
+done
+
 # Create font-only profile if it doesn't exist
 if [ ! -f iterm-profiles/font-only.json ]; then
     echo "✓ Creating font-only profile template"
