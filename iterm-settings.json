@@ -978,6 +978,7 @@
     "TabStyleWithAutomaticOption": 5,
     "TabViewType": 2,
     "TabsHaveCloseButton": true,
+    "TmuxUsesDedicatedProfile": false,
     "ToolbeltTools": [
       "Paste History",
       "Recent Directories",
