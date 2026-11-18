@@ -692,6 +692,12 @@ What is excluded, by pattern:
 matching a credential pattern is withheld from the export and named in the output for manual
 review. Read `iterm-settings.json` before committing.
 
+The export filter (the exclusion patterns, the secrets gate and the profiles iTerm creates for
+itself, such as `tmux`) lives in `iterm-filter.py`, one definition used by `export.sh` and
+`import.sh --check`. `--check` also reports a setting present in the live plist that
+`iterm-settings.json` lacks, as `N unexported: KEY, ...`: set by hand in iTerm and never exported,
+so run `export.sh` and read the diff.
+
 ## Credits
 
 - [Oh-My-Zsh](https://ohmyz.sh/)

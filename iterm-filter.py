@@ -31,3 +31,16 @@ SECRET = re.compile(
     r"|oauth|bearer",
     re.I,
 )
+
+
+def looks_secret(key, value):
+    """A key is withheld when its name, or its string value, looks credential-shaped."""
+    if SECRET.search(key):
+        return True
+    return isinstance(value, str) and bool(SECRET.search(value))
+
+
+# Profiles iTerm creates for itself, not ones the owner made: export leaves them out, and
+# import never has a file for them. "tmux" is the profile iTerm adds the first time a tmux
+# session opens with TmuxUsesDedicatedProfile on; it is a copy of Default plus a hotkey off.
+AUTO_CREATED_PROFILES = {"tmux"}

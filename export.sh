@@ -261,14 +261,6 @@ def convert_for_json(obj):
         return obj
 
 
-def looks_secret(key, value):
-    if SECRET.search(key):
-        return True
-    if isinstance(value, str) and SECRET.search(value):
-        return True
-    return False
-
-
 def name_to_filename(name):
     return name.lower().replace(" ", "-") + ".json"
 
@@ -298,6 +290,8 @@ else:
     seen = {}
     for profile in profiles:
         name = profile.get("Name", "Unknown")
+        if name in AUTO_CREATED_PROFILES:
+            continue
         filename = name_to_filename(name)
 
         # Distinct profile names can collapse to one filename (lowercase + hyphenate).

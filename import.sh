@@ -274,7 +274,7 @@ if len(sys.argv) > 2 and sys.argv[2] == "--check":
     # add. Without this, it stays on this machine and the next machine never gets it.
     import re
     exec(open(os.path.join(os.environ["DEV_ENV_DIR"], "iterm-filter.py")).read())
-    unexported = sorted(k for k in plist if k not in settings and not DENY.match(k) and not SECRET.search(k))
+    unexported = sorted(k for k in plist if k not in settings and not DENY.match(k) and not looks_secret(k, plist[k]))
     if unexported:
         print(f"  {len(unexported)} unexported: " + ", ".join(unexported))
     sys.exit(1 if changed or unexported else 0)
