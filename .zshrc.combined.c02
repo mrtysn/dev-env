@@ -126,8 +126,12 @@ unalias _ 2>/dev/null  # OMZ sets _='sudo'; prefer explicit sudo
 # Preferred editor for local and remote sessions
 if [[ -n $SSH_CONNECTION ]]; then
   export EDITOR='nano'
-else
+elif (( $+commands[subl] )); then
   export EDITOR='subl --wait'
+elif (( $+commands[code] )); then
+  export EDITOR='code --wait'   # a work profile machine may not carry Sublime
+else
+  export EDITOR='nano'
 fi
 
 # history size fix
@@ -414,6 +418,16 @@ _update-all-asdf-plugins() {
   mkdir -p "${stamp:h}" && touch "$stamp"
 }
 
+# Whether an Apple ID is signed in to the App Store: an active, authenticated iTunesStore account
+# in macOS's Accounts database (a count only). Unreadable means no.
+_mas-signed-in() {
+  local db="$HOME/Library/Accounts/Accounts4.sqlite" n
+  [[ -r "$db" ]] || return 1
+  n=$(sqlite3 -readonly "$db" "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
+      WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)
+  (( ${n:-0} > 0 ))
+}
+
 # One update-all stage. Runs from $HOME: global pnpm and asdf state resolve
 # against the cwd's version pins, so a project's packageManager must not pick them.
 # HEAD of every custom plugin/theme repo, to tell whether an update changed anything.
@@ -424,14 +438,59 @@ _update-all-custom-heads() {
   done
 }
 
+# `brew upgrade`, repeated after reinstalling a cask whose install receipt names an app
+# that is gone (brew: "It seems the App source '...' is not there"): a reinstall forces the
+# uninstall and skips the missing app. Each cask is reinstalled once per run.
+_update-all-brew-upgrade() {
+  local out rc token
+  local -a fixed=()
+  out=$(mktemp) || return 1
+  while :; do
+    brew upgrade 2>&1 | tee "$out"
+    rc=${pipestatus[1]}
+    (( rc )) || break
+    token=$(sed -n "s/^Error: \([^:]*\): It seems the App source .* is not there.*/\1/p" "$out" | head -n 1)
+    [[ -n $token && ${fixed[(Ie)$token]} == 0 ]] || break
+    fixed+=($token)
+    print -P "%B==> $token: receipt names an app that is gone, reinstalling%b"
+    brew reinstall --cask "$token" || { rc=$?; break; }
+  done
+  command rm -f -- "$out"
+  return $rc
+}
+
+# Spotify overwrites spicetify's patch when it updates itself, and a new spicetify
+# build needs the patch redone: re-apply only when either version differs from the pair
+# last applied. On macOS the terminal needs App Management permission to edit Spotify.app.
+_update-all-spicetify-reapply() {
+  local app=/Applications/Spotify.app stamp="${XDG_CACHE_HOME:-$HOME/.cache}/update-all/spicetify-applied" now
+  [[ -d $app ]] || { echo "Spotify.app not installed, skipping"; return 0; }
+  now="$(defaults read "$app/Contents/Info" CFBundleShortVersionString) $(spicetify --version)"
+  if [[ -f $stamp && "$(<$stamp)" == "$now" ]]; then
+    echo "spicetify already applied to Spotify ${now% *} (spicetify ${now#* })"
+    return 0
+  fi
+  # restore fails when Spotify is already stock and its backup is outdated; backup apply fixes that
+  if ! spicetify restore backup apply && ! spicetify backup apply; then
+    echo "Error: spicetify apply failed; if it reports a file not found, allow this terminal under Settings > Privacy & Security > App Management and rerun"
+    return 1
+  fi
+  mkdir -p "${stamp:h}" && print -r -- "$now" >| "$stamp"
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
-    brew) brew update && brew upgrade && _unquarantine-notarized-casks ;;
+    brew) brew update && _update-all-brew-upgrade && _update-all-upgrade-manual-update-casks && _unquarantine-notarized-casks ;;
     pnpm) _pnpm-migrate-globals && pnpm update -g && _pnpm-fix-shims && _happy-daemon-refresh ;;
     asdf) _update-all-asdf-plugins && _update-all-bump-asdf-pins ;;
     uv)   uv tool upgrade --all ;;
-    mas)  mas upgrade ;;
+    mas)
+      # Without an App Store account, mas tries the preinstalled Apple apps and the App Store
+      # opens a sign-in window (ISErrorDomain -128). Same check as import.sh step 2.
+      if _mas-signed-in; then mas upgrade; else echo "no App Store account signed in: mas skipped"; fi ;;
+    spicetify) _update-all-spicetify-reapply ;;
+    local-builds) _update-all-local-builds ;;
     omz)
       # OMZ core, the same call and stamp as `omz update`, so its session-start reminder goes quiet.
       # Skipped within ':omz:update' frequency days; frequency, verbose and cooldown are read in
@@ -474,6 +533,76 @@ _update-all-stage() {
       [[ "$(_update-all-custom-heads)" == "$heads_before" ]] \
         || echo "LAST_EPOCH=$(( EPOCHSECONDS / 86400 ))" >| "${ZSH_CACHE_DIR:-$HOME/.cache/oh-my-zsh}/.zsh-custom-update" ;;
   esac
+}
+
+# Apps built from the user's own repos under ~/dev, each with the script that builds,
+# installs and relaunches it. Fast-forwards main and rebuilds only when HEAD moved; a
+# repo on another branch, with uncommitted changes, or diverged from origin is left
+# untouched and reported.
+_update-all-local-builds() {
+  local -A builds=(
+    hiddenbar-mirror scripts/build-install.zsh
+  )
+  # The dev root as tools/install.sh finds it: DEV_ROOT (init-global.sh exports it), else the
+  # folder holding the tools checkout that ~/bin links into, else ~/dev.
+  local root="${DEV_ROOT:-}" link="$HOME/bin/toolbelt"
+  [[ -z "$root" && -L "$link" ]] && root="${link:A:h:h:h}"
+  root="${root:-$HOME/dev}"
+  local name repo before branch rc=0
+  for name in ${(ko)builds}; do
+    repo="$root/$name"
+    [[ -d "$repo/.git" ]] || { echo "$name: no repo at $repo, skipping"; continue; }
+    branch=$(git -C "$repo" symbolic-ref --short -q HEAD)
+    if [[ "$branch" != main ]]; then
+      echo "Action needed: $name is on ${branch:-a detached HEAD}, not main; not pulled"; continue
+    fi
+    if [[ -n "$(git -C "$repo" status --porcelain)" ]]; then
+      echo "Action needed: $name has uncommitted changes; not pulled"; continue
+    fi
+    before=$(git -C "$repo" rev-parse HEAD)
+    if ! git -C "$repo" pull --ff-only -q; then
+      echo "Action needed: $name main cannot fast-forward to origin; pull and rebuild by hand"; rc=1; continue
+    fi
+    if [[ "$(git -C "$repo" rev-parse HEAD)" == "$before" ]]; then
+      echo "$name: up to date"; continue
+    fi
+    echo "$name: pulled ${before:0:7}..$(git -C "$repo" rev-parse --short HEAD), rebuilding"
+    ( cd "$repo" && "./${builds[$name]}" ) || { echo "Error: $name build failed; see this stage's log"; rc=1; }
+  done
+  return $rc
+}
+
+# Packages whose update needs a step by hand afterwards, each as "token<TAB>step". They
+# are casks that update themselves, so plain `brew upgrade` skips them: uall upgrades
+# them (--greedy) and reports the step; upgrading needs no restart, the step comes after.
+# Add a row to handle another package.
+_update-all-manual-update-steps() {
+  print -r -- $'macfuse\treboot, then allow the macFUSE system extension under System Settings > Privacy & Security'
+  print -r -- $'karabiner-elements\tre-approve its driver extension if macOS asks (System Settings > Privacy & Security)'
+}
+
+# Upgrade the outdated ones among those packages, which `brew upgrade` leaves alone.
+_update-all-upgrade-manual-update-casks() {
+  local -a outdated=(${${(f)"$(brew outdated --greedy --quiet 2>/dev/null)"}:t}) todo=()
+  local line
+  for line in "${(@f)$(_update-all-manual-update-steps)}"; do
+    (( ${outdated[(Ie)${line%%$'\t'*}]} )) && todo+=(${line%%$'\t'*})
+  done
+  (( ${#todo} )) || return 0
+  brew upgrade --cask --greedy $todo
+}
+
+_update-all-report-manual-updates() {
+  local brew_log="$1" line token
+  local -a outdated=(${${(f)"$(brew outdated --greedy --quiet 2>/dev/null)"}:t})
+  for line in "${(@f)$(_update-all-manual-update-steps)}"; do
+    token=${line%%$'\t'*}
+    if (( ${outdated[(Ie)$token]} )); then
+      echo "$token is outdated; update it, then ${line#*$'\t'}"
+    elif [[ -f "$brew_log" ]] && grep -qE "^==> Upgrading ${token}"$'\r'"?\$" "$brew_log"; then
+      echo "$token was upgraded this run; ${line#*$'\t'}"
+    fi
+  done
 }
 
 _update-all-report-brew-bin() {
@@ -636,13 +765,13 @@ update-all() {
   local run_dir="$log_root/$(strftime %Y%m%d-%H%M%S $EPOCHSECONDS)"
   mkdir -p "$run_dir" || return 1
 
-  local -a stages=(brew pnpm asdf uv mas omz omz-plugins)
+  local -a stages=(brew spicetify pnpm asdf uv mas omz omz-plugins local-builds)
   local -A stage_status stage_secs
   local stage start rc failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
-  local stage_env="$(typeset -f _update-all-stage _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _mas-signed-in _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
@@ -652,7 +781,7 @@ update-all() {
   local su_pid=$!
 
   for stage in $stages; do
-    if ! { command -v $stage >/dev/null || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
+    if ! { command -v $stage >/dev/null || [[ $stage == local-builds ]] || [[ $stage == omz && -f $ZSH/tools/upgrade.sh ]] || [[ $stage == omz-plugins && -n $functions[upgrade_oh_my_zsh_custom] ]] }; then
       stage_status[$stage]=skipped; stage_secs[$stage]=0
       continue
     fi
@@ -686,12 +815,13 @@ update-all() {
   for stage in $stages; do
     [[ -f "$run_dir/$stage.log" ]] || continue
     e="$(sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$run_dir/$stage.log" \
-      | grep -E '^[[:space:]]*(Error|error|ERR_PNPM|Action needed)')"
+      | grep -E "^[[:space:]]*(Error|error|ERR_PNPM|Action needed|Warning: Application '.*' did not quit)")"
     [[ -n "$e" ]] && errors+="  [$stage]"$'\n'"$(print -r -- "$e" | sed 's/^/    /')"$'\n'
   done
   [[ -n "$errors" ]] && { print; print -P "%B==> Needs attention%b"; print -rn -- "$errors" }
 
   local -a titles=(
+    "Updates to finish by hand"
     "Regular files in the brew bin dir"
     "Casks with a missing app"
     "asdf pins behind their line"
@@ -699,6 +829,7 @@ update-all() {
     "Pending macOS updates"
   )
   local -a bodies=(
+    "$(_update-all-report-manual-updates "$run_dir/brew.log")"
     "$(_update-all-report-brew-bin)"
     "$(_update-all-report-missing-casks)"
     "$(<"$run_dir/report-asdf.txt")"
@@ -728,11 +859,6 @@ update-all() {
 
   return $failed
 }
-
-# ─── Aliases: Navigation ────────────────────────────────────────────────────────
-alias dl="cd $HOME/Downloads"
-alias dt="cd $HOME/Desktop"
-alias dv="cd $HOME/dev"
 
 # ─── Aliases: Git ───────────────────────────────────────────────────────────────
 # fancy git log
@@ -801,6 +927,11 @@ path=("$JAVA_HOME/bin" "$HOME/.rd/bin" $path)   # java, rancher desktop (deduped
 # https://github.com/sissbruecker/linkding
 alias linkding-start='docker run --name linkding -p 9090:9090 -v "$HOME/dev/linkding:/etc/linkding/data" -d sissbruecker/linkding:latest'
 
+# ── Folder shortcuts (home Mac only) ──
+alias dl="cd $HOME/Downloads"
+alias dt="cd $HOME/Desktop"
+alias dv="cd $HOME/dev"
+
 # ── Project shortcuts ──
 alias oj="cd $HOME/dev/oj"
 alias mertyasdotin="cd $HOME/dev/mertyas.in"
@@ -847,3 +978,6 @@ codex() {
 # Peon-ping mute/unmute (c01 also touches ~/.openpeon; not installed here)
 alias peon-ping-mute="touch $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: muted'"
 alias peon-ping-unmute="rm -f $_CLAUDE_DIR/hooks/peon-ping/.paused 2>/dev/null && echo 'peon-ping: unmuted'"
+
+# Unity CLI (its installer appends this to ~/.zshrc, which import.sh owns)
+[ -f "$HOME/.unity/env" ] && . "$HOME/.unity/env"
