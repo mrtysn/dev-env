@@ -5,12 +5,18 @@ set -e
 
 # --check: run each step's comparison and write nothing (see "Check mode" below).
 # --steps LIST: run (or with --check, compare) only those steps, e.g. 16,17 or 2-5,16.
-USAGE="usage: ./import.sh [--check] [--steps LIST]
-  --check        compare this machine with the repo step by step; asks nothing, writes nothing,
-                 exits 1 when anything would change
-  --steps LIST   only these steps, by number: 16,17 or 2-5,16 (the step numbers are in the README)"
+USAGE="usage: ./import.sh [--check] [--steps LIST] [--non-interactive] [--answer KEY=VALUE]...
+  --check              compare this machine with the repo step by step; asks nothing, writes nothing,
+                       exits 1 when anything would change
+  --steps LIST         only these steps, by number: 16,17 or 2-5,16 (the step numbers are in the README)
+  --answer KEY=VALUE   answer the prompt with that key (yes|no, or its value); repeatable. The keys are in
+                       the README (Non-interactive use); a prompt's key is named when it has no answer
+  --non-interactive    never prompt: a prompt without an --answer stops with exit 2 and names its key.
+                       Implied when stdin is not a terminal (an agent's shell)"
 CHECK=false
 STEPS=()
+NON_INTERACTIVE=false
+typeset -A ANSWERS
 while (( $# )); do
     case "$1" in
         --check) CHECK=true ;;
@@ -22,11 +28,17 @@ while (( $# )); do
                 else print -u2 "--steps: '$part' is not a step number or range"; exit 2; fi
             done
             shift ;;
+        --non-interactive) NON_INTERACTIVE=true ;;
+        --answer)
+            [[ $# -ge 2 && "$2" == ?*=* ]] || { print -u2 -r -- "--answer: give KEY=VALUE"; exit 2; }
+            ANSWERS[${2%%=*}]="${2#*=}"
+            shift ;;
         -h|--help) print "$USAGE"; exit 0 ;;
         *) print -u2 "$USAGE"; exit 2 ;;
     esac
     shift
 done
+[[ -t 0 ]] || NON_INTERACTIVE=true
 # Whether step $1 runs: with --steps, only the listed ones; without, every step but those this
 # machine declines (MACHINE_SKIP_STEPS in machine-label.sh, set once that file is sourced).
 want_step() {
@@ -67,11 +79,38 @@ command_exists() {
 }
 
 # Function to ask yes/no with default
-# Usage: ask_yes_no "prompt" [default: y/n]
+# Every prompt has a key, so an agent can answer it: --answer KEY=VALUE. With --non-interactive (or no
+# terminal), a prompt with no answer stops the run with exit 2 and names its key.
+prompt_unanswered() {  # key prompt expected
+    print -u2 "${RED}✗ no answer for '$1': $2${NC}"
+    print -u2 "  supply it with: --answer '$1=$3'"
+    exit 2
+}
+
+# A key has no spaces; a prompt passed first means a prompt was added without one, which would leave an agent
+# with no way to answer it.
+require_prompt_key() {
+    [[ "$1" != *" "* && -n "$1" ]] && return 0
+    print -u2 -r -- "import.sh bug: a prompt was added without a key (--answer KEY=VALUE): $1"
+    exit 70
+}
+
+# Usage: ask_yes_no KEY "prompt" [default: y/n]
 ask_yes_no() {
-    local prompt="$1"
-    local default="${2:-y}"
+    require_prompt_key "$1"
+    local key="$1"
+    local prompt="$2"
+    local default="${3:-y}"
     local reply
+
+    if (( ${+ANSWERS[$key]} )); then
+        case "${(L)ANSWERS[$key]}" in
+            y|yes|true|1) return 0 ;;
+            n|no|false|0) return 1 ;;
+            *) print -u2 "${RED}✗ --answer $key must be yes or no, not '${ANSWERS[$key]}'${NC}"; exit 2 ;;
+        esac
+    fi
+    $NON_INTERACTIVE && prompt_unanswered "$key" "$prompt" "yes|no"
 
     if [[ "$default" == "y" ]]; then
         read "reply?${prompt} [Y/n] "
@@ -82,6 +121,19 @@ ask_yes_no() {
     fi
 
     [[ "$reply" =~ ^[Yy]$ ]]
+}
+
+# Usage: ask_value KEY "prompt" VARNAME: the answer, or what is typed, goes into VARNAME.
+ask_value() {
+    require_prompt_key "$1"
+    local key="$1" prompt="$2" var="$3" reply
+    if (( ${+ANSWERS[$key]} )); then
+        typeset -g "$var=${ANSWERS[$key]}"
+        return 0
+    fi
+    $NON_INTERACTIVE && prompt_unanswered "$key" "$prompt" "<value>"
+    read "reply?${prompt}"
+    typeset -g "$var=$reply"
 }
 
 # Whether an Apple ID is signed in to the App Store. macOS keeps the App Store login as a
@@ -108,10 +160,10 @@ mas_signed_in() {
             return 1
         fi
     fi
-    # No terminal (an agent's shell, piped answers): unknown counts as signed out, as --check does,
-    # so the mas lines are skipped instead of a stray answer trying them.
-    [[ -t 0 ]] || return 1
-    ask_yes_no "Is an Apple ID signed in to the App Store (for the mas apps)?" n
+    # Not interactive and no --answer mas-signed-in: unknown counts as signed out, as --check does,
+    # so the mas lines are skipped.
+    $NON_INTERACTIVE && (( ! ${+ANSWERS[mas-signed-in]} )) && return 1
+    ask_yes_no mas-signed-in "Is an Apple ID signed in to the App Store (for the mas apps)?" n
 }
 
 # Taps the Brewfile layers list that Homebrew does not trust yet. Homebrew ignores an untrusted
@@ -804,7 +856,7 @@ if [ -f Brewfile ]; then
     for layer in "${BREW_LAYERS[@]}"; do
         print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask|mas) ' "$layer") entries"
     done
-    if ask_yes_no "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
+    if ask_yes_no brew-bundle "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
         skip_mas_without_login
         for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do
             print "${YELLOW}→ trusting the tap $t (listed in a Brewfile)${NC}"
@@ -847,7 +899,7 @@ echo "=== Step 3: asdf Runtimes ==="
 # .zshrc.<label>: this machine only ever reads its own file.
 if [[ -n "$BREW_LABEL" ]] && [ -s "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
     print "${BLUE}Runtimes ($BREW_LABEL):${NC} $(tr '\n' ' ' < "asdf/tool-versions.$BREW_LABEL")"
-    if ask_yes_no "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
+    if ask_yes_no asdf-runtimes "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
         # Pins older than what this machine runs mean export.sh has not run since an upgrade:
         # importing them would switch every runtime back.
         if [ -f ~/.tool-versions ] && ! cmp -s "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions; then
@@ -888,7 +940,7 @@ echo "=== Step 4: Oh-My-Zsh ==="
 if [ -d ~/.oh-my-zsh ]; then
     print "${GREEN}✓ Oh-My-Zsh already installed${NC}"
 else
-    if ask_yes_no "Install Oh-My-Zsh?"; then
+    if ask_yes_no oh-my-zsh "Install Oh-My-Zsh?"; then
         print "${YELLOW}→ Installing Oh-My-Zsh...${NC}"
         if sh -c "$(curl -fsSL https://raw.github.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended; then
             if [ -d ~/.oh-my-zsh ]; then
@@ -917,7 +969,7 @@ elif [ ! -f plugins.list ]; then
     print "${RED}✗ plugins.list not found${NC}"
 else
     print "${BLUE}Plugins: $(tr '\n' ' ' < plugins.list)${NC}"
-    if ask_yes_no "Install custom plugins?"; then
+    if ask_yes_no custom-plugins "Install custom plugins?"; then
         mkdir -p ~/.oh-my-zsh/custom/plugins
 
         # Plugin repository mapping
@@ -990,7 +1042,7 @@ if [ -f ~/.fzf.zsh ]; then
 else
     FZF_INSTALL_PATH="$(brew --prefix 2>/dev/null)/opt/fzf/install"
     if [ -f "$FZF_INSTALL_PATH" ]; then
-        if ask_yes_no "Setup FZF shell integration?"; then
+        if ask_yes_no fzf "Setup FZF shell integration?"; then
             print "${YELLOW}→ Setting up FZF integration...${NC}"
             if "$FZF_INSTALL_PATH" --key-bindings --completion --no-update-rc --no-bash --no-fish; then
                 print "${GREEN}✓ FZF configured${NC}"
@@ -1035,7 +1087,7 @@ else
     [ -f .zshrc.full ] && echo "  - .zshrc.full  (legacy monolith)"
     [ -f .p10k.zsh ] && echo "  - .p10k.zsh"
 
-    if ask_yes_no "Copy configuration files? (existing files that differ will be backed up)"; then
+    if ask_yes_no copy-zsh-configs "Copy configuration files? (existing files that differ will be backed up)"; then
         # A file that differs from the repo's copy is backed up here; the folder is made only then.
         BACKUP_DIR=~/.zsh-config-backup-$(date +%Y%m%d-%H%M%S)
 
@@ -1084,7 +1136,8 @@ else
         fi
         echo "  3) Skip"
         echo ""
-        read "iterm_choice?Select option [1/2/3]: "
+        ask_value iterm-profiles "Select option [1/2/3, or full|font|skip]: " iterm_choice
+        case "${(L)iterm_choice}" in full) iterm_choice=1 ;; font|font-only) iterm_choice=2 ;; skip) iterm_choice=3 ;; esac
 
         case "$iterm_choice" in
             1)
@@ -1112,7 +1165,7 @@ else
                                 print "${YELLOW}! The saved ${filename%.json} profile differs from the repo's in: ${differs}${NC}"
                                 if ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
                                     print "${BLUE}  Quit iTerm2 completely and re-run to take the repo's, or run export.sh if this machine is newer${NC}"
-                                elif ask_yes_no "Replace the saved ${filename%.json} profile with the repo's? (the iTerm2 plist is backed up first)" n; then
+                                elif ask_yes_no "replace-saved-profile:${filename%.json}" "Replace the saved ${filename%.json} profile with the repo's? (the iTerm2 plist is backed up first)" n; then
                                     iterm_plist="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
                                     cp "$iterm_plist" "$iterm_plist.backup-$(date +%Y%m%d-%H%M%S)" &&
                                         iterm_profile_replace "$profile" &&
@@ -1166,7 +1219,7 @@ else
         print "${BLUE}  Quit iTerm2 completely, then re-run this script to apply them${NC}"
     else
         echo ""
-        if ask_yes_no "Apply iTerm2 app-level settings (theme, tab bar, keymaps, pointer actions)?"; then
+        if ask_yes_no iterm-app-settings "Apply iTerm2 app-level settings (theme, tab bar, keymaps, pointer actions)?"; then
             print "${YELLOW}→ Applying iTerm2 app-level settings...${NC}"
             if iterm_settings_py "$ITERM_SETTINGS"
             then
@@ -1194,7 +1247,7 @@ echo "=== Step 10: Default Shell ==="
 if [ "$SHELL" = "/bin/zsh" ]; then
     print "${GREEN}✓ zsh is already the default shell${NC}"
 else
-    if ask_yes_no "Set zsh as default shell? (requires password)"; then
+    if ask_yes_no default-shell-zsh "Set zsh as default shell? (requires password)"; then
         print "${YELLOW}→ Setting zsh as default shell...${NC}"
         if chsh -s /bin/zsh; then
             print "${GREEN}✓ zsh set as default shell${NC}"
@@ -1230,7 +1283,11 @@ else
         done
         echo "  s) Skip"
         echo ""
-        read "tmux_choice?Select machine config: "
+        ask_value tmux-machine-config "Select machine config: " tmux_choice
+        # An agent names the machine (c02) instead of its number.
+        for (( i = 1; i <= ${#TMUX_CHOICES[@]}; i++ )); do
+            [[ "$tmux_choice" == "${TMUX_CHOICES[$i]:t:r}" ]] && tmux_choice=$i
+        done
 
         if [[ "$tmux_choice" == <-> ]] && (( tmux_choice >= 1 && tmux_choice <= ${#TMUX_CHOICES[@]} )); then
             TMUX_CONF="${TMUX_CHOICES[$tmux_choice]}"
@@ -1243,7 +1300,7 @@ else
     if [[ -n "$TMUX_CONF" ]]; then
         print "${BLUE}Detected: $MACHINE_NAME${NC}"
 
-        if ask_yes_no "Setup tmux configuration?"; then
+        if ask_yes_no tmux-config "Setup tmux configuration?"; then
             # Symlink tmux config
             TMUX_CONF_ABS="$SCRIPT_DIR/$TMUX_CONF"
             if [ -L ~/.tmux.conf ] && [ "$(readlink ~/.tmux.conf)" = "$TMUX_CONF_ABS" ]; then
@@ -1262,7 +1319,7 @@ else
             if [ -f ~/.ssh/config ] && grep -qF "$SSH_MARKER" ~/.ssh/config; then
                 print "${GREEN}✓ SSH config already contains tmux cross-SSH entries${NC}"
             else
-                if ask_yes_no "Append tmux cross-SSH entries to ~/.ssh/config?"; then
+                if ask_yes_no tmux-ssh-config "Append tmux cross-SSH entries to ~/.ssh/config?"; then
                     mkdir -p ~/.ssh
                     chmod 700 ~/.ssh
                     echo "" >> ~/.ssh/config
@@ -1299,17 +1356,26 @@ else
     CLAUDE_DIRS=("${(@f)$("$SETTINGS_TOOL" dirs)}")
     print "${BLUE}Config folders:${NC} ${${CLAUDE_DIRS[@]/#$HOME/~}[*]}"
     print "${BLUE}This machine's profiles:${NC} ${MACHINE_PROFILES[*]:-none (unknown machine)}"
-    while ask_yes_no "Add another Claude config folder (one per account)?" "n"; do
-        read "extra_dir?Path, e.g. ~/.claude-work or ~/.claude-personal: "
-        extra_dir="${extra_dir/#\~/$HOME}"
+    # An agent names them in one answer: --answer claude-extra-folders=~/.claude-work,~/.claude-personal
+    add_claude_dir() {
+        local d="${1/#\~/$HOME}"
         # A relative answer ("claude-personal") would land in the cwd, which is this
         # public repo: only ~/... or an absolute path is a config folder.
-        if [[ -n "$extra_dir" && "$extra_dir" != /* ]]; then
-            print "${RED}✗ $extra_dir is not a full path: give ~/.claude-<name> or /full/path${NC}"
-            continue
+        if [[ -n "$d" && "$d" != /* ]]; then
+            print "${RED}✗ $d is not a full path: give ~/.claude-<name> or /full/path${NC}"
+            return 0
         fi
-        [[ -n "$extra_dir" ]] && CLAUDE_DIRS+=("${extra_dir%/}")
-    done
+        [[ -n "$d" ]] && CLAUDE_DIRS+=("${d%/}")
+        return 0
+    }
+    if (( ${+ANSWERS[claude-extra-folders]} )); then
+        for extra_dir in ${(s:,:)ANSWERS[claude-extra-folders]}; do add_claude_dir "$extra_dir"; done
+    else
+        while ! $NON_INTERACTIVE && ask_yes_no claude-extra-folder "Add another Claude config folder (one per account)?" "n"; do
+            ask_value claude-extra-folder-path "Path, e.g. ~/.claude-work or ~/.claude-personal: " extra_dir
+            add_claude_dir "$extra_dir"
+        done
+    fi
 
     for target_dir in "${CLAUDE_DIRS[@]}"; do
         target="$target_dir/settings.json"
@@ -1317,7 +1383,7 @@ else
         echo ""
         print "${BLUE}── $shown${NC}"
 
-        if [ ! -d "$target_dir" ] && ! ask_yes_no "$shown does not exist — create it?" "n"; then
+        if [ ! -d "$target_dir" ] && ! ask_yes_no "claude-create-folder:$shown" "$shown does not exist — create it?" "n"; then
             print "${YELLOW}! Skipped $shown${NC}"
             continue
         fi
@@ -1330,7 +1396,7 @@ else
             if [[ "$target_dir" != "$HOME/.claude" && ${#MACHINE_PROFILES[@]} -gt 1 ]]; then
                 suggested="${MACHINE_PROFILES[2]}"
             fi
-            read "profile?Profile for $shown (${MACHINE_PROFILES[*]:-personal work}) [$suggested]: "
+            ask_value "claude-profile:$shown" "Profile for $shown (${MACHINE_PROFILES[*]:-personal work}) [$suggested]: " profile
             profile="${profile:-$suggested}"
         fi
         if (( ${#MACHINE_PROFILES[@]} )) && (( ! ${MACHINE_PROFILES[(Ie)$profile]} )); then
@@ -1363,7 +1429,7 @@ else
                 continue
             fi
         fi
-        if ! ask_yes_no "Write $shown/settings.json for profile '$profile'? (backed up first)" "y"; then
+        if ! ask_yes_no "claude-write-settings:$shown" "Write $shown/settings.json for profile '$profile'? (backed up first)" "y"; then
             print "${YELLOW}! Skipped $shown${NC}"
             continue
         fi
@@ -1414,7 +1480,7 @@ else
     [ "$WANT_PHOENIX" = true ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
     [ "$WANT_KARABINER" = true ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
 
-    if ask_yes_no "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
+    if ask_yes_no copy-window-configs "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
         install_window_configs
     else
         print "${YELLOW}! Skipped window & keyboard configs${NC}"
@@ -1440,7 +1506,7 @@ else
     [ -f lazygit/config.yml ] && echo "  - lazygit/config.yml + themes → $LAZYGIT_DIR/"
     [ -d repo-tabs ] && echo "  - repo-tabs/theme-* → ~/.config/repo-tabs/ (group themes for repo-tabs lazy)"
 
-    if ask_yes_no "Copy lazygit & repo-tabs configs? (existing files that differ will be backed up)"; then
+    if ask_yes_no copy-lazygit-configs "Copy lazygit & repo-tabs configs? (existing files that differ will be backed up)"; then
         install_lazygit_repotabs
     else
         print "${YELLOW}! Skipped lazygit & repo-tabs configs${NC}"
@@ -1476,7 +1542,7 @@ else
     [[ -n "$existing_hooks" ]] && print "${YELLOW}! core.hooksPath is currently $existing_hooks; it will be replaced${NC}"
     print "${YELLOW}  Per repo here: on a work machine do not set it globally (git config --global core.hooksPath), it would run on the employer's repos.${NC}"
     print "${YELLOW}  On a personal machine the recommended setup is global: git config --global core.hooksPath \"$GUARD_HOOKS\"${NC}"
-    if ask_yes_no "Route this clone's pushes through the name guard ($GUARD_HOOKS/pre-push)?"; then
+    if ask_yes_no name-guard-pre-push "Route this clone's pushes through the name guard ($GUARD_HOOKS/pre-push)?"; then
         git -C "$SCRIPT_DIR" config core.hooksPath "$GUARD_HOOKS"
         print "${GREEN}✓ core.hooksPath → $GUARD_HOOKS${NC}"
     else
@@ -1511,7 +1577,7 @@ if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
     print "${YELLOW}! app-settings/app-settings.py or /usr/bin/python3 missing, skipping${NC}"
 else
     print "${BLUE}Apps:${NC} $(/usr/bin/python3 -I -c 'import json,sys; print(" ".join(a["name"] for a in json.load(open(sys.argv[1]))["apps"]))' "$SCRIPT_DIR/app-settings/apps.json")"
-    if ask_yes_no "Load these apps' settings (only keys that differ)?"; then
+    if ask_yes_no app-settings "Load these apps' settings (only keys that differ)?"; then
         "$APP_SETTINGS" import || print "${RED}✗ app settings import failed${NC}"
     else
         print "${YELLOW}! Skipped app settings${NC}"
@@ -1533,7 +1599,7 @@ elif "$HOTKEYS" check --label "${MACHINE_LABEL:-}" >/dev/null; then
     print "${GREEN}✓ Recorded macOS shortcuts already match${NC}"
 else
     "$HOTKEYS" check --label "${MACHINE_LABEL:-}" | sed 's/^/  /'
-    if ask_yes_no "Set these macOS shortcuts as recorded (System Settings > Keyboard > Keyboard Shortcuts)?"; then
+    if ask_yes_no macos-shortcuts "Set these macOS shortcuts as recorded (System Settings > Keyboard > Keyboard Shortcuts)?"; then
         "$HOTKEYS" import --label "${MACHINE_LABEL:-}" || print "${RED}✗ some shortcuts still differ${NC}"
     else
         print "${YELLOW}! Skipped macOS shortcuts${NC}"
@@ -1557,7 +1623,7 @@ if [[ -d /Applications/Karabiner-Elements.app ]]; then
 else
     if "$CAPSLOCK" --check >/dev/null 2>&1; then
         print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
-    elif ask_yes_no "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
+    elif ask_yes_no caps-lock-f18 "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
         "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
     else
         print "${YELLOW}! Skipped Caps Lock to F18${NC}"
@@ -1566,7 +1632,7 @@ else
         print "${GREEN}✓ modifier keys already match Karabiner's config${NC}"
     else
         "$MODKEYS" check | sed 's/^/  /'
-        if ask_yes_no "Set these keyboards' modifier keys as Karabiner's config has them?"; then
+        if ask_yes_no karabiner-modifier-keys "Set these keyboards' modifier keys as Karabiner's config has them?"; then
             "$MODKEYS" import || print "${RED}✗ some modifier keys still differ${NC}"
         else
             print "${YELLOW}! Skipped modifier keys${NC}"

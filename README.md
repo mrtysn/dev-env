@@ -357,6 +357,29 @@ step 3 compares the pins file and whether each pinned runtime is installed.
 Step 9 also reports iTerm2's tmux prefs (`OpenTmuxWindowsIn`, `AutoHideTmuxClientSession`,
 `TmuxUsesDedicatedProfile`) as a change when unset, and `export.sh` warns for the same keys; `clo` needs them.
 
+### Non-interactive use (agents)
+
+Every prompt in `import.sh` has a key, and `--answer KEY=VALUE` (repeatable) answers it. With
+`--non-interactive`, or whenever stdin is not a terminal, a prompt without an answer stops the run with
+exit 2 and prints its key, so an agent never hangs. Yes/no keys take `yes` or `no`. Every interactive
+prompt added to `import.sh` must take a key: `ask_yes_no KEY "prompt"` and `ask_value KEY "prompt" VAR`
+refuse a call without one.
+
+| Key | Step | Value |
+|---|---|---|
+| `brew-bundle` (2), `asdf-runtimes` (3), `oh-my-zsh` (4), `custom-plugins` (5), `fzf` (7), `copy-zsh-configs` (8) | as listed | yes/no |
+| `iterm-profiles` | 9 | `full`, `font` or `skip` |
+| `replace-saved-profile:<profile>` | 9 | yes/no, one per profile file name without `.json` (`default`) |
+| `iterm-app-settings` | 9 | yes/no |
+| `default-shell-zsh` | 10 | yes/no (`chsh` still asks for the password) |
+| `tmux-machine-config` | 11 | `c02`-style machine name or `skip`, only on an unknown machine |
+| `tmux-config`, `tmux-ssh-config` | 11 | yes/no |
+| `claude-extra-folders` | 12 | comma-separated folders, e.g. `~/.claude-work,~/.claude-personal`; absent means none |
+| `claude-create-folder:<folder>`, `claude-write-settings:<folder>`, `claude-profile:<folder>` | 12 | yes/no, yes/no, profile name; `<folder>` as printed (`~/.claude-work`) |
+| `copy-window-configs`, `copy-lazygit-configs` | 13, 14 | yes/no |
+| `name-guard-pre-push` (15), `app-settings` (16), `macos-shortcuts` (17), `caps-lock-f18` and `karabiner-modifier-keys` (18) | as listed | yes/no |
+| `mas-signed-in` | 2 | yes/no; unanswered counts as signed out |
+
 ## Detailed Installation Steps
 
 If you prefer manual installation instead of using the import script:
