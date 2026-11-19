@@ -3,6 +3,14 @@
 
 set -euo pipefail
 
+# --yes: skip the "Continue?" question (an agent's shell has no terminal to answer it).
+ASSUME_YES=false
+case "${1:-}" in
+    "") ;;
+    --yes|-y) ASSUME_YES=true ;;
+    *) echo "usage: ./export.sh [--yes]" >&2; exit 2 ;;
+esac
+
 SCRIPT_DIR="$(cd "$(dirname "${0}")" && pwd)"
 cd "$SCRIPT_DIR"
 
@@ -52,8 +60,15 @@ echo "  - $SCRIPT_DIR/asdf/tool-versions.${MACHINE_LABEL:-<label>} (this machine
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
-read "REPLY?Continue? (y/N) "
-REPLY=${REPLY:-N}
+if $ASSUME_YES; then
+    REPLY=y
+elif [[ ! -t 0 ]]; then
+    echo "✗ Not a terminal, so there is nobody to ask: re-run with --yes to export without the question" >&2
+    exit 2
+else
+    read "REPLY?Continue? (y/N) "
+    REPLY=${REPLY:-N}
+fi
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "Export cancelled."
     exit 0

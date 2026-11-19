@@ -272,7 +272,7 @@ This allows you to:
 
 ### `export.sh`
 
-Exports your current terminal configuration to this repo.
+Exports your current terminal configuration to this repo. It asks "Continue?" once; `./export.sh --yes` skips the question, and without a terminal (an agent's shell) it refuses to run unless `--yes` is given.
 
 What it exports:
 - Your full `.zshrc` as `.zshrc.full`
