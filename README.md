@@ -324,7 +324,7 @@ What it does:
 6. Sets up Homebrew command-not-found
 7. Configures FZF integration
 8. Copies the zsh configs to the home directory, backing up any that differ
-9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings; those apply only while iTerm2 is not running, so run `import.sh` from Terminal.app for them, or quit iTerm2 and re-run
+9. Installs iTerm2 profiles (full profiles or font-only) and applies app-level iTerm2 settings; those apply only while iTerm2 is not running, so run `import.sh` from Terminal.app for them, or quit iTerm2 and re-run. A profile that is already saved in iTerm2 (the machine `export.sh` reads) is not installed as a dynamic profile, because iTerm2 refuses a dynamic profile with a saved profile's Guid; import removes such a dynamic copy. When the saved profile differs from the repo's file, import lists the differing settings and asks whether to replace the saved one (default no, plist backed up first, iTerm2 quit); `--check` reports the difference and says to run `export.sh` if this machine is newer
 10. Sets zsh as default shell
 11. Sets up tmux configuration (per-machine)
 12. For each Claude config folder (`~/.claude`, every `~/.claude-*`, and any you add when asked): records its profile and agents-shared checkout in `paths.local.sh` via `agents/claude/write-paths-local.sh` (the guard hooks refuse every Bash tool call until it resolves), then backs up and writes `settings.json` as base + that profile's overlays

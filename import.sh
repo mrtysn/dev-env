@@ -241,6 +241,63 @@ for path in sys.argv[1:]:
 ' "$@"
 }
 
+# The settings (keys) in which the saved iTerm2 profile with this file's Guid differs from the file, comma
+# separated; empty when they are equal or no such profile is saved. The file is converted back as export.sh wrote it.
+iterm_profile_diff() {
+    defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
+import base64, json, plistlib, sys
+def restore(obj):
+    if isinstance(obj, dict):
+        if obj.get("_type") == "data" and "value" in obj:
+            return base64.b64decode(obj["value"])
+        return {k: restore(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [restore(item) for item in obj]
+    return obj
+try:
+    saved = {b.get("Guid"): b for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
+    repo = restore(json.load(open(sys.argv[1]))).get("Profiles", [])
+except Exception:
+    sys.exit(0)
+for prof in repo:
+    mine = saved.get(prof.get("Guid"))
+    if mine is not None:
+        keys = sorted(k for k in set(prof) | set(mine) if prof.get(k) != mine.get(k))
+        if keys:
+            print(", ".join(keys))
+' "$1"
+}
+
+# Replace the saved iTerm2 profile that has this file's Guid with the file's. Writes the plist itself, so only
+# while iTerm2 is quit (it rewrites its plist from memory on quit); the caller backs the plist up first.
+iterm_profile_replace() {
+    python3 -I - "$1" <<'PYTHON_EOF'
+import base64, json, os, plistlib, sys
+def restore(obj):
+    if isinstance(obj, dict):
+        if obj.get("_type") == "data" and "value" in obj:
+            return base64.b64decode(obj["value"])
+        return {k: restore(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [restore(item) for item in obj]
+    return obj
+plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
+try:
+    repo = restore(json.load(open(sys.argv[1]))).get("Profiles", [])
+    with open(plist_path, "rb") as f:
+        plist = plistlib.load(f)
+    by_guid = {prof["Guid"]: prof for prof in repo}
+    plist["New Bookmarks"] = [by_guid.get(b.get("Guid"), b) for b in plist.get("New Bookmarks", [])]
+    tmp = plist_path + ".tmp"
+    with open(tmp, "wb") as f:
+        plistlib.dump(plist, f)
+    os.replace(tmp, plist_path)
+except Exception as e:
+    print(f"  Failed to replace the saved profile: {e}", file=sys.stderr)
+    sys.exit(1)
+PYTHON_EOF
+}
+
 # Step 9's app-level settings: merge the export into the iTerm2 plist; with --check, only compare.
 iterm_settings_py() {
     python3 - "$@" <<'PYTHON_EOF'
@@ -540,6 +597,8 @@ if $CHECK; then
                 # Already a saved profile (this machine is the one export.sh reads): the dynamic copy is the
                 # one iTerm2 refuses, so it is the file that must not exist.
                 [[ -e "$twin" ]] && CHECK_CHANGES+=("iTerm2 profile ${pf:t:r} is already saved in iTerm2, its dynamic copy causes a Dynamic Profiles error: import.sh removes it")
+                differs="$(iterm_profile_diff "$pf")"
+                [[ -n "$differs" ]] && CHECK_CHANGES+=("iTerm2 profile ${pf:t:r} saved here differs from the repo in: ${differs}. Run export.sh if this machine is newer, or import.sh to take the repo's")
             else
                 cmp -s "$pf" "$twin" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
             fi
@@ -1037,6 +1096,21 @@ else
                                 print "${GREEN}✓ ${filename%.json} is already saved in iTerm2; removed its dynamic copy${NC}"
                             else
                                 print "${GREEN}✓ ${filename%.json} is already saved in iTerm2${NC}"
+                            fi
+                            differs="$(iterm_profile_diff "$profile")"
+                            if [[ -n "$differs" ]]; then
+                                print "${YELLOW}! The saved ${filename%.json} profile differs from the repo's in: ${differs}${NC}"
+                                if ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
+                                    print "${BLUE}  Quit iTerm2 completely and re-run to take the repo's, or run export.sh if this machine is newer${NC}"
+                                elif ask_yes_no "Replace the saved ${filename%.json} profile with the repo's? (the iTerm2 plist is backed up first)" n; then
+                                    iterm_plist="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
+                                    cp "$iterm_plist" "$iterm_plist.backup-$(date +%Y%m%d-%H%M%S)" &&
+                                        iterm_profile_replace "$profile" &&
+                                        killall cfprefsd 2>/dev/null
+                                    print "${GREEN}✓ Replaced the saved ${filename%.json} profile${NC}"
+                                else
+                                    print "${BLUE}  Kept the saved profile; run export.sh to update the repo from it${NC}"
+                                fi
                             fi
                         elif cmp -s "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"; then
                             print "${GREEN}✓ ${filename%.json} already matches${NC}"
