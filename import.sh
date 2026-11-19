@@ -535,11 +535,15 @@ if $CHECK; then
             profile_files=("$PROFILES_DIR/font-only.json")
         fi
         for pf in $profile_files; do
-            cmp -s "$pf" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
+            twin="$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}"
+            if [[ -n "$(iterm_guid_clashes "$pf")" ]]; then
+                # Already a saved profile (this machine is the one export.sh reads): the dynamic copy is the
+                # one iTerm2 refuses, so it is the file that must not exist.
+                [[ -e "$twin" ]] && CHECK_CHANGES+=("iTerm2 profile ${pf:t:r} is already saved in iTerm2, its dynamic copy causes a Dynamic Profiles error: import.sh removes it")
+            else
+                cmp -s "$pf" "$twin" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
+            fi
         done
-        while IFS= read -r clash; do
-            [[ -n "$clash" ]] && CHECK_CHANGES+=("iTerm2 profile ${clash%%:*} also saved in iTerm2 preferences (Dynamic Profiles error): delete the saved copy in Settings > Profiles")
-        done < <(iterm_guid_clashes $profile_files)
         for tmux_key in OpenTmuxWindowsIn AutoHideTmuxClientSession TmuxUsesDedicatedProfile; do
             defaults read com.googlecode.iterm2 "$tmux_key" &>/dev/null || CHECK_CHANGES+=("iTerm2 tmux pref $tmux_key unset (clo warns about it; export it on a machine that has it)")
         done
@@ -1025,19 +1029,22 @@ else
                     for profile in "${FULL_PROFILES[@]}"; do
                         filename=$(basename "$profile")
                         # No backup here: iTerm2 loads every file in this folder as a profile.
-                        if cmp -s "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"; then
+                        if [[ -n "$(iterm_guid_clashes "$profile")" ]]; then
+                            # export.sh reads saved profiles only, so on the machine it exports from the saved one stays
+                            # and the dynamic copy, which iTerm2 refuses for the shared Guid, is removed.
+                            if [[ -e "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename" ]]; then
+                                rm "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"
+                                print "${GREEN}✓ ${filename%.json} is already saved in iTerm2; removed its dynamic copy${NC}"
+                            else
+                                print "${GREEN}✓ ${filename%.json} is already saved in iTerm2${NC}"
+                            fi
+                        elif cmp -s "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"; then
                             print "${GREEN}✓ ${filename%.json} already matches${NC}"
                         else
                             cp "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"
                             print "${GREEN}✓ Installed ${filename%.json}${NC}"
                         fi
                     done
-                    clashes="$(iterm_guid_clashes "${FULL_PROFILES[@]}")"
-                    if [[ -n "$clashes" ]]; then
-                        print "${RED}✗ These profiles are also saved in iTerm2's own preferences; iTerm2 will refuse the dynamic copy and show a Dynamic Profiles error:${NC}"
-                        print -r -- "${clashes//$'\n'/$'\n'    }" | sed 's/^/    /'
-                        print "${BLUE}  Delete the saved copies in iTerm2 > Settings > Profiles${NC}"
-                    fi
                     print "${BLUE}  Restart iTerm2 and select your preferred profile${NC}"
                 else
                     print "${RED}✗ Full profiles not available${NC}"
