@@ -222,19 +222,20 @@ install_zsh_configs() {
 
 # Dynamic profile files whose Guid is also a profile saved in iTerm2's own preferences: iTerm2 refuses to
 # load such a dynamic profile ("conflicts with non-dynamic profile with same Guid") and shows an error
-# dialog on every launch. Prints "<file name>: <profile name>" per clash.
+# dialog on every launch. Prints "<file name>: <profile name>" per clash; exits 2 when the saved profiles or a
+# file cannot be read, which is not the same as "no clash": callers must not install on it.
 iterm_guid_clashes() {
     defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
 import json, os, plistlib, sys
 try:
     saved = {b.get("Guid") for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
 except Exception:
-    sys.exit(0)
+    sys.exit(2)
 for path in sys.argv[1:]:
     try:
         profiles = json.load(open(path)).get("Profiles", [])
     except Exception:
-        continue
+        sys.exit(2)
     for prof in profiles:
         if prof.get("Guid") in saved:
             print(os.path.basename(path) + ": " + str(prof.get("Name", "?")))
@@ -242,7 +243,8 @@ for path in sys.argv[1:]:
 }
 
 # The settings (keys) in which the saved iTerm2 profile with this file's Guid differs from the file, comma
-# separated; empty when they are equal or no such profile is saved. The file is converted back as export.sh wrote it.
+# separated; empty when they are equal or no such profile is saved; exit 2 when unreadable. The file is converted
+# back as export.sh wrote it.
 iterm_profile_diff() {
     defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
 import base64, json, plistlib, sys
@@ -258,7 +260,7 @@ try:
     saved = {b.get("Guid"): b for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
     repo = restore(json.load(open(sys.argv[1]))).get("Profiles", [])
 except Exception:
-    sys.exit(0)
+    sys.exit(2)
 for prof in repo:
     mine = saved.get(prof.get("Guid"))
     if mine is not None:
@@ -593,11 +595,15 @@ if $CHECK; then
         fi
         for pf in $profile_files; do
             twin="$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}"
-            if [[ -n "$(iterm_guid_clashes "$pf")" ]]; then
+            clash="$(iterm_guid_clashes "$pf")" || {
+                CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}: iTerm2's saved profiles or this file could not be read, so a Dynamic Profiles clash is not ruled out")
+                continue
+            }
+            if [[ -n "$clash" ]]; then
                 # Already a saved profile (this machine is the one export.sh reads): the dynamic copy is the
                 # one iTerm2 refuses, so it is the file that must not exist.
                 [[ -e "$twin" ]] && CHECK_CHANGES+=("iTerm2 profile ${pf:t:r} is already saved in iTerm2, its dynamic copy causes a Dynamic Profiles error: import.sh removes it")
-                differs="$(iterm_profile_diff "$pf")"
+                differs="$(iterm_profile_diff "$pf")" || differs=""
                 [[ -n "$differs" ]] && CHECK_CHANGES+=("iTerm2 profile ${pf:t:r} saved here differs from the repo in: ${differs}. Run export.sh if this machine is newer, or import.sh to take the repo's")
             else
                 cmp -s "$pf" "$twin" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
@@ -1088,7 +1094,11 @@ else
                     for profile in "${FULL_PROFILES[@]}"; do
                         filename=$(basename "$profile")
                         # No backup here: iTerm2 loads every file in this folder as a profile.
-                        if [[ -n "$(iterm_guid_clashes "$profile")" ]]; then
+                        clash="$(iterm_guid_clashes "$profile")" || {
+                            print "${RED}✗ Could not read iTerm2's saved profiles or ${filename}; not installing it, to avoid a Dynamic Profiles clash${NC}"
+                            continue
+                        }
+                        if [[ -n "$clash" ]]; then
                             # export.sh reads saved profiles only, so on the machine it exports from the saved one stays
                             # and the dynamic copy, which iTerm2 refuses for the shared Guid, is removed.
                             if [[ -e "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename" ]]; then
@@ -1097,7 +1107,7 @@ else
                             else
                                 print "${GREEN}✓ ${filename%.json} is already saved in iTerm2${NC}"
                             fi
-                            differs="$(iterm_profile_diff "$profile")"
+                            differs="$(iterm_profile_diff "$profile")" || differs=""
                             if [[ -n "$differs" ]]; then
                                 print "${YELLOW}! The saved ${filename%.json} profile differs from the repo's in: ${differs}${NC}"
                                 if ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then

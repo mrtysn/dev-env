@@ -288,6 +288,7 @@ if not profiles:
 else:
     exported = 0
     seen = {}
+    written = {}
     for profile in profiles:
         name = profile.get("Name", "Unknown")
         if name in AUTO_CREATED_PROFILES:
@@ -303,15 +304,45 @@ else:
             continue
         seen[filename] = name
 
+        # A file of this name that holds a different profile (another Guid) is not replaced: this machine's
+        # profile of that name is a different one (e.g. iTerm2's stock Default next to the repo's customised
+        # Default), and the file would be lost.
+        target = os.path.join(profiles_dir, filename)
+        if os.path.exists(target):
+            try:
+                old_guids = {p.get("Guid") for p in json.load(open(target)).get("Profiles", [])}
+            except Exception as e:
+                print(f"  ! {filename} exists but cannot be read ({e}), not overwriting it", file=sys.stderr)
+                failed = True
+                continue
+            if profile.get("Guid") not in old_guids:
+                print(f"  ! {filename} holds a different profile (another Guid) than this machine's '{name}': "
+                      f"not overwriting it. Rename one of the two profiles, or move the file aside", file=sys.stderr)
+                failed = True
+                continue
+        written[profile.get("Guid")] = filename
+
         try:
-            write_json_atomic(os.path.join(profiles_dir, filename),
-                              {"Profiles": [convert_for_json(profile)]})
+            write_json_atomic(target, {"Profiles": [convert_for_json(profile)]})
             print(f"  - {name} -> {filename}")
             exported += 1
         except Exception as e:
             print(f"  Failed to write {filename}: {e}", file=sys.stderr)
             failed = True
     print(f"  Exported {exported} profiles")
+    # A profile renamed in iTerm2 is written to a new file; the old file keeps the same Guid, and import would
+    # install both. Nothing is deleted here: report it so it is removed by hand once it is known to be the old name.
+    for fname in sorted(os.listdir(profiles_dir)):
+        if not fname.endswith(".json") or fname == "font-only.json":
+            continue
+        try:
+            guids = {p.get("Guid") for p in json.load(open(os.path.join(profiles_dir, fname))).get("Profiles", [])}
+        except Exception:
+            continue
+        for guid in guids:
+            if guid in written and written[guid] != fname:
+                print(f"  ! {fname} has the same Guid as the saved profile now exported to {written[guid]}: "
+                      f"it is probably the old name; delete {fname} if so", file=sys.stderr)
 
 # ── app-level settings ─────────────────────────────────────────────────────────
 settings, withheld, dropped = {}, [], 0
