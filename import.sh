@@ -220,6 +220,27 @@ install_zsh_configs() {
     return 0
 }
 
+# Dynamic profile files whose Guid is also a profile saved in iTerm2's own preferences: iTerm2 refuses to
+# load such a dynamic profile ("conflicts with non-dynamic profile with same Guid") and shows an error
+# dialog on every launch. Prints "<file name>: <profile name>" per clash.
+iterm_guid_clashes() {
+    defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
+import json, os, plistlib, sys
+try:
+    saved = {b.get("Guid") for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
+except Exception:
+    sys.exit(0)
+for path in sys.argv[1:]:
+    try:
+        profiles = json.load(open(path)).get("Profiles", [])
+    except Exception:
+        continue
+    for prof in profiles:
+        if prof.get("Guid") in saved:
+            print(os.path.basename(path) + ": " + str(prof.get("Name", "?")))
+' "$@"
+}
+
 # Step 9's app-level settings: merge the export into the iTerm2 plist; with --check, only compare.
 iterm_settings_py() {
     python3 - "$@" <<'PYTHON_EOF'
@@ -516,6 +537,9 @@ if $CHECK; then
         for pf in $profile_files; do
             cmp -s "$pf" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-${pf:t}" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
         done
+        while IFS= read -r clash; do
+            [[ -n "$clash" ]] && CHECK_CHANGES+=("iTerm2 profile ${clash%%:*} also saved in iTerm2 preferences (Dynamic Profiles error): delete the saved copy in Settings > Profiles")
+        done < <(iterm_guid_clashes $profile_files)
         for tmux_key in OpenTmuxWindowsIn AutoHideTmuxClientSession TmuxUsesDedicatedProfile; do
             defaults read com.googlecode.iterm2 "$tmux_key" &>/dev/null || CHECK_CHANGES+=("iTerm2 tmux pref $tmux_key unset (clo warns about it; export it on a machine that has it)")
         done
@@ -1008,6 +1032,12 @@ else
                             print "${GREEN}✓ Installed ${filename%.json}${NC}"
                         fi
                     done
+                    clashes="$(iterm_guid_clashes "${FULL_PROFILES[@]}")"
+                    if [[ -n "$clashes" ]]; then
+                        print "${RED}✗ These profiles are also saved in iTerm2's own preferences; iTerm2 will refuse the dynamic copy and show a Dynamic Profiles error:${NC}"
+                        print -r -- "${clashes//$'\n'/$'\n'    }" | sed 's/^/    /'
+                        print "${BLUE}  Delete the saved copies in iTerm2 > Settings > Profiles${NC}"
+                    fi
                     print "${BLUE}  Restart iTerm2 and select your preferred profile${NC}"
                 else
                     print "${RED}✗ Full profiles not available${NC}"
