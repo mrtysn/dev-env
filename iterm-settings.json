@@ -992,6 +992,42 @@
     "Workgroups": {
       "_type": "data",
       "value": "W3sibmFtZSI6IkNsYXVkZSBDb2RlIiwic2Vzc2lvbnMiOlt7ImRpc3BsYXlOYW1lIjoiQ2hhdCIsIm1vZGUiOiJyZWd1bGFyIiwidXJsU3RyaW5nIjoiIiwidW5pcXVlSWRlbnRpZmllciI6ImJ1aWx0aW4uY2xhdWRlQ29kZS5tYWluIiwiY29tbWFuZCI6IiIsInRvb2xiYXJJdGVtcyI6W3sia2luZCI6Im1vZGVTd2l0Y2hlciJ9LHsia2luZCI6ImdpdFN0YXR1cyJ9LHsia2luZCI6ImF1dG9SZXF1ZXN0UmV2aWV3V2hlbklkbGUifV0sImtpbmQiOnsia2luZCI6InJvb3QifSwicGVyRmlsZUNvbW1hbmQiOiIifSx7InBlckZpbGVDb21tYW5kIjoiZ2l0IGRpZmZ0b29sIC15IC14IHZpbWRpZmYgXFwoZ2l0QmFzZSkgLS0gXFwoZmlsZSkiLCJtb2RlIjoiZGlmZiIsInRvb2xiYXJJdGVtcyI6W3sia2luZCI6Im1vZGVTd2l0Y2hlciJ9LHsia2luZCI6ImNoYW5nZWRGaWxlU2VsZWN0b3IifSx7ImtpbmQiOiJnaXRCYXNlU2VsZWN0b3IifSx7ImZvcndhcmRTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHhmNzAzLTB4MzQwMDAwLTB4N2MifSwicmVsb2FkU2hvcnRjdXQiOnsic2VyaWFsaXplZCI6IjB4NzItMHgxMDAwMDAtMHhmIn0sImJhY2tTaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHhmNzAyLTB4MzQwMDAwLTB4N2IifSwia2luZCI6Im5hdmlnYXRpb24ifV0sInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4iLCJ1bmlxdWVJZGVudGlmaWVyIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLmRpZmYiLCJ1cmxTdHJpbmciOiIiLCJjb21tYW5kIjoiZ2l0IGRpZmZ0b29sIC15IC14IHZpbWRpZmYgXFwoZ2l0QmFzZSkiLCJraW5kIjp7ImtpbmQiOiJwZWVyIn0sImRpc3BsYXlOYW1lIjoiRGlmZiJ9LHsidG9vbGJhckl0ZW1zIjpbeyJraW5kIjoibW9kZVN3aXRjaGVyIn0seyJzaG9ydGN1dCI6eyJzZXJpYWxpemVkIjoiMHg3Mi0weDEwMDAwMC0weGYifSwia2luZCI6InJlbG9hZCJ9LHsia2luZCI6ImF1dG9TZW5kQ2xpcHBpbmdzV2hlbklkbGUifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVkZUNvZGUucmV2aWV3IiwiZGlzcGxheU5hbWUiOiJDb2RlIFJldmlldyIsInVybFN0cmluZyI6IiIsInBhcmVudElEIjoiYnVpbHRpbi5jbGF1ZGVDb2RlLm1haW4iLCJraW5kIjp7ImtpbmQiOiJwZWVyIn0sIm1vZGUiOiJjb2RlUmV2aWV3IiwiY29tbWFuZCI6ImNsYXVkZSBcXChjb2RlUmV2aWV3UHJvbXB0KSAtLWFwcGVuZC1zeXN0ZW0tcHJvbXB0LWZpbGUgJ1xcKGNvZGVSZXZpZXdTeXN0ZW1Qcm9tcHRGaWxlKScgLS1zZXR0aW5ncyAnXFwoY29kZVJldmlld1NldHRpbmdzRmlsZSknIiwicGVyRmlsZUNvbW1hbmQiOiIifV0sInVuaXF1ZUlkZW50aWZpZXIiOiJidWlsdGluLmNsYXVkZUNvZGUifV0="
+    },
+    "NSUserKeyEquivalents": {
+      "AI Chats": "",
+      "Add Annotation at Cursor": "",
+      "Alert on Next Mark": "",
+      "Auto Command Completion": "",
+      "Auto Composer": "",
+      "Clear Buffer": "",
+      "Clear Instant Replay": "",
+      "Clear Scrollback Buffer": "",
+      "Clear to Last Mark": "",
+      "Clear to Start of Selection": "",
+      "Cockpit": "",
+      "Engage Artificial Intelligence": "",
+      "Explain Output with AI": "",
+      "Fold All": "",
+      "Fold Selected Lines": "",
+      "Jump to Mark": "",
+      "Next Annotation": "",
+      "Next Mark": "",
+      "Open AI Chat\u2026": "",
+      "Open Autocomplete\u2026": "",
+      "Password Manager": "",
+      "Previous Annotation": "",
+      "Previous Mark": "",
+      "Reset": "",
+      "Set Mark": "",
+      "Set Named Mark": "",
+      "Show Annotations": "",
+      "Show Clippings": "",
+      "Show Composer": "",
+      "Show Inline Chat": "",
+      "Show Session Note": "",
+      "Show Timestamps": "",
+      "Start Instant Replay": "",
+      "Use Transparency": ""
     }
   }
 }
