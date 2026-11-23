@@ -142,12 +142,18 @@ ask_value() {
 # `mas account`, so this is read first; `mas account` (mas 6 and older) next; the user is
 # asked (default no) only when neither can answer.
 mas_signed_in() {
-    local out db="$HOME/Library/Accounts/Accounts4.sqlite"
-    if [[ -r "$db" ]] && command_exists sqlite3 && out="$(sqlite3 -readonly "$db" \
-        "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
-         WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)"; then
+    local out db="$HOME/Library/Accounts/Accounts4.sqlite" why
+    # macOS privacy protection (TCC) guards this file: without Full Disk Access for the terminal,
+    # [[ -r ]] fails or sqlite3 answers "authorization denied". Either way the reason is shown.
+    if ! command_exists sqlite3; then
+        why="sqlite3 is not installed"
+    elif [[ -r "$db" ]] && out="$(sqlite3 -readonly "$db" \
+            "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
+             WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)"; then
         (( out > 0 ))
         return
+    else
+        why="macOS blocks this terminal from reading its account database; give the terminal Full Disk Access (System Settings > Privacy & Security) and this question goes away"
     fi
     # Check mode asks nothing and starts no extra mas call: an unknown login counts as signed out.
     if $CHECK; then
@@ -163,6 +169,7 @@ mas_signed_in() {
     # Not interactive and no --answer mas-signed-in: unknown counts as signed out, as --check does,
     # so the mas lines are skipped.
     $NON_INTERACTIVE && (( ! ${+ANSWERS[mas-signed-in]} )) && return 1
+    (( ${+ANSWERS[mas-signed-in]} )) || print "${YELLOW}! Cannot tell whether an Apple ID is signed in: $why.${NC}"
     ask_yes_no mas-signed-in "Is an Apple ID signed in to the App Store (for the mas apps)?" n
 }
 
