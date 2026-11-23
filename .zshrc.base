@@ -413,12 +413,14 @@ _update-all-asdf-plugins() {
 }
 
 # Whether an Apple ID is signed in to the App Store: an active, authenticated iTunesStore account
-# in macOS's Accounts database (a count only). Unreadable means no.
+# in macOS's Accounts database (a count only). 0 signed in, 1 signed out, 2 unreadable: macOS
+# privacy protection blocks the file unless the terminal has Full Disk Access, and an unreadable
+# login is not a signed-out one.
 _mas-signed-in() {
   local db="$HOME/Library/Accounts/Accounts4.sqlite" n
-  [[ -r "$db" ]] || return 1
+  [[ -r "$db" ]] || return 2
   n=$(sqlite3 -readonly "$db" "SELECT count(*) FROM ZACCOUNT a JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK
-      WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null)
+      WHERE t.ZIDENTIFIER = 'com.apple.account.iTunesStore' AND a.ZACTIVE = 1 AND a.ZAUTHENTICATED = 1;" 2>/dev/null) || return 2
   (( ${n:-0} > 0 ))
 }
 
@@ -485,12 +487,19 @@ _update-all-stage() {
       # mas 7 upgrades through sudo ("Requires root privileges"); `mas outdated` does not. The stage
       # runs under `script`, whose pty hides whether update-all had a terminal, so update-all
       # decides that and passes UPDATE_ALL_MAS_SUDO=1 when a password prompt can be answered.
-      if ! _mas-signed-in; then
-        echo "no App Store account signed in, or this terminal cannot read it (Full Disk Access): mas skipped"
+      # A skip exits 78, which the summary shows as "skipped", never "ok".
+      local signed_in=0; _mas-signed-in || signed_in=$?
+      if (( signed_in == 2 )); then
+        echo "Action needed: this terminal cannot read the App Store login (macOS privacy protection). Give it Full Disk Access (System Settings > Privacy & Security > Full Disk Access), reopen it and rerun, or run mas upgrade yourself"
+        return 78
+      elif (( signed_in == 1 )); then
+        echo "no App Store account signed in: mas skipped"
+        return 78
       elif [[ -z "$(mas outdated 2>/dev/null)" ]]; then
         echo "mas: nothing to upgrade"
       elif (( ! ${UPDATE_ALL_MAS_SUDO:-0} )); then
         echo "Action needed: mas upgrades need the sudo password and this shell has no terminal; run mas upgrade in a terminal"
+        return 78
       else
         mas upgrade
       fi ;;
@@ -804,7 +813,9 @@ update-all() {
       return 130
     fi
     stage_secs[$stage]=$(( EPOCHSECONDS - start ))
-    if (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
+    # 78: the stage skipped its work on purpose and said why (its "Action needed" line lands in the errors below)
+    if (( rc == 78 )); then stage_status[$stage]=skipped
+    elif (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
   done
   wait $su_pid 2>/dev/null
   _update-all-report-asdf-pins > "$run_dir/report-asdf.txt" 2>/dev/null   # after the asdf stage bumped the pins
