@@ -715,6 +715,11 @@ lowercase-first (`minimalDeslectedColoredTabAlpha`). Writing the lowercase spell
 `defaults write` creates a separate key that nothing ever reads — it looks like it worked
 and changes nothing.
 
+**A menu shortcut is removed by moving it, not by emptying it.** `NSUserKeyEquivalents` maps a
+menu item's exact title (with its `…`) to a key; iTerm2 reads it at launch. An empty value is
+ignored and the default shortcut stays. The repo moves each unwanted shortcut to `@~^$`
+(⌃⌥⇧⌘F20, a chord no keyboard sends), which iTerm2 applies.
+
 **iTerm2 must be quit before importing.** It rewrites its plist from memory on quit, so
 settings written while it is running are silently discarded. `import.sh` checks for a running
 iTerm2 and refuses rather than writing values that would vanish.
