@@ -482,7 +482,18 @@ _update-all-stage() {
     mas)
       # Without an App Store account, mas tries the preinstalled Apple apps and the App Store
       # opens a sign-in window (ISErrorDomain -128). Same check as import.sh step 2.
-      if _mas-signed-in; then mas upgrade; else echo "no App Store account signed in: mas skipped"; fi ;;
+      # mas 7 upgrades through sudo ("Requires root privileges"); `mas outdated` does not. The stage
+      # runs under `script`, whose pty hides whether update-all had a terminal, so update-all
+      # decides that and passes UPDATE_ALL_MAS_SUDO=1 when a password prompt can be answered.
+      if ! _mas-signed-in; then
+        echo "no App Store account signed in, or this terminal cannot read it (Full Disk Access): mas skipped"
+      elif [[ -z "$(mas outdated 2>/dev/null)" ]]; then
+        echo "mas: nothing to upgrade"
+      elif (( ! ${UPDATE_ALL_MAS_SUDO:-0} )); then
+        echo "Action needed: mas upgrades need the sudo password and this shell has no terminal; run mas upgrade in a terminal"
+      else
+        mas upgrade
+      fi ;;
     spicetify) _update-all-spicetify-reapply ;;
     local-builds) _update-all-local-builds ;;
     omz)
@@ -765,6 +776,8 @@ update-all() {
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
+  local mas_sudo=0
+  { (( EUID == 0 )) || [[ -t 0 ]] || sudo -n true 2>/dev/null } && mas_sudo=1
   local stage_env="$(typeset -f _mas-signed-in _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
@@ -781,7 +794,7 @@ update-all() {
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown}; trap 'exit 130' INT; _update-all-stage $stage"
+    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown} UPDATE_ALL_MAS_SUDO=$mas_sudo; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
     # (130) and would otherwise start the next one. Treat it as abort-the-run.
