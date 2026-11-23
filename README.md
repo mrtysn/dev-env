@@ -124,6 +124,19 @@ with a diff. Move the change into the base or the overlay, then re-run step 12. 
 ignores `feedbackSurveyState`, `theme` (the theme picker's choice; step 12 keeps it), `env.AGENTS_SHARED` and the order of hooks within an event
 (Claude Code runs them in parallel).
 
+### One Chrome profile per Claude account
+
+Claude-in-Chrome opens `https://clau.de/chrome/...` with `open -a "Google Chrome"`, which lands in
+whichever Chrome profile was last used. `agents/claude/chrome-open-shim/open` is a PATH shim that adds
+`--profile-directory` to that one call. It is opt-in per machine: run
+`agents/claude/chrome-open-shim/install.sh`, then put the Chrome profile folder (`Profile 1`, `Default`;
+see `~/Library/Application Support/Google/Chrome`) in each config folder's `paths.local.sh`:
+
+    CLAUDE_CHROME_PROFILE="Profile 1"
+
+The `claude()` wrapper in `.zshrc.base` puts the shim first on `PATH` only when it is installed. A folder
+with no profile, and every other `open` call, passes through unchanged. `test-open-shim.sh` checks it.
+
 ### Setting up a fresh config folder
 
 The base settings call hooks that live outside this repo, and a new folder has none of them

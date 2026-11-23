@@ -1,0 +1,32 @@
+#!/bin/zsh
+# DESC: PATH shim for `open`: sends Claude-in-Chrome's browser launch to this config folder's Chrome profile
+#
+# Claude-in-Chrome runs `open -a "Google Chrome" https://clau.de/chrome/...`. With this
+# script first on PATH (the claude() wrapper in .zshrc.base does that), the launch gets
+# `--args --profile-directory=<profile>` added, so each Claude account opens its own Chrome
+# profile. The profile name comes from CLAUDE_CHROME_PROFILE, else from the same variable in
+# the config folder's paths.local.sh (${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh):
+#
+#     CLAUDE_CHROME_PROFILE="Profile 1"     # the folder name under ~/Library/Application Support/Google/Chrome
+#
+# Every other `open` call, and a folder with no profile set, passes through unchanged.
+# CLAUDE_OPEN_REAL overrides the real binary (the self-check uses it).
+
+real=${CLAUDE_OPEN_REAL:-/usr/bin/open}
+
+if [[ -z ${CLAUDE_CHROME_PROFILE:-} ]]; then
+  f="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh"
+  [[ -r $f ]] && CLAUDE_CHROME_PROFILE=$(. "$f" >/dev/null 2>&1; print -r -- "${CLAUDE_CHROME_PROFILE:-}")
+fi
+
+chrome=0 url=0 has_args=0
+for a in "$@"; do
+  [[ $a == "Google Chrome" || $a == "Google Chrome.app" ]] && chrome=1
+  [[ $a == https://clau.de/chrome/* ]] && url=1
+  [[ $a == --args ]] && has_args=1
+done
+
+if (( chrome && url && ! has_args )) && [[ -n ${CLAUDE_CHROME_PROFILE:-} ]]; then
+  exec "$real" "$@" --args "--profile-directory=$CLAUDE_CHROME_PROFILE"
+fi
+exec "$real" "$@"

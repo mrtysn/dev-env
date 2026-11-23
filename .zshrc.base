@@ -867,6 +867,13 @@ alias python='python3'
 alias bu='brew update && brew upgrade'
 alias uall='update-all'
 alias chrome="open -a 'Google Chrome'"
+
+# Claude-in-Chrome: open the browser in this config folder's Chrome profile. Active only where
+# agents/claude/chrome-open-shim/install.sh has been run; otherwise claude runs unchanged.
+claude() {
+  local shim="$HOME/.local/share/claude-open-shim"
+  if [[ -x $shim/open ]]; then PATH="$shim:$PATH" command claude "$@"; else command claude "$@"; fi
+}
 alias zshconfig="subl $HOME/.zshrc"
 alias wifi-list='get_wifi_networks'
 
