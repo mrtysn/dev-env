@@ -481,7 +481,7 @@ _update-all-stage() {
     uv)   uv tool upgrade --all ;;
     mas)
       # Without an App Store account, mas tries the preinstalled Apple apps and the App Store
-      # opens a sign-in window (ISErrorDomain -128). Same check as import.sh step 2.
+      # opens a sign-in window (ISErrorDomain -128). Same check as import.sh step 20.
       # mas 7 upgrades through sudo ("Requires root privileges"); `mas outdated` does not. The stage
       # runs under `script`, whose pty hides whether update-all had a terminal, so update-all
       # decides that and passes UPDATE_ALL_MAS_SUDO=1 when a password prompt can be answered.

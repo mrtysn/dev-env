@@ -4,9 +4,8 @@
 #   Brewfile.<label>    this machine only, e.g. Brewfile.c02
 # An entry belongs here when every machine wants it, the work Mac included. Something only
 # one profile or one machine wants goes in its layer, and never in two files.
-# The `mas` lines at the end need an Apple ID signed in to the App Store and a terminal for the
-# sudo password (mas 7 installs as root); import.sh step 2 skips them with a message when either
-# is missing.
+# The `mas` lines at the end are installed by import.sh step 20, not step 2: they need an Apple ID
+# signed in to the App Store and a terminal for the sudo password (mas 7 installs as root).
 
 tap "localsend/localsend"       # LocalSend's own tap; the cask is not in homebrew-cask
 
@@ -101,7 +100,7 @@ cask "imageoptim"               # shrinks images
 cask "image2icon"               # icon creator
 cask "upscayl"                  # AI image upscaler
 
-# ── Mac App Store (needs an Apple ID signed in; import.sh skips these otherwise)
+# ── Mac App Store (the mas lines need an Apple ID signed in; import.sh step 20 installs them)
 # Picked 2026-11-17 from the apps in use on the home Mac
 cask "opera"                    # browser
 cask "google-chrome"            # browser

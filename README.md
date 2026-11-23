@@ -78,13 +78,15 @@ per-machine files it needs.
    `Brewfile.work` holds what every work machine wants beyond the shared file.
 3. `Brewfile.<label>`: this machine only.
 
-An entry is listed once, in the layer that owns it. The `mas` lines need an Apple ID signed in
-to the App Store: step 2 checks (macOS's Accounts database, then `mas account` where mas has it,
-otherwise it asks) and, with no Apple ID, skips every `mas` entry with a message instead of failing; re-run the step once
-signed in. They also need root: mas 7 installs through `sudo`. A shell with no terminal (an agent's) and no
-cached sudo credential cannot type the password, so step 2 skips the `mas` apps not yet installed, says so
-again at its end, and `--check` lists them as a change. Run `./import.sh --steps 2` in a terminal to install
-them; `--answer mas-signed-in=yes` alone does not.
+An entry is listed once, in the layer that owns it. The `mas` lines are installed by step 20, not
+step 2: they need an Apple ID signed in to the App Store and root (mas 7 installs through `sudo`),
+which nothing else in the bundle does, so installing App Store apps never re-checks the whole
+bundle. Step 20 installs only the listed apps not yet installed. It checks the sign-in (macOS's
+Accounts database, then `mas account` where mas has it, otherwise it asks and says why it cannot
+tell: without Full Disk Access for the terminal, macOS blocks reading that database). A shell with no
+terminal (an agent's) and no cached sudo credential cannot type the password, so step 20 skips with a
+message there; run `./import.sh --steps 20` in a terminal. mas asks for the password itself and prints
+nothing while it downloads; the step prints a command that follows the download.
 
 Only the primary profile's layer is installed, so the work Mac's personal config folder does
 not bring the personal casks with it. `export.sh` reports installed formulae and casks that no
@@ -166,8 +168,8 @@ Re-run `import.sh` after cloning cc-statusline if the folder's `paths.local.sh` 
 3. Copy `agents/claude/overlays/work.json.example` to `agents/claude/overlays/work.local.json`
    and fill in every placeholder.
 4. Run `./import.sh`. Step 2 installs `Brewfile`, `Brewfile.work` and `Brewfile.c03`. The `mas`
-   apps in `Brewfile` wait for the work Mac's own Apple ID: step 2 detects that no App Store
-   account is signed in and skips them; sign in, then re-run step 2. Step 12
+   apps in `Brewfile` wait for the work Mac's own Apple ID: step 20 skips them while no App Store
+   account is signed in; sign in, then run `./import.sh --steps 20` in a terminal. Step 12
    asks the profile of `~/.claude` (work) and offers to add a folder for the personal account
    (for example `~/.claude-personal`, personal).
 5. For each config folder, follow "Setting up a fresh config folder" (cc-statusline's
@@ -333,7 +335,7 @@ Sets up your terminal from this repo configuration.
 
 What it does:
 1. Installs Homebrew (if not present)
-2. Installs brew dependencies via `brew bundle`: `Brewfile`, `Brewfile.<primary profile>`, `Brewfile.<label>` (includes FiraCode Nerd Font)
+2. Installs brew dependencies via `brew bundle`: `Brewfile`, `Brewfile.<primary profile>`, `Brewfile.<label>` (includes FiraCode Nerd Font), all but their `mas` lines
 3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.<label>`
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
@@ -350,6 +352,8 @@ What it does:
 16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). macshot's ⇧⌘9 does nothing until macshot has been opened once and granted Screen Recording. Launch each app once before its first import: Lunar, for one, switches its own brightness mode on first launch and would overwrite what step 16 loaded. An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
 17. Sets the macOS keyboard shortcuts as recorded (`macos/symbolic-hotkeys.plist`, written by `export.sh`): on or off, and their keys, asking first
 18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; the machine's shortcuts bind F18, as c03 binds it to Show Apps), and each keyboard gets the modifier swaps `karabiner/karabiner.json` makes for it (`macos/modifier-keys.py`; applies when the keyboard reconnects or at the next login)
+19. Links `~/MY Applications` to `~/Applications` (`macos/my-applications-link.zsh`)
+20. Installs the Mac App Store apps the Brewfile layers list (`mas` lines) that are not installed yet; needs an Apple ID signed in and a terminal for the sudo password (see "Brewfile layers")
 
 `./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
 A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them. Step 3 skips a machine whose `asdf/tool-versions.<label>` is empty.
@@ -367,7 +371,7 @@ before it is replaced. `./import.sh --check` proves it without a second run (see
 asdf install, git config or `killall`; it asks nothing and opens nothing. It prints one line per
 step, `✓ step N: matches`, `✗ step N: would change <what>` or `- step N: not checked (<why>)` (such
 as iTerm2's app-level settings while iTerm2 runs), and exits 1 when any step would change. Step 2
-is `brew bundle check` per layer (the mas apps are skipped without an App Store login, and brew is
+is `brew bundle check` per layer (the mas apps are left to step 20, which lists any not installed; brew is
 kept from auto-updating, so the only network use is whatever `brew bundle check` itself does);
 step 3 compares the pins file and whether each pinned runtime is installed.
 Step 9 also reports iTerm2's tmux prefs (`OpenTmuxWindowsIn`, `AutoHideTmuxClientSession`,
@@ -394,7 +398,7 @@ refuse a call without one.
 | `claude-create-folder:<folder>`, `claude-write-settings:<folder>`, `claude-profile:<folder>` | 12 | yes/no, yes/no, profile name; `<folder>` as printed (`~/.claude-work`) |
 | `copy-window-configs`, `copy-lazygit-configs` | 13, 14 | yes/no |
 | `name-guard-pre-push` (15), `app-settings` (16), `macos-shortcuts` (17), `caps-lock-f18` and `karabiner-modifier-keys` (18) | as listed | yes/no |
-| `mas-signed-in` | 2 | yes/no; unanswered counts as signed out |
+| `mas-signed-in`, `mas-apps` | 20 | yes/no; an unanswered `mas-signed-in` counts as signed out. With no terminal, step 20 skips anyway: mas needs the sudo password typed |
 
 ## Detailed Installation Steps
 

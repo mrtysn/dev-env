@@ -218,30 +218,31 @@ BREW_LAYERS=(Brewfile)
 [[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREW_LAYERS+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
 [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && BREW_LAYERS+=("Brewfile.$BREW_LABEL")
 
-# `mas "<name>", id: <id>` lines need two things: an Apple ID signed in to the App Store, and root,
-# because mas 7 installs through sudo ("Requires root privileges" in `mas install --help`).
-# Without a login, or without a terminal to type the sudo password into (an agent's shell), the
-# lines still not installed are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) with one message
-# instead of failing nine times after the whole bundle ran. MAS_PENDING_REASON is set when
-# apps were skipped, so the step can say so again at its end and --check can report them.
-MAS_PENDING_REASON=""
-skip_mas_without_login() {
-    MAS_PENDING_REASON=""
-    local all_ids=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
-    local have=" $(command_exists mas && mas list 2>/dev/null | awk '{print $1}' | tr '\n' ' ') "
-    MAS_IDS=()
-    local id
-    for id in $all_ids; do [[ "$have" == *" $id "* ]] || MAS_IDS+=($id); done
-    (( ${#MAS_IDS} )) || return 0
+# `mas "<name>", id: <id>` lines are installed by step 20, never by step 2's brew bundle: they need
+# what nothing else in the bundle does (an Apple ID signed in, and root, since mas 7 installs
+# through sudo), and re-checking the whole bundle to get one App Store app is wasted work.
+# Step 2 and its --check pass every mas id to brew bundle's HOMEBREW_BUNDLE_MAS_SKIP.
+mas_brewfile_ids() { grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/' }
+
+# The listed mas apps not installed yet: MAS_IDS and MAS_NAMES, in Brewfile order.
+mas_pending() {
+    MAS_IDS=(); MAS_NAMES=()
+    local have=" $(command_exists mas && mas list 2>/dev/null | awk '{print $1}' | tr '\n' ' ') " line id
+    for line in "${(@f)$(grep -hE '^mas ' "${BREW_LAYERS[@]}")}"; do
+        [[ -n "$line" ]] || continue
+        id="$(sed -E 's/.*id: *([0-9]+).*/\1/' <<< "$line")"
+        [[ "$have" == *" $id "* ]] && continue
+        MAS_IDS+=($id); MAS_NAMES+=("$(sed -E 's/^mas "([^"]+)".*/\1/' <<< "$line")")
+    done
+}
+
+# Why the pending mas apps cannot be installed from this shell, or nothing when they can.
+mas_blocker() {
     if ! mas_signed_in; then
-        MAS_PENDING_REASON="no Apple ID signed in to the App Store, or the login cannot be read from this shell"
+        print "no Apple ID signed in to the App Store, or the login cannot be read from this shell"
     elif (( EUID != 0 )) && ! [[ -t 0 ]] && ! sudo -n true 2>/dev/null; then
-        MAS_PENDING_REASON="mas needs root and this shell has no terminal for the sudo password"
-    else
-        return 0
+        print "mas needs root and this shell has no terminal for the sudo password"
     fi
-    print "${YELLOW}! ${#MAS_IDS} mas app(s) skipped: $MAS_PENDING_REASON. Fix that, then re-run ./import.sh --steps 2 in a terminal.${NC}"
-    export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
 }
 
 # Step 8's installs, shared by the real run and --check (where install_file only records).
@@ -573,14 +574,13 @@ if $CHECK; then
     command_exists brew || CHECK_CHANGES+=("Homebrew (not installed)")
     check_report 1
 
-    # Step 2: brew bundle check per layer; mas apps are skipped without an App Store login
-    # (an unknown login counts as none), exactly as the real step does.
+    # Step 2: brew bundle check per layer; mas apps are left to step 20, exactly as the real step does.
     if ! command_exists brew; then
         check_skip 2 "Homebrew not installed"
     elif [ ! -f Brewfile ]; then
         check_skip 2 "Brewfile not found"
     else
-        skip_mas_without_login >/dev/null
+        export HOMEBREW_BUNDLE_MAS_SKIP="$(mas_brewfile_ids | tr '\n' ' ')"
         for layer in "${BREW_LAYERS[@]}"; do
             if ! out="$(brew bundle check --file="$layer" --verbose 2>&1)"; then
                 missing=(${(f)"$(print -r -- "$out" | sed -nE 's/^[^A-Za-z]*(.*) needs to be installed.*/\1/p')"})
@@ -593,7 +593,6 @@ if $CHECK; then
             fi
         done
         for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do CHECK_CHANGES+=("trust tap $t"); done
-        (( ${#MAS_PENDING_REASON} )) && CHECK_CHANGES+=("${#MAS_IDS} mas app(s) not installed ($MAS_PENDING_REASON)")
         unset HOMEBREW_BUNDLE_MAS_SKIP
         check_report 2
     fi
@@ -844,6 +843,15 @@ if $CHECK; then
     "$SCRIPT_DIR/macos/my-applications-link.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("~/MY Applications link")
     check_report 19
 
+    # Step 20: the listed App Store apps that are not installed (installs nothing, asks nothing)
+    if ! command_exists mas; then
+        check_skip 20 "mas not installed (step 2 installs it)"
+    else
+        mas_pending
+        (( ${#MAS_IDS} )) && CHECK_CHANGES+=("App Store apps not installed: ${(j:, :)MAS_NAMES}")
+        check_report 20
+    fi
+
     echo ""
     if (( CHECK_BAD )); then
         print "${RED}✗ import.sh would change something (nothing was written)${NC}"
@@ -882,10 +890,11 @@ echo "=== Step 2: Brew Bundle ==="
 if [ -f Brewfile ]; then
     [[ -z "$MACHINE_PRIMARY_PROFILE" ]] && print "${YELLOW}! Unknown machine — no profile or machine Brewfile, shared layer only${NC}"
     for layer in "${BREW_LAYERS[@]}"; do
-        print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask|mas) ' "$layer") entries"
+        print "${BLUE}$layer:${NC} $(grep -cE '^(brew|cask) ' "$layer") entries"
     done
     if ask_yes_no brew-bundle "Install brew dependencies (brew bundle: ${BREW_LAYERS[*]})?"; then
-        skip_mas_without_login
+        # The mas lines are step 20's.
+        export HOMEBREW_BUNDLE_MAS_SKIP="$(mas_brewfile_ids | tr '\n' ' ')"
         for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do
             print "${YELLOW}→ trusting the tap $t (listed in a Brewfile)${NC}"
             brew trust --tap "$t" || print "${RED}✗ could not trust $t: brew trust --tap $t${NC}"
@@ -905,18 +914,10 @@ for a in json.load(sys.stdin)["casks"][0].get("artifacts",[]):
             print "${YELLOW}→ $c: /Applications/${apps[1]} was installed without Homebrew, adopting it${NC}"
             brew install --cask --adopt "$c" || print "${RED}✗ could not adopt $c; remove /Applications/${apps[1]} and re-run${NC}"
         done
-        # mas installs through sudo, and its bare "Password:" comes after every other entry, so it
-        # reads as a hang unless announced here.
-        if (( ${#MAS_IDS} )) && [[ -z "$MAS_PENDING_REASON" ]] && (( EUID != 0 )) && ! sudo -n true 2>/dev/null; then
-            print "${YELLOW}→ ${#MAS_IDS} mas app(s) to install: after the other entries, mas asks for your Mac login password (sudo). Typing shows nothing.${NC}"
-            print "${YELLOW}  mas then prints nothing while it downloads (some apps are large). Follow it in another tab:${NC}"
-            print "  /usr/bin/log stream --style compact --predicate 'process == \"storedownloadd\"' | grep --line-buffered 'sending status'"
-        fi
         for layer in "${BREW_LAYERS[@]}"; do
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
         done
         unset HOMEBREW_BUNDLE_MAS_SKIP
-        (( ${#MAS_PENDING_REASON} )) && print "${YELLOW}! Step 2 is not complete: ${#MAS_IDS} mas app(s) still pending ($MAS_PENDING_REASON)${NC}"
     else
         print "${YELLOW}! Skipped brew bundle${NC}"
     fi
@@ -1690,6 +1691,44 @@ elif ask_yes_no my-applications-link "Link ~/MY Applications to ~/Applications (
     "$MYAPPS" || print "${RED}✗ could not create the link${NC}"
 else
     print "${YELLOW}! Skipped the MY Applications link${NC}"
+fi
+echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 20: Mac App Store apps (the Brewfile layers' mas lines)
+# ═══════════════════════════════════════════════════════════════════════════════
+if want_step 20; then
+echo "=== Step 20: App Store apps ==="
+if ! command_exists mas; then
+    print "${RED}✗ mas is not installed; step 2 installs it${NC}"
+else
+    mas_pending
+    if (( ! ${#MAS_IDS} )); then
+        print "${GREEN}✓ every listed App Store app is installed${NC}"
+    else
+        print "${BLUE}Not installed:${NC} ${(j:, :)MAS_NAMES}"
+        blocker="$(mas_blocker)"
+        if [[ -n "$blocker" ]]; then
+            print "${YELLOW}! Skipped ${#MAS_IDS} App Store app(s): $blocker. Fix that, then run ./import.sh --steps 20 in a terminal.${NC}"
+        elif ask_yes_no mas-apps "Install ${#MAS_IDS} App Store app(s)?"; then
+            # mas asks for the password itself, and prints nothing while it downloads.
+            (( EUID == 0 )) || sudo -n true 2>/dev/null || \
+                print "${YELLOW}→ mas asks for your Mac login password (sudo). Typing shows nothing.${NC}"
+            print "${YELLOW}  mas prints nothing while it downloads (some apps are large). Follow it in another tab:${NC}"
+            print "  /usr/bin/log stream --style compact --predicate 'process == \"storedownloadd\"' | grep --line-buffered 'sending status'"
+            # As brew bundle does: install (apps this Apple ID already has), then get (free apps it does not).
+            mas install "${MAS_IDS[@]}" || mas get "${MAS_IDS[@]}"
+            mas_pending
+            if (( ${#MAS_IDS} )); then
+                print "${RED}✗ still not installed: ${(j:, :)MAS_NAMES}${NC}"
+            else
+                print "${GREEN}✓ every listed App Store app is installed${NC}"
+            fi
+        else
+            print "${YELLOW}! Skipped the App Store apps${NC}"
+        fi
+    fi
 fi
 echo ""
 fi
