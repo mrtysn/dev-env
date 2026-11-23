@@ -81,7 +81,10 @@ per-machine files it needs.
 An entry is listed once, in the layer that owns it. The `mas` lines need an Apple ID signed in
 to the App Store: step 2 checks (macOS's Accounts database, then `mas account` where mas has it,
 otherwise it asks) and, with no Apple ID, skips every `mas` entry with a message instead of failing; re-run the step once
-signed in.
+signed in. They also need root: mas 7 installs through `sudo`. A shell with no terminal (an agent's) and no
+cached sudo credential cannot type the password, so step 2 skips the `mas` apps not yet installed, says so
+again at its end, and `--check` lists them as a change. Run `./import.sh --steps 2` in a terminal to install
+them; `--answer mas-signed-in=yes` alone does not.
 
 Only the primary profile's layer is installed, so the work Mac's personal config folder does
 not bring the personal casks with it. `export.sh` reports installed formulae and casks that no

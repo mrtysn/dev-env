@@ -211,14 +211,30 @@ BREW_LAYERS=(Brewfile)
 [[ -n "$MACHINE_PRIMARY_PROFILE" && -f "Brewfile.$MACHINE_PRIMARY_PROFILE" ]] && BREW_LAYERS+=("Brewfile.$MACHINE_PRIMARY_PROFILE")
 [[ -n "$BREW_LABEL" && -f "Brewfile.$BREW_LABEL" ]] && BREW_LAYERS+=("Brewfile.$BREW_LABEL")
 
-# `mas "<name>", id: <id>` lines need an Apple ID signed in to the App Store. Without
-# one they are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) instead of failing.
+# `mas "<name>", id: <id>` lines need two things: an Apple ID signed in to the App Store, and root,
+# because mas 7 installs through sudo ("Requires root privileges" in `mas install --help`).
+# Without a login, or without a terminal to type the sudo password into (an agent's shell), the
+# lines still not installed are skipped (brew bundle's HOMEBREW_BUNDLE_MAS_SKIP) with one message
+# instead of failing nine times after the whole bundle ran. MAS_PENDING_REASON is set when
+# apps were skipped, so the step can say so again at its end and --check can report them.
+MAS_PENDING_REASON=""
 skip_mas_without_login() {
-    MAS_IDS=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
-    if (( ${#MAS_IDS} )) && ! mas_signed_in; then
-        print "${YELLOW}! No Apple ID signed in to the App Store: skipping ${#MAS_IDS} mas app(s). Sign in, then re-run this step.${NC}"
-        export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
+    MAS_PENDING_REASON=""
+    local all_ids=($(grep -hE '^mas ' "${BREW_LAYERS[@]}" | sed -E 's/.*id: *([0-9]+).*/\1/'))
+    local have=" $(command_exists mas && mas list 2>/dev/null | awk '{print $1}' | tr '\n' ' ') "
+    MAS_IDS=()
+    local id
+    for id in $all_ids; do [[ "$have" == *" $id "* ]] || MAS_IDS+=($id); done
+    (( ${#MAS_IDS} )) || return 0
+    if ! mas_signed_in; then
+        MAS_PENDING_REASON="no Apple ID signed in to the App Store, or the login cannot be read from this shell"
+    elif (( EUID != 0 )) && ! [[ -t 0 ]] && ! sudo -n true 2>/dev/null; then
+        MAS_PENDING_REASON="mas needs root and this shell has no terminal for the sudo password"
+    else
+        return 0
     fi
+    print "${YELLOW}! ${#MAS_IDS} mas app(s) skipped: $MAS_PENDING_REASON. Fix that, then re-run ./import.sh --steps 2 in a terminal.${NC}"
+    export HOMEBREW_BUNDLE_MAS_SKIP="${MAS_IDS[*]}"
 }
 
 # Step 8's installs, shared by the real run and --check (where install_file only records).
@@ -570,6 +586,7 @@ if $CHECK; then
             fi
         done
         for t in $(untrusted_taps "${BREW_LAYERS[@]}"); do CHECK_CHANGES+=("trust tap $t"); done
+        (( ${#MAS_PENDING_REASON} )) && CHECK_CHANGES+=("${#MAS_IDS} mas app(s) not installed ($MAS_PENDING_REASON)")
         unset HOMEBREW_BUNDLE_MAS_SKIP
         check_report 2
     fi
@@ -885,6 +902,7 @@ for a in json.load(sys.stdin)["casks"][0].get("artifacts",[]):
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
         done
         unset HOMEBREW_BUNDLE_MAS_SKIP
+        (( ${#MAS_PENDING_REASON} )) && print "${YELLOW}! Step 2 is not complete: ${#MAS_IDS} mas app(s) still pending ($MAS_PENDING_REASON)${NC}"
     else
         print "${YELLOW}! Skipped brew bundle${NC}"
     fi

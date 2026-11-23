@@ -4,8 +4,9 @@
 #   Brewfile.<label>    this machine only, e.g. Brewfile.c02
 # An entry belongs here when every machine wants it, the work Mac included. Something only
 # one profile or one machine wants goes in its layer, and never in two files.
-# The `mas` lines at the end need an Apple ID signed in to the App Store; import.sh step 2
-# skips them with a message when none is.
+# The `mas` lines at the end need an Apple ID signed in to the App Store and a terminal for the
+# sudo password (mas 7 installs as root); import.sh step 2 skips them with a message when either
+# is missing.
 
 tap "localsend/localsend"       # LocalSend's own tap; the cask is not in homebrew-cask
 
