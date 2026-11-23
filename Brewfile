@@ -89,7 +89,8 @@ cask "foxitreader"              # PDF reader
 cask "syntax-highlight"         # Quick Look for source files
 cask "iina"                     # media player
 cask "vlc"                      # media player
-cask "kap"                      # screen recorder
+cask "kap"                      # screen recorder; 3.6.0's helpers are Intel-only, so it fails with error -86 without Rosetta (macOS 27 removes it)
+brew "gifski"                   # .mov to GIF, native (pulls in ffmpeg): `gifski --fps 15 --width 960 -o out.gif in.mov` after a ⌘⇧5 recording
 cask "gimp"                     # image editor
 cask "krita"                    # painting
 cask "inkscape"                 # vector graphics
