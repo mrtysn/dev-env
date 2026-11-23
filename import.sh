@@ -902,6 +902,8 @@ for a in json.load(sys.stdin)["casks"][0].get("artifacts",[]):
         # reads as a hang unless announced here.
         if (( ${#MAS_IDS} )) && [[ -z "$MAS_PENDING_REASON" ]] && (( EUID != 0 )) && ! sudo -n true 2>/dev/null; then
             print "${YELLOW}→ ${#MAS_IDS} mas app(s) to install: after the other entries, mas asks for your Mac login password (sudo). Typing shows nothing.${NC}"
+            print "${YELLOW}  mas then prints nothing while it downloads (some apps are large). Follow it in another tab:${NC}"
+            print "  /usr/bin/log stream --style compact --predicate 'process == \"storedownloadd\"' | grep --line-buffered 'sending status'"
         fi
         for layer in "${BREW_LAYERS[@]}"; do
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
