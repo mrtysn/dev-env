@@ -816,6 +816,10 @@ if $CHECK; then
         check_report 18
     fi
 
+    # Step 19
+    "$SCRIPT_DIR/macos/my-applications-link.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("~/MY Applications link")
+    check_report 19
+
     echo ""
     if (( CHECK_BAD )); then
         print "${RED}✗ import.sh would change something (nothing was written)${NC}"
@@ -1638,6 +1642,22 @@ else
             print "${YELLOW}! Skipped modifier keys${NC}"
         fi
     fi
+fi
+echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 19: ~/MY Applications link (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+if want_step 19; then
+echo "=== Step 19: MY Applications link ==="
+MYAPPS="$SCRIPT_DIR/macos/my-applications-link.zsh"
+if "$MYAPPS" --check >/dev/null 2>&1; then
+    print "${GREEN}✓ ~/MY Applications already links to ~/Applications${NC}"
+elif ask_yes_no my-applications-link "Link ~/MY Applications to ~/Applications (for a second Applications entry in Finder's sidebar)?"; then
+    "$MYAPPS" || print "${RED}✗ could not create the link${NC}"
+else
+    print "${YELLOW}! Skipped the MY Applications link${NC}"
 fi
 echo ""
 fi
