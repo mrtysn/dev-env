@@ -898,6 +898,11 @@ for a in json.load(sys.stdin)["casks"][0].get("artifacts",[]):
             print "${YELLOW}→ $c: /Applications/${apps[1]} was installed without Homebrew, adopting it${NC}"
             brew install --cask --adopt "$c" || print "${RED}✗ could not adopt $c; remove /Applications/${apps[1]} and re-run${NC}"
         done
+        # mas installs through sudo, and its bare "Password:" comes after every other entry, so it
+        # reads as a hang unless announced here.
+        if (( ${#MAS_IDS} )) && [[ -z "$MAS_PENDING_REASON" ]] && (( EUID != 0 )) && ! sudo -n true 2>/dev/null; then
+            print "${YELLOW}→ ${#MAS_IDS} mas app(s) to install: after the other entries, mas asks for your Mac login password (sudo). Typing shows nothing.${NC}"
+        fi
         for layer in "${BREW_LAYERS[@]}"; do
             brew bundle --file="$layer" || print "${RED}✗ some $layer entries failed${NC}"
         done
