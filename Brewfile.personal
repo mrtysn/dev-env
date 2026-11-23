@@ -4,6 +4,10 @@ cask "karabiner-elements"       # keymaps (karabiner/karabiner.json synced; inst
 cask "phoenix"                  # window manager (.phoenix.js synced; needs Accessibility)
 cask "sourcetree"               # repo-tabs st mode
 
+# Kept off work machines (moved from the shared Brewfile 2026-11-23)
+brew "syncthing"                # continuous file synchronisation
+cask "rustdesk"                 # remote desktop
+
 # Picked 2026-11-17: games, media, VPNs, VMs and personal tooling
 cask "mullvad-vpn"
 cask "protonvpn"

@@ -26,7 +26,6 @@ brew "wifi-password"            # shows the current Wi-Fi password
 brew "blueutil"                 # Bluetooth power and discoverable state from the shell
 brew "baobab"                   # disk usage analyzer
 brew "sleepwatcher"             # runs a script on sleep, wake and idle
-brew "syncthing"                # continuous file synchronisation
 
 # ── Development
 brew "asdf"                     # runtime version manager (see asdf/tool-versions)
@@ -82,7 +81,6 @@ cask "whatsapp"                 # WhatsApp
 cask "zoom"                     # meetings
 cask "spotify"                  # music
 cask "localsend"                # AirDrop-like file sending (tap above)
-cask "rustdesk"                 # remote desktop
 
 # ── Files, images and media
 cask "keka"                     # file archiver
