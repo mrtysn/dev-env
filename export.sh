@@ -308,6 +308,12 @@ else:
         name = profile.get("Name", "Unknown")
         if name in AUTO_CREATED_PROFILES:
             continue
+        # A dynamic profile is one import.sh installed from this repo: iTerm2 lists it among the saved ones,
+        # filled out with every default and its file's absolute path. Exporting it would copy the repo onto
+        # itself, bloated and with this machine's home folder in a public file.
+        if profile.get("Is Dynamic Profile") or "Dynamic Profile Filename" in profile:
+            print(f"  - {name}: dynamic profile installed from this repo, not exported")
+            continue
         filename = name_to_filename(name)
 
         # Distinct profile names can collapse to one filename (lowercase + hyphenate).
@@ -332,7 +338,9 @@ else:
                 continue
             if profile.get("Guid") not in old_guids:
                 print(f"  ! {filename} holds a different profile (another Guid) than this machine's '{name}': "
-                      f"not overwriting it. Rename one of the two profiles, or move the file aside", file=sys.stderr)
+                      f"not overwriting it. Rename one of the two profiles, or move the file aside. If it is "
+                      f"iTerm2's stock profile, import.sh --check names it and import.sh step 9 offers to remove it",
+                      file=sys.stderr)
                 failed = True
                 continue
         written[profile.get("Guid")] = filename
@@ -527,8 +535,13 @@ fi
 # Absolute home paths in exported files break the repo on any other machine (and leak
 # the layout). The live files are the source, so say which one to fix.
 echo "✓ Checking exports for hardcoded home paths"
-for f in ".zshrc.$ZSH_LABEL" agents/claude/settings.json agents/claude/overlays/*.json(N); do
+# Every file the export writes, not only the hand-edited ones: an app or iTerm2 can store a path itself.
+for f in .zshrc.base .zshrc.loader ".zshrc.$ZSH_LABEL" ".zshrc.combined.$ZSH_LABEL" .p10k.zsh plugins.list \
+         iterm-profiles/*.json(N) iterm-settings.json .phoenix.js karabiner/karabiner.json tmux/*.conf(N) \
+         lazygit/**/*(N.) repo-tabs/**/*(N.) asdf/*(N.) app-settings/**/*(N.) macos/*.plist(N) \
+         agents/claude/settings.json agents/claude/overlays/*.json(N); do
     [[ -f "$f" ]] || continue
+    [[ "$f" == agents/claude/overlays/*.local.json ]] && continue
     if grep -qF "$HOME/" "$f"; then
         warn "$f contains $HOME/ — fix the live source (use \$HOME) before committing"
     fi
