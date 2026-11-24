@@ -50,7 +50,7 @@ def macos_major():
 
 
 MACOS = ""  # this Mac's major version, set in main
-META = {"_machine", "_macos"}  # the record's own keys; Finder's real keys may start with _ too
+META = {"_machine", "_macos", "_not_set"}  # the record's own keys; Finder's real keys may start with _ too
 
 
 def say(colour, text):
@@ -197,6 +197,8 @@ class Record:
         want = self.shared(d)
         if label and label != self.owner(d):
             want.update(self.overlay(d, label))
+            for k in load(self.overlay_path(d, label)).get("_not_set", []):
+                want.pop(k, None)
         return present_tiles(d, want)
 
 
@@ -263,16 +265,21 @@ def export(domains, store, rec, label):
         except Unreadable as e:
             say(RED, f"✗ {d['name']}: {e}, not exported")
             continue
-        if not live:
-            continue
         owner = rec.owner(d)
         if not os.path.exists(rec.shared_path(d)) or not owner or owner == label:
+            if not live:
+                continue
             if write_if_changed(rec.shared_path(d), dict(live, _machine=label or "unknown", _macos=MACOS)):
                 changed += 1
                 say(GREEN, f"✓ exported {d['name']} ({len(live)} keys)")
             continue
         base = present_tiles(d, rec.shared(d))[0]  # a tile for an app this Mac lacks is not a difference
         diff = {k: v for k, v in live.items() if base.get(k) != v}
+        # A shared key this Mac has never written stays unset here, rather than taking the owner's value:
+        # a default left alone, or a key this Mac's macOS no longer reads.
+        not_set = sorted(k for k in base if k not in live)
+        if not_set:
+            diff["_not_set"] = not_set
         path = rec.overlay_path(d, label)
         if not diff:
             if os.path.exists(path):
@@ -282,7 +289,8 @@ def export(domains, store, rec, label):
             continue
         if write_if_changed(path, dict(diff, _macos=MACOS)):
             changed += 1
-            say(GREEN, f"✓ exported {d['name']}: {len(diff)} keys where {label} differs")
+            say(GREEN, f"✓ exported {d['name']}: {len(diff) - bool(not_set)} keys where {label} differs"
+                       + (f", {len(not_set)} it leaves unset" if not_set else ""))
     if not changed:
         say(GREEN, "✓ macOS settings already match the repo")
     return 0
@@ -302,7 +310,7 @@ def warn_versions(domains, rec, label):
 
 
 def import_(domains, store, rec, label):
-    restart, bad, total = set(), 0, 0
+    restart, bad, total, written = set(), 0, 0, []
     backup = ""
     warn_versions(domains, rec, label)
     for d in domains:
@@ -335,6 +343,8 @@ def import_(domains, store, rec, label):
         total += len(todo)
         say(GREEN, f"✓ {d['name']}: set {', '.join(sorted(todo))}")
         restart.update(d.get("restart", []))
+        if d.get("restart"):
+            written.append(d)
     if not total and not bad:
         say(GREEN, "✓ macOS settings already match the repo")
     if backup:
@@ -344,8 +354,35 @@ def import_(domains, store, rec, label):
             subprocess.run(["killall", proc], capture_output=True)
         if os.access(ACTIVATE, os.X_OK):
             subprocess.run([ACTIVATE, "-u"], capture_output=True)
+        else:
+            say(YELLOW, f"! {ACTIVATE} is missing: some changes apply only at the next login")
+        settle(sorted(restart))
         print(f"  restarted {', '.join(sorted(restart))}; trackpad, mouse and input source changes "
               "take full effect at the next login")
+        bad |= recheck(written, store, rec, label)
+    return bad
+
+
+def settle(procs, timeout=20):
+    """Wait until each restarted process runs again, then a little longer for it to write its prefs."""
+    end = time.time() + timeout
+    for proc in procs:
+        while time.time() < end and subprocess.run(["pgrep", "-xq", proc]).returncode != 0:
+            time.sleep(0.5)
+        if subprocess.run(["pgrep", "-xq", proc]).returncode != 0:
+            say(YELLOW, f"! {proc} has not come back after {timeout}s")
+    time.sleep(3)
+
+
+def recheck(written, store, rec, label):
+    """Name the values a restarted process wrote back over the import (exit 1 if any)."""
+    bad = 0
+    for d in written:
+        left = differing(d, store, rec, label)[1]
+        if left:
+            bad = 1
+            say(RED, f"✗ {d['name']}: changed back after the restart: {', '.join(sorted(left))}. "
+                     "This macOS may not accept the recorded value; export here to record what it keeps.")
     return bad
 
 

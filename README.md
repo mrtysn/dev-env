@@ -254,8 +254,10 @@ the domain's other keys stay.
 Order matters on a Mac that has settings of its own. Export there before its first import, and
 everything it does differently becomes its `<name>.<label>.plist`, which import then keeps. Import
 first, and the shared record replaces them (the backup folder keeps the old values); a setting
-changed afterwards and exported is recorded in the overlay. An overlay cannot unset a key: a key
-the shared record holds is always applied.
+changed afterwards and exported is recorded in the overlay. A shared key the machine has never
+written goes into its overlay's `_not_set` list, and import leaves it alone there: a default the
+machine kept, or a key its macOS no longer reads. After restarting Finder, the Dock and the menu
+bar, import reads their settings again and names any value they wrote back.
 Not carried, since macOS keeps them per machine or out of reach: the Finder sidebar, privacy
 grants, displays, login items. `macos/test-system-settings.zsh` tests it on files in a sandbox.
 

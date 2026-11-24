@@ -105,5 +105,19 @@ run export --dir $other --label c03 >/dev/null
 out=$(run check --dir $other --label c02)
 [[ $out != *NotAllowlisted* ]] && ok || bad "a key outside the allowlist is wanted: $out"
 
+# A machine that never wrote a shared key records it as not set, and its import leaves it out.
+third=$tmp/third; mkdir -p $third
+defaults write $third/finder.plist ShowPathbar -bool true
+out=$(run export --dir $third --label c04)
+[[ $out == *"finder: "*"it leaves unset"* ]] && ok || bad "export did not record unset keys: $out"
+ns=$(plutil -p $rec/finder.c04.plist)
+[[ $ns == *_not_set*ShowStatusBar* && $ns == *NewWindowTargetPath* ]] && ok || bad "_not_set misses keys: $ns"
+out=$(run import --dir $third --label c04)
+[[ $(defaults read $third/finder.plist ShowStatusBar 2>&1) == *"does not exist"* ]] && ok || bad "an unset key was imported: $out"
+run check --dir $third --label c04 >/dev/null && ok || bad "check wants an unset key"
+fourth=$tmp/fourth; mkdir -p $fourth
+run import --dir $fourth --label c02 >/dev/null
+[[ $(defaults read $fourth/finder.plist ShowStatusBar) == 1 ]] && ok || bad "c04's unset list leaked into c02's import"
+
 print "system-settings: $pass passed, $fail failed"
 (( fail == 0 ))
