@@ -1702,7 +1702,8 @@ if want_step 18; then
 echo "=== Step 18: Keyboard without Karabiner ==="
 # Karabiner-Elements (personal profile) maps the keys itself. Elsewhere macOS's own settings do:
 # a login agent maps Caps Lock to F18 with hidutil (the machine's shortcuts, step 17, bind F18),
-# and each keyboard gets the modifier swaps karabiner/karabiner.json makes for it.
+# and each external keyboard karabiner/karabiner.json names gets its modifier swaps and Karabiner's
+# F-key media mappings (F1-F12 as brightness, Mission Control, play/pause, volume...).
 CAPSLOCK="$SCRIPT_DIR/macos/capslock-to-f18.zsh"
 MODKEYS="$SCRIPT_DIR/macos/modifier-keys.py"
 if [[ -d /Applications/Karabiner-Elements.app ]]; then
@@ -1716,13 +1717,13 @@ else
         print "${YELLOW}! Skipped Caps Lock to F18${NC}"
     fi
     if "$MODKEYS" check >/dev/null 2>&1; then
-        print "${GREEN}✓ modifier keys already match Karabiner's config${NC}"
+        print "${GREEN}✓ keyboard mappings already match Karabiner's config${NC}"
     else
         "$MODKEYS" check | sed 's/^/  /'
-        if ask_yes_no karabiner-modifier-keys "Set these keyboards' modifier keys as Karabiner's config has them?"; then
-            "$MODKEYS" import || print "${RED}✗ some modifier keys still differ${NC}"
+        if ask_yes_no karabiner-modifier-keys "Set these keyboards' modifier keys and F-key media keys as Karabiner's config has them?"; then
+            "$MODKEYS" import || print "${RED}✗ some keyboard mappings still differ${NC}"
         else
-            print "${YELLOW}! Skipped modifier keys${NC}"
+            print "${YELLOW}! Skipped keyboard mappings${NC}"
         fi
     fi
 fi
