@@ -832,10 +832,30 @@ update-all() {
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
   local mas_sudo=0
   { (( EUID == 0 )) || [[ -t 0 ]] || sudo -n true 2>/dev/null } && mas_sudo=1
-  local stage_env="$(typeset -f _mas-signed-in _update-all-mas-upgrade _update-all-stage_update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
-    _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
-    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
-    _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
+  # Functions the stage subshells need, copied in by `typeset -f`. typeset skips a name that is
+  # not defined without failing, so a typo here (two names run together) used to surface only as
+  # every stage dying with 127. Every required name must be defined before any stage starts;
+  # the optional ones come from the omz autoupdate plugin, whose absence skips omz-plugins.
+  local -a stage_fns=(
+    _mas-signed-in _update-all-mas-upgrade _update-all-stage _update-all-brew-upgrade
+    _update-all-manual-update-steps _update-all-upgrade-manual-update-casks
+    _update-all-spicetify-reapply _update-all-local-builds
+    _pnpm-migrate-globals _pnpm-global-manifests _pnpm-shims-broken _pnpm-fix-shims
+    _happy-daemon-refresh _unquarantine-notarized-casks
+    _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins
+    _update-all-custom-heads
+  )
+  local -a optional_stage_fns=(_upgrade_custom_plugin upgrade_oh_my_zsh_custom)
+  local fn
+  local -a missing_fns=()
+  for fn in $stage_fns; do (( $+functions[$fn] )) || missing_fns+=($fn); done
+  if (( $#missing_fns )); then
+    print -u2 "update-all: not defined, so no stage can run: ${(j:, :)missing_fns}"
+    print -u2 "  Check the stage_fns list in update-all (~/.zshrc.base) for a typo, then open a new shell."
+    return 1
+  fi
+  for fn in $optional_stage_fns; do (( $+functions[$fn] )) && stage_fns+=($fn); done
+  local stage_env="$(typeset -f $stage_fns)"
 
   # Slow network lookups no stage depends on run alongside the updates.
   softwareupdate -l 2>&1 | sed -n 's/^\* Label: //p' > "$run_dir/report-softwareupdate.txt" &
