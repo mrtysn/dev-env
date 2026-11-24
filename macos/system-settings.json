@@ -61,7 +61,7 @@
       "name": "control-center",
       "domain": "com.apple.controlcenter",
       "restart": ["ControlCenter"],
-      "keys": "NSStatusItem Visible (?!Item-)\\w+"
+      "keys": "NSStatusItem Visible (?!Item-|AudioVideoModule$)\\w+"
     },
     {
       "name": "control-center-host",
