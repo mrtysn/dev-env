@@ -10,11 +10,22 @@ writes to a running app (it would overwrite the change when it quits): it names 
 quit and moves on. Export refuses any carried value that holds the home folder's path or an
 email address, since this repo is public.
 
-Options: --home DIR (default: $HOME), --ignore-running (tests, where HOME is a sandbox).
+Per machine: the machine apps.json names as "owner" writes the shared copies. Any other machine
+(--label, from machine-label.sh) writes only where it differs: <app>.<label>.plist with the
+differing keys, and for a whole file <stem>.<label><ext> holding the differing keys of a JSON
+settings file, or the whole file when it is not one (a keymap). Import lays a machine's overlay
+over the shared copy, on that machine only.
+
+Options: --label LABEL (this machine's label), --home DIR (default: $HOME), --ignore-running
+(tests, where HOME is a sandbox), --repo DIR and --apps FILE (tests: where the records and the
+app list live, default this folder).
 """
 import json, os, plistlib, re, shutil, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = HERE                                 # where the records live (--repo)
+APPS = os.path.join(HERE, "apps.json")      # --apps
+LABEL = OWNER = ""                          # this machine's label (--label); the shared copies' machine
 GREEN, YELLOW, RED, NC = "\033[0;32m", "\033[1;33m", "\033[0;31m", "\033[0m"
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
@@ -24,8 +35,136 @@ def say(colour, text):
 
 
 def load_apps():
-    with open(os.path.join(HERE, "apps.json")) as f:
-        return json.load(f)["apps"]
+    global OWNER
+    with open(APPS) as f:
+        cfg = json.load(f)
+    OWNER = cfg.get("owner", "")
+    return cfg["apps"]
+
+
+def overlaid():
+    """Whether this machine keeps its differences in overlays rather than in the shared copies."""
+    return bool(LABEL) and LABEL != OWNER
+
+
+def plist_overlay_path(a):
+    return os.path.join(REPO, f"{a['name']}.{LABEL}.plist")
+
+
+def file_overlay_path(a, fn):
+    stem, ext = os.path.splitext(fn)
+    return os.path.join(REPO, a["name"], f"{stem}.{LABEL}{ext}")
+
+
+def parse_loose(data):
+    """A Sublime-style JSON file (comments and trailing commas allowed) as data; None if it is not one."""
+    try:
+        text = data.decode()
+    except UnicodeDecodeError:
+        return None
+    out, i, n, in_str = [], 0, len(text), False
+    while i < n:
+        c = text[i]
+        if in_str:
+            out.append(c)
+            if c == "\\" and i + 1 < n:
+                out.append(text[i + 1])
+                i += 2
+                continue
+            in_str = c != '"'
+            i += 1
+            continue
+        if c == '"':
+            in_str = True
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+            continue
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            i = n if j < 0 else j + 2
+            continue
+        elif c == ",":
+            j = i + 1
+            while j < n:  # past blanks and comments
+                if text[j] in " \t\r\n":
+                    j += 1
+                elif text.startswith("//", j):
+                    k = text.find("\n", j)
+                    j = n if k < 0 else k
+                elif text.startswith("/*", j):
+                    k = text.find("*/", j + 2)
+                    j = n if k < 0 else k + 2
+                else:
+                    break
+            if j < n and text[j] in "}]":  # a trailing comma
+                i += 1
+                continue
+        out.append(c)
+        i += 1
+    try:
+        return json.loads("".join(out))
+    except ValueError:
+        return None
+
+
+def read_bytes(path):
+    if not os.path.exists(path):
+        return None
+    with open(path, "rb") as f:
+        return f.read()
+
+
+def file_want(a, fn):
+    """What this machine should hold for a carried file: ("bytes", data) or ("data", dict); None if the
+    repo has no copy."""
+    shared = read_bytes(os.path.join(REPO, a["name"], fn))
+    if shared is None:
+        return None
+    if overlaid():
+        mine = read_bytes(file_overlay_path(a, fn))
+        if mine is not None:
+            base, patch = parse_loose(shared), parse_loose(mine)
+            if isinstance(base, dict) and isinstance(patch, dict):
+                base.update(patch)
+                return ("data", base)
+            return ("bytes", mine)
+    return ("bytes", shared)
+
+
+def file_matches(want, have):
+    """A file matches when its bytes are the same, or both are JSON settings holding the same values."""
+    if have is None:
+        return False
+    kind, value = want
+    if kind == "bytes" and have == value:
+        return True
+    if kind == "bytes":
+        value = parse_loose(value)
+        if value is None:
+            return False
+    return parse_loose(have) == value
+
+
+def plist_want(a):
+    """The shared keys with this machine's overlay laid over them."""
+    want = {}
+    shared = os.path.join(REPO, f"{a['name']}.plist")
+    if os.path.exists(shared):
+        with open(shared, "rb") as f:
+            want = plistlib.load(f)
+    if overlaid() and os.path.exists(plist_overlay_path(a)):
+        with open(plist_overlay_path(a), "rb") as f:
+            want.update(plistlib.load(f))
+    return want
+
+
+def remove_overlay(path, what):
+    if not os.path.exists(path):
+        return 0
+    os.remove(path)
+    say(GREEN, f"✓ {what}: {LABEL} matches the shared copy now, removed its overlay")
+    return 1
 
 
 def wrong_file(a):
@@ -130,7 +269,11 @@ def export(apps, home):
                 if home.encode() in data or EMAIL.search(data.decode("utf-8", "replace")):
                     say(RED, f"✗ {name}/{fn} holds a home path or an address: not exported, fix the live file")
                     continue
-                if write_if_changed(os.path.join(HERE, name, fn), data):
+                shared_path = os.path.join(REPO, name, fn)
+                if overlaid() and os.path.exists(shared_path):
+                    changed += export_file_overlay(a, fn, read_bytes(shared_path), data)
+                    continue
+                if write_if_changed(shared_path, data):
                     changed += 1
                     say(GREEN, f"✓ exported {name}/{fn}")
             continue
@@ -149,7 +292,22 @@ def export(apps, home):
                 continue
             kept[k] = v
         # Keep the repo's copy of a value that is only reordered, so an export writes nothing.
-        repo_file = os.path.join(HERE, f"{name}.plist")
+        repo_file = os.path.join(REPO, f"{name}.plist")
+        if overlaid() and os.path.exists(repo_file):
+            with open(repo_file, "rb") as f:
+                stored = plistlib.load(f)
+            diff = {k: v for k, v in kept.items() if not same(stored.get(k), v)}
+            path = plist_overlay_path(a)
+            if os.path.exists(path):  # keep a reordered value as stored, as for the shared copy
+                with open(path, "rb") as f:
+                    before = plistlib.load(f)
+                diff = {k: before[k] if k in before and same(before[k], v) else v for k, v in diff.items()}
+            if not diff:
+                changed += remove_overlay(path, name)
+            elif write_if_changed(path, plistlib.dumps(diff, fmt=plistlib.FMT_XML, sort_keys=True)):
+                changed += 1
+                say(GREEN, f"✓ exported {name}: {len(diff)} keys where {LABEL} differs")
+            continue
         if os.path.exists(repo_file):
             with open(repo_file, "rb") as f:
                 stored = plistlib.load(f)
@@ -157,12 +315,35 @@ def export(apps, home):
                 if k in stored and same(stored[k], v):
                     kept[k] = stored[k]
         data = plistlib.dumps(kept, fmt=plistlib.FMT_XML, sort_keys=True)
-        if write_if_changed(os.path.join(HERE, f"{name}.plist"), data):
+        if write_if_changed(repo_file, data):
             changed += 1
             say(GREEN, f"✓ exported {name} ({len(kept)} keys)")
     if not changed:
         say(GREEN, "✓ app settings already match the repo")
     return 0
+
+
+def export_file_overlay(a, fn, shared, live):
+    """Write this machine's difference from a shared file; returns 1 when the repo changed."""
+    what, path = f"{a['name']}/{fn}", file_overlay_path(a, fn)
+    if file_matches(("bytes", shared), live):
+        return remove_overlay(path, what)
+    base, mine = parse_loose(shared), parse_loose(live)
+    if isinstance(base, dict) and isinstance(mine, dict):
+        diff = {k: v for k, v in mine.items() if base.get(k) != v}
+        gone = sorted(k for k in base if k not in mine)
+        if gone:
+            say(YELLOW, f"! {what}: {LABEL} lacks {', '.join(gone)}; an overlay only sets keys, so import "
+                        "brings them back. Set them here instead of deleting them")
+        if not diff:
+            return remove_overlay(path, what)
+        data, detail = (json.dumps(diff, indent=4, sort_keys=True) + "\n").encode(), f"{len(diff)} keys"
+    else:
+        data, detail = live, "the whole file"
+    if not write_if_changed(path, data):
+        return 0
+    say(GREEN, f"✓ exported {what}: {detail} where {LABEL} differs")
+    return 1
 
 
 def status(a, home):
@@ -172,21 +353,13 @@ def status(a, home):
     if "files" in a:
         diff = []
         for fn in a["files"]:
-            repo = os.path.join(HERE, a["name"], fn)
-            if not os.path.exists(repo):
-                continue
-            live = os.path.join(home, a["dir"], fn)
-            with open(repo, "rb") as f:
-                want = f.read()
-            have = open(live, "rb").read() if os.path.exists(live) else None
-            if have != want:
+            want = file_want(a, fn)
+            if want is not None and not file_matches(want, read_bytes(os.path.join(home, a["dir"], fn))):
                 diff.append(fn)
         return ("differs", diff) if diff else ("match", None)
-    repo = os.path.join(HERE, f"{a['name']}.plist")
-    if not os.path.exists(repo):
+    want = plist_want(a)
+    if not want:
         return "match", None
-    with open(repo, "rb") as f:
-        want = plistlib.load(f)
     have = read_plist(os.path.join(home, a["file"]))
     diff = sorted(k for k, v in want.items() if not same(have.get(k), v))
     return ("differs", diff) if diff else ("match", None)
@@ -237,12 +410,14 @@ def load(a, home, diff):
             os.makedirs(os.path.dirname(live), exist_ok=True)
             if os.path.exists(live):
                 shutil.copy2(live, f"{live}.backup-{stamp}")
-            shutil.copyfile(os.path.join(HERE, name, fn), live)
+            kind, value = file_want(a, fn)
+            data = value if kind == "bytes" else (json.dumps(value, indent=4, sort_keys=True) + "\n").encode()
+            with open(live, "wb") as f:
+                f.write(data)
         say(GREEN, f"✓ {name}: loaded {', '.join(diff)}")
         return
     path = os.path.join(home, a["file"])
-    with open(os.path.join(HERE, f"{name}.plist"), "rb") as f:
-        want = plistlib.load(f)
+    want = plist_want(a)
     merged = read_plist(path)
     merged.update(want)
     os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -281,7 +456,13 @@ def main(argv):
     if not argv or argv[0] not in ("export", "import", "check"):
         print(__doc__.strip(), file=sys.stderr)
         return 2
+    global REPO, APPS, LABEL
     home = os.path.expanduser("~")
+    def opt(name):
+        return argv[argv.index(name) + 1] if name in argv and argv.index(name) + 1 < len(argv) else None
+    REPO = os.path.realpath(opt("--repo") or REPO)
+    APPS = opt("--apps") or APPS
+    LABEL = opt("--label") or ""
     if "--home" in argv:
         home = os.path.realpath(argv[argv.index("--home") + 1])  # defaults treats /var and /private/var as two files
     apps, refused = [], 0

@@ -266,14 +266,22 @@ grants, displays, login items. `macos/test-system-settings.zsh` tests it on file
 also hold locations, licence data, device IDs and window positions, which a list of keys to
 drop would miss. Sublime Text carries its `Packages/User` settings files instead of keys.
 
-    app-settings/app-settings.py export   # this machine's allowlisted settings into app-settings/
-    app-settings/app-settings.py import   # into this machine, for installed apps (import.sh step 16)
-    app-settings/app-settings.py check    # per app: matches or differs
+    app-settings/app-settings.py export --label c02   # this machine's allowlisted settings into app-settings/
+    app-settings/app-settings.py import --label c02   # into this machine, for installed apps (import.sh step 16)
+    app-settings/app-settings.py check  --label c02   # per app: matches or differs
+
+Per machine as with the macOS settings: the machine `apps.json` names as `owner` (c02) writes the
+shared copies; any other machine exports only where it differs, to `<app>.<label>.plist` for a
+plist app, and for a file to `<app>/<stem>.<label><ext>`: the differing keys of a JSON settings
+file (`Preferences.c03.sublime-settings` holds only `font_size`), or the whole file when it is not
+one (a keymap). Import lays a machine's overlay over the shared copy on that machine only, and an
+export that finds the machine matching again removes its overlay. An overlay only sets keys: a
+key deleted on one machine comes back on import, and export says so.
 
 Both directions write only what differs, so re-runs change nothing. Import skips a running app
 (it would write its old values back on quit) and says to quit it first. Export refuses a value
 that holds the home folder's path or an email address. `export.sh` runs the export;
-`app-settings/test-app-settings.zsh` imports into an empty home twice and checks the second run
+`app-settings/test-app-settings.zsh` checks the overlays on a made-up app, then imports into an empty home twice and checks the second run
 loads nothing. To carry another app, add it to `apps.json` with the keys that are settings, run
 the export, and read the new file before committing.
 

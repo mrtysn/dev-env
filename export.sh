@@ -510,7 +510,7 @@ done
 
 # App settings: only the keys each app's allowlist in app-settings/apps.json names.
 echo "✓ Exporting app settings"
-if "$SCRIPT_DIR/app-settings/app-settings.py" export; then
+if "$SCRIPT_DIR/app-settings/app-settings.py" export --label "$MACHINE_LABEL"; then
     note "app-settings/ (allowlisted keys)"
 else
     warn "app-settings export failed"

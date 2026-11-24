@@ -848,7 +848,7 @@ if $CHECK; then
         # An app whose settings this terminal cannot read (a group container without the "access
         # data from other apps" grant) is not checked, rather than counted as a change.
         unreadable=()
-        if ! out="$("$APP_SETTINGS" check 2>&1)"; then
+        if ! out="$("$APP_SETTINGS" check --label "$MACHINE_LABEL" 2>&1)"; then
             for line in "${(@f)out}"; do
                 case "$line" in
                     "✗ "*) n="${line#✗ }"; CHECK_CHANGES+=("${n%%:*} settings") ;;
@@ -1691,7 +1691,7 @@ if [[ ! -x "$APP_SETTINGS" ]] || [[ ! -x /usr/bin/python3 ]]; then
 else
     print "${BLUE}Apps:${NC} $(/usr/bin/python3 -I -c 'import json,sys; print(" ".join(a["name"] for a in json.load(open(sys.argv[1]))["apps"]))' "$SCRIPT_DIR/app-settings/apps.json")"
     if ask_yes_no app-settings "Load these apps' settings (only keys that differ)?"; then
-        "$APP_SETTINGS" import || print "${RED}✗ app settings import failed${NC}"
+        "$APP_SETTINGS" import --label "$MACHINE_LABEL" || print "${RED}✗ app settings import failed${NC}"
     else
         print "${YELLOW}! Skipped app settings${NC}"
     fi
