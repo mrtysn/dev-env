@@ -8,5 +8,7 @@ cask "teleport-connect"         # Teleport client (bundles tsh) for server and d
 cask "gcloud-cli"               # Google Cloud CLI
 # Meetings
 cask "granola"                  # meeting notes
+# Issue tracking
+cask "linear"                   # Linear desktop app; updates itself
 # Editors
 cask "visual-studio-code"       # editor; this Mac only, Sublime is the editor elsewhere
