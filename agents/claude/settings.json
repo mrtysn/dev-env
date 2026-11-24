@@ -127,6 +127,15 @@
       {
         "hooks": [
           {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/note-secret-in-tool-output.py\" ] && exec \"$AGENTS_SHARED_DIR/hooks/note-secret-in-tool-output.py\"; exit 0",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|Read|Grep"
+      },
+      {
+        "hooks": [
+          {
             "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${CC_STATUS_PATH:-}\" ] && [ -x \"$CC_STATUS_PATH\" ] && exec \"$CC_STATUS_PATH\"; exit 0",
             "type": "command"
           }
