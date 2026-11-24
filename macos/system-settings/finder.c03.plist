@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NewWindowTarget</key>
+	<string>PfHm</string>
+	<key>NewWindowTargetPath</key>
+	<string>file://$HOME/</string>
+	<key>ShowExternalHardDrivesOnDesktop</key>
+	<true/>
+	<key>ShowRemovableMediaOnDesktop</key>
+	<true/>
+	<key>_macos</key>
+	<string>27</string>
+</dict>
+</plist>
