@@ -6,12 +6,15 @@ and Control Center) between machines; system-settings.json says which domains an
     system-settings.py import   make this Mac match the record, then restart what shows them
     system-settings.py check    list the recorded settings that differ here (exit 1 if any)
 
-Both directions write only what differs, so a second run changes nothing. A key this Mac has
-never written is not recorded: it keeps macOS's default on the other machine too.
+Both directions write only what differs, so a second run changes nothing. A key no machine has
+written is not recorded: it keeps macOS's default everywhere.
 
-Per machine: system-settings/<name>.plist is the shared record, written by the machine in its
-"_machine" key. Any other machine (--label, from machine-label.sh) records only the keys where it
-differs, in <name>.<label>.plist, and import applies that on top of the shared record.
+Shared by default: system-settings/<name>.plist is the one record every machine syncs to, and an
+export on any machine updates it; a key the exporting Mac has never written keeps its recorded
+value. Only the keys machine-keeps.json lists for this machine (--label, from machine-label.sh)
+go to <name>.<label>.plist instead, and import lays those over the shared record here. Export
+refuses a record that changed since this Mac last imported it (lib/sync_state.py); --force
+overrides. In a Dock tile list, the shared tiles for apps this Mac lacks keep their places.
 
 Across macOS versions: each record keeps the macOS major version it was exported on ("_macos"),
 and check and import name the domains recorded on another version, since a key that version
@@ -26,7 +29,7 @@ Import first saves each domain it changes, whole, to
 writes only the keys that differ: `defaults import` merges them into the domain, keeping the rest.
 A domain marked "same_version" in system-settings.json (Spotlight's category list, which macOS
 versions change) is applied only on the macOS version it was recorded on.
-Options: --label LABEL (this machine's label); --dir DIR reads and writes DIR/<name>.plist files
+Options: --label LABEL (this machine's label); --force; --dir DIR reads and writes DIR/<name>.plist files
 instead of the user's domains and restarts nothing (tests); --record DIR keeps the record there
 instead of macos/system-settings (tests); --macos N takes N as this Mac's major version (tests).
 """
@@ -34,6 +37,8 @@ import json, os, plistlib, re, subprocess, sys, time
 from urllib.parse import unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "lib"))
+import sync_state  # noqa: E402
 HOME = os.path.expanduser("~")
 TOKEN = "$HOME"
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
@@ -50,7 +55,8 @@ def macos_major():
 
 
 MACOS = ""  # this Mac's major version, set in main
-META = {"_machine", "_macos", "_not_set"}  # the record's own keys; Finder's real keys may start with _ too
+META = {"_machine", "_macos"}  # the record's own keys; Finder's real keys may start with _ too
+FORCE = False  # --force: export over a record this Mac is behind on
 
 
 def say(colour, text):
@@ -166,9 +172,6 @@ class Record:
     def overlay_path(self, d, label):
         return os.path.join(self.dir, f"{d['name']}.{label}.plist")
 
-    def owner(self, d):
-        return load(self.shared_path(d)).get("_machine", "")
-
     def version(self, d):
         return str(load(self.shared_path(d)).get("_macos", ""))
 
@@ -177,28 +180,19 @@ class Record:
         return {k: v for k, v in load(self.shared_path(d)).items() if k not in META and allow.fullmatch(k)}
 
     def overlay(self, d, label):
-        allow = re.compile(d["keys"])
-        return {k: v for k, v in load(self.overlay_path(d, label)).items() if k not in META and allow.fullmatch(k)}
+        """This machine's own values, for the keys machine-keeps.json lets it keep."""
+        keep = sync_state.kept("system-settings", d["name"], label)
+        return {k: v for k, v in load(self.overlay_path(d, label)).items() if k in keep}
 
-    def overlay_version(self, d, label):
-        return str(load(self.overlay_path(d, label)).get("_macos", ""))
-
-    def applies(self, d, label):
+    def applies(self, d):
         """False for a same_version domain recorded on another macOS than this Mac's."""
-        if not d.get("same_version"):
-            return True
-        if label and label != self.owner(d) and self.overlay_version(d, label) == MACOS:
-            return True
-        return self.version(d) == MACOS
+        return not d.get("same_version") or not os.path.exists(self.shared_path(d)) or self.version(d) == MACOS
 
     def wanted(self, d, label):
-        if not self.applies(d, label):
+        if not self.applies(d):
             return {}, []
         want = self.shared(d)
-        if label and label != self.owner(d):
-            want.update(self.overlay(d, label))
-            for k in load(self.overlay_path(d, label)).get("_not_set", []):
-                want.pop(k, None)
+        want.update(self.overlay(d, label))
         return present_tiles(d, want)
 
 
@@ -223,16 +217,27 @@ def present_tiles(d, want):
     return want, skipped
 
 
+def merge_tiles(base, live):
+    """This Mac's tile list, with the shared tiles for apps it lacks kept after the tile they followed."""
+    out = list(live)
+    anchor = -1  # where in `out` the last shared tile found sits
+    for t in base or []:
+        path = tile_path(t)
+        if path and not os.path.exists(path) and t not in out:
+            anchor += 1
+            out.insert(anchor, t)
+        elif t in out[anchor + 1:]:
+            anchor = out.index(t, anchor + 1)
+    return out
+
+
 def version_note(domains, rec, label):
-    """A line naming the domains recorded on another macOS major version than this Mac's, or "".
-    A domain this Mac has exported its own overlay for, on its own version, is not named."""
+    """A line naming the domains recorded on another macOS major version than this Mac's, or ""."""
     other, skipped = {}, []
     for d in domains:
         if not os.path.exists(rec.shared_path(d)) or rec.version(d) == MACOS:
             continue
-        if label and label != rec.owner(d) and rec.overlay_version(d, label) == MACOS:
-            continue
-        if not rec.applies(d, label):
+        if not rec.applies(d):
             skipped.append(d["name"])
             continue
         other.setdefault(rec.version(d) or "an unrecorded version", []).append(d["name"])
@@ -258,41 +263,53 @@ def write_if_changed(path, data):
 
 
 def export(domains, store, rec, label):
-    changed = 0
+    changed = bad = 0
     for d in domains:
         try:
             live = carried(d, store.read(d), report=True)
         except Unreadable as e:
             say(RED, f"✗ {d['name']}: {e}, not exported")
             continue
-        owner = rec.owner(d)
-        if not os.path.exists(rec.shared_path(d)) or not owner or owner == label:
-            if not live:
+        if not rec.applies(d):
+            say(YELLOW, f"! {d['name']}: recorded on macOS {rec.version(d)}, this Mac runs {MACOS}: not exported")
+            continue
+        keep = sync_state.kept("system-settings", d["name"], label)
+        changed += export_keeps(d, rec, label, {k: v for k, v in live.items() if k in keep})
+        path = rec.shared_path(d)
+        base = rec.shared(d)
+        new = dict(base)  # a key this Mac never wrote, or keeps for itself, stays as recorded
+        for k, v in live.items():
+            if k in keep:
                 continue
-            if write_if_changed(rec.shared_path(d), dict(live, _machine=label or "unknown", _macos=MACOS)):
-                changed += 1
-                say(GREEN, f"✓ exported {d['name']} ({len(live)} keys)")
+            new[k] = merge_tiles(base.get(k), v) if k in d.get("tiles", []) and isinstance(v, list) else v
+        if not new or new == base:
             continue
-        base = present_tiles(d, rec.shared(d))[0]  # a tile for an app this Mac lacks is not a difference
-        diff = {k: v for k, v in live.items() if base.get(k) != v}
-        # A shared key this Mac has never written stays unset here, rather than taking the owner's value:
-        # a default left alone, or a key this Mac's macOS no longer reads.
-        not_set = sorted(k for k in base if k not in live)
-        if not_set:
-            diff["_not_set"] = not_set
-        path = rec.overlay_path(d, label)
-        if not diff:
-            if os.path.exists(path):
-                os.remove(path)
-                changed += 1
-                say(GREEN, f"✓ {d['name']}: {label} matches the shared record now, removed its overlay")
+        if sync_state.behind(path) and not FORCE:
+            bad = 1
+            say(RED, "✗ " + sync_state.refusal(f"macOS settings {d['name']}", 21))
             continue
-        if write_if_changed(path, dict(diff, _macos=MACOS)):
+        if write_if_changed(path, dict(new, _macos=MACOS)):
+            sync_state.mark(path)
             changed += 1
-            say(GREEN, f"✓ exported {d['name']}: {len(diff) - bool(not_set)} keys where {label} differs"
-                       + (f", {len(not_set)} it leaves unset" if not_set else ""))
-    if not changed:
+            moved = sorted(k for k in new if base.get(k) != new[k])
+            say(GREEN, f"✓ exported {d['name']}: {', '.join(moved)}")
+    if not changed and not bad:
         say(GREEN, "✓ macOS settings already match the repo")
+    return bad
+
+
+def export_keeps(d, rec, label, mine):
+    """Write the keys this machine keeps for itself; 1 when the repo changed."""
+    path = rec.overlay_path(d, label)
+    if not mine:
+        if os.path.exists(path):
+            os.remove(path)
+            say(GREEN, f"✓ {d['name']}: {label} keeps nothing of its own now, removed {os.path.basename(path)}")
+            return 1
+        return 0
+    if write_if_changed(path, mine):
+        say(GREEN, f"✓ exported {d['name']}: {label} keeps {', '.join(sorted(mine))}")
+        return 1
     return 0
 
 
@@ -323,6 +340,7 @@ def import_(domains, store, rec, label):
         if skipped:
             say(YELLOW, f"! {d['name']}: left out tiles not on this Mac: {', '.join(skipped)}")
         if not todo:
+            sync_state.mark(rec.shared_path(d))
             continue
         whole = store.read(d)
         if not backup:
@@ -340,6 +358,7 @@ def import_(domains, store, rec, label):
             bad = 1
             say(RED, f"✗ {d['name']}: still different: {', '.join(sorted(left)) or err}")
             continue
+        sync_state.mark(rec.shared_path(d))
         total += len(todo)
         say(GREEN, f"✓ {d['name']}: set {', '.join(sorted(todo))}")
         restart.update(d.get("restart", []))
@@ -415,8 +434,9 @@ def main(argv):
     store = Store(os.path.realpath(opt("--dir")) if "--dir" in argv else "")
     rec = Record(opt("--record") or os.path.join(HERE, "system-settings"))
     label = opt("--label")
-    global MACOS
+    global MACOS, FORCE
     MACOS = opt("--macos") or macos_major()
+    FORCE = "--force" in argv
     return {"export": export, "import": import_, "check": check}[argv[0]](load_domains(), store, rec, label)
 
 

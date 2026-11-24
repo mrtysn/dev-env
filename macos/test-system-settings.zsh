@@ -1,123 +1,119 @@
 #!/bin/zsh
 # Test system-settings.py on plist files in a sandbox (--dir, --record): the user's real
-# domains are never read or written, and nothing is restarted.
+# domains are never read or written, and nothing is restarted. Each made-up machine has its own
+# applied-state folder (DEV_ENV_STATE_DIR), as each real Mac has its own.
 set -u -o pipefail   # run's exit code is the tool's, not sed's
 here=${0:A:h}
 tool=$here/system-settings.py
 tmp=${$(mktemp -d):A}   # resolved: defaults treats /var and /private/var as two files
 trap 'rm -rf -- "$tmp"' EXIT
-live=$tmp/live other=$tmp/other rec=$tmp/record
-mkdir -p $live $other $rec
+rec=$tmp/record
+mkdir -p $rec $tmp/c02 $tmp/c03 $tmp/c04
+export DEV_ENV_KEEPS=$tmp/keeps.json
+print -r -- '{"c03": {"system-settings/finder": ["ShowStatusBar"]}}' > $DEV_ENV_KEEPS
 pass=0 fail=0
 ok()  { pass=$((pass + 1)); }
 bad() { fail=$((fail + 1)); print -r -- "FAIL: $1"; }
 plain() { sed $'s/\x1b\\[[0-9;]*m//g'; }
-run() { $tool "$@" --record $rec | plain; }
+# on LABEL ARGS...: run the tool as machine LABEL, on its own settings folder and applied state.
+on() { local m=$1; shift; DEV_ENV_STATE_DIR=$tmp/state-$m $tool "$@" --dir $tmp/$m --label $m --record $rec | plain; }
+val() { defaults read $tmp/$1/$2.plist $3 2>&1; }
+recval() { /usr/bin/python3 -I -c 'import plistlib,sys; print(plistlib.load(open(sys.argv[1],"rb")).get(sys.argv[2],"<none>"))' $rec/$1.plist $2; }
 
-# A Finder domain with carried keys, an uncarried one, a home path and an address.
-defaults write $live/finder.plist ShowPathbar -bool true
-defaults write $live/finder.plist FXRecentFolders -string "not carried"
-defaults write $live/finder.plist NewWindowTargetPath -string "file://$HOME/Downloads/"
-defaults write $live/finder.plist FXDefaultSearchScope -string "someone@example.com"
-# A Dock tile with a per-machine bookmark and GUID.
-/usr/bin/python3 -I - $live/dock.plist <<'PY'
+# c02's settings: carried keys, an uncarried one, a home path, an address, and a Dock tile.
+defaults write $tmp/c02/finder.plist ShowPathbar -bool true
+defaults write $tmp/c02/finder.plist ShowStatusBar -bool true
+defaults write $tmp/c02/finder.plist FXRecentFolders -string "not carried"
+defaults write $tmp/c02/finder.plist NewWindowTargetPath -string "file://$HOME/Downloads/"
+defaults write $tmp/c02/finder.plist FXDefaultSearchScope -string "someone@example.com"
+/usr/bin/python3 -I - $tmp/c02/dock.plist <<'PY'
 import plistlib, sys
-plistlib.dump({"tilesize": 40, "persistent-apps": [{"GUID": 123, "tile-type": "file-tile", "tile-data": {
-    "book": b"bookmark", "file-mod-date": 5, "file-label": "Safari", "bundle-identifier": "com.apple.Safari",
-    "file-data": {"_CFURLString": "file:///Applications/Safari.app/", "_CFURLStringType": 15}}}]},
+t = lambda label, path: {"GUID": 1, "tile-type": "file-tile", "tile-data": {"book": b"bookmark", "file-mod-date": 5,
+     "file-label": label, "file-data": {"_CFURLString": f"file://{path}", "_CFURLStringType": 15}}}
+plistlib.dump({"tilesize": 40, "persistent-apps": [t("Safari", "/Applications/Safari.app/"),
+    t("No Such App", "/Applications/No%20Such%20App.app/"), t("Settings", "/System/Applications/System%20Settings.app/")]},
     open(sys.argv[1], "wb"))
 PY
 
-out=$(run export --dir $live --label c02)
+# Export: only the allowlist, $HOME for the home folder, no address, Dock tiles reduced.
+out=$(on c02 export)
 [[ $out == *"FXDefaultSearchScope holds a home path or an address"* ]] && ok || bad "an address was not refused: $out"
 f=$(plutil -p $rec/finder.plist)
 [[ $f == *ShowPathbar* && $f != *FXRecentFolders* && $f != *example.com* ]] && ok || bad "finder record is not the allowlist: $f"
-[[ $f == *'file://$HOME/Downloads/'* && $f != *$HOME* ]] && ok || bad "home path not recorded as \$HOME: $f"
+[[ $f == *'file://$HOME/Downloads/'* && $f != *$HOME* && $f == *_macos* ]] && ok || bad "home path or _macos not recorded: $f"
 d=$(plutil -p $rec/dock.plist)
-[[ $d == *com.apple.Safari* && $d != *book* && $d != *GUID* && $d != *mod-date* ]] && ok || bad "dock tile not reduced: $d"
-out=$(run export --dir $live --label c02)
-[[ $out == *"already match the repo"* ]] && ok || bad "second export wrote something: $out"
+[[ $d == *Safari* && $d != *book* && $d != *GUID* && $d != *mod-date* ]] && ok || bad "dock tile not reduced: $d"
+[[ $(on c02 export) == *"already match the repo"* ]] && ok || bad "second export wrote something"
 
-# Import into an empty machine, then again: the second run sets nothing.
-out=$(run import --dir $other --label c02)
+# Import on c03: everything shared arrives, $HOME expanded, a backup kept, other keys untouched.
+defaults write $tmp/c03/finder.plist FXRecentFolders -string "kept"
+out=$(on c03 import)
 [[ $out == *"finder: set"* && $out == *"dock: set"* ]] && ok || bad "first import: $out"
-[[ $(defaults read $other/finder.plist NewWindowTargetPath) == "file://$HOME/Downloads/" ]] && ok || bad "\$HOME not expanded on import"
-ls -d $other/.macos-settings-backup-* >/dev/null 2>&1 && ok || bad "import kept no backup"
-run check --dir $other --label c02 >/dev/null && ok || bad "check differs after import"
-out=$(run import --dir $other --label c02)
-[[ $out == *"already match the repo"* ]] && ok || bad "second import set something: $out"
+[[ $(val c03 finder NewWindowTargetPath) == "file://$HOME/Downloads/" ]] && ok || bad "\$HOME not expanded on import"
+[[ $(val c03 finder FXRecentFolders) == kept ]] && ok || bad "import removed an uncarried key"
+ls -d $tmp/c03/.macos-settings-backup-* >/dev/null 2>&1 && ok || bad "import kept no backup"
+on c03 check >/dev/null && ok || bad "check differs after import"
+[[ $(on c03 import) == *"already match the repo"* ]] && ok || bad "second import set something"
 
-# Another machine differs in one key: its export writes only that key, in its overlay.
-defaults write $other/finder.plist ShowPathbar -bool false
-out=$(run check --dir $other --label c03)
-[[ $out == *"differs here: finder ShowPathbar"* ]] && ok || bad "check missed a difference: $out"
-run export --dir $other --label c03 >/dev/null
-o=$(plutil -p $rec/finder.c03.plist 2>&1)
-[[ $o == *ShowPathbar* && $o != *NewWindowTargetPath* ]] && ok || bad "c03 overlay is not just the difference: $o"
-# plutil -p prints a true boolean as 1 on older macOS and as true on macOS 27.
-[[ $(plutil -p $rec/finder.plist) == *'"ShowPathbar" => '(1|true)* ]] && ok || bad "c03 export changed the shared record"
-run check --dir $other --label c03 >/dev/null && ok || bad "c03 differs from its own overlay"
-run check --dir $other --label c02 >/dev/null && bad "c02 should differ from c03's Finder" || ok
+# A tile for an app c03 lacks is named, not written, not a difference.
+[[ $(on c03 check) == *"tiles not on this Mac, left out: No Such App"* ]] && ok || bad "missing app tile not named"
+[[ $(defaults read $tmp/c03/dock.plist persistent-apps) != *"No Such App"* ]] && ok || bad "missing app tile was written"
 
-# Another macOS version: check and import name it, and the comparison is unchanged.
-out=$(run check --dir $other --label c03 --macos 99)
-[[ $out == *"this Mac runs 99 (all of them)"* ]] && ok || bad "no version note on another macOS: $out"
-out=$(run check --dir $other --label c03)
-[[ $out != *"this Mac runs"* ]] && ok || bad "version note on the same macOS: $out"
-[[ $(plutil -p $rec/finder.plist) == *_macos* && $(plutil -p $rec/finder.c03.plist) == *_macos* ]] && ok || bad "records lack _macos"
+# Shared by default: a change exported on c03 goes to the shared record, not to a c03 file.
+defaults write $tmp/c03/finder.plist ShowPathbar -bool false
+out=$(on c03 export)
+[[ $(recval finder ShowPathbar) == False && $(plutil -p $rec/finder.c03.plist) != *ShowPathbar* ]] && ok || bad "c03's change did not reach the shared record: $out"
+# The shared Dock keeps the tile c03 lacks, in its place, after c03 exports its Dock.
+defaults write $tmp/c03/dock.plist tilesize -int 50
+on c03 export >/dev/null
+order=$(/usr/bin/python3 -I -c 'import plistlib,sys; print(",".join(t["tile-data"]["file-label"] for t in plistlib.load(open(sys.argv[1],"rb"))["persistent-apps"]))' $rec/dock.plist)
+[[ $order == "Safari,No Such App,Settings" ]] && ok || bad "shared Dock lost or moved the tile c03 lacks: $order"
+[[ $(recval dock tilesize) == 50 ]] && ok || bad "c03's Dock size did not reach the shared record"
 
-# A Dock tile whose app is not on this Mac is left out, named, and not counted as a difference.
-/usr/bin/python3 -I - $rec/dock.plist <<'PY'
-import plistlib, sys
-p = sys.argv[1]; r = plistlib.load(open(p, "rb"))
-r["persistent-apps"].append({"tile-type": "file-tile", "tile-data": {"file-label": "No Such App",
-    "file-data": {"_CFURLString": "file:///Applications/No%20Such%20App.app/", "_CFURLStringType": 15}}})
-plistlib.dump(r, open(p, "wb"))
-PY
-out=$(run check --dir $other --label c02)
-[[ $out == *"tiles not on this Mac, left out: No Such App"* && $out != *"differs here: dock"* ]] && ok || bad "missing app tile: $out"
-out=$(run import --dir $other --label c02)
-[[ $out == *"left out tiles not on this Mac: No Such App"* ]] && ok || bad "import did not name the missing tile: $out"
-[[ $(defaults read $other/dock.plist persistent-apps) != *"No Such App"* ]] && ok || bad "missing app tile was written"
+# c02 is behind now: its export is refused until it imports, and --force overrides.
+defaults write $tmp/c02/finder.plist ShowSidebar -bool true
+out=$(on c02 export)
+[[ $out == *"changed since this Mac last imported it"* && $(recval finder ShowPathbar) == False ]] && ok || bad "a behind export was not refused: $out"
+on c02 import >/dev/null
+[[ $(val c02 finder ShowPathbar) == 0 ]] && ok || bad "c02 did not take c03's change"
+on c02 export >/dev/null
+[[ $(recval finder ShowSidebar) == True ]] && ok || bad "c02's export after importing was refused"
+defaults write $tmp/c03/finder.plist ShowSidebar -bool false
+out=$(on c03 export --force)
+[[ $(recval finder ShowSidebar) == False ]] && ok || bad "--force did not overwrite: $out"
 
-# Import writes only what differs and keeps the domain's other keys.
-defaults write $other/finder.plist FXRecentFolders -string "kept"
-defaults write $live/finder.plist ShowStatusBar -bool true; run export --dir $live --label c02 >/dev/null
-out=$(run import --dir $other --label c02)
-[[ $out == *"finder: set ShowStatusBar"* ]] && ok || bad "import did not set just the new key: $out"
-[[ $(defaults read $other/finder.plist FXRecentFolders) == kept ]] && ok || bad "import removed an uncarried key"
+# A declared keep: c03's ShowStatusBar stays in finder.c03.plist; the shared value is c02's.
+defaults write $tmp/c03/finder.plist ShowStatusBar -bool false
+on c03 import >/dev/null   # catch up after the forced export
+defaults write $tmp/c03/finder.plist ShowStatusBar -bool false
+on c03 export >/dev/null
+[[ $(plutil -p $rec/finder.c03.plist) == *ShowStatusBar* && $(recval finder ShowStatusBar) == True ]] && ok || bad "keep not kept apart: $(plutil -p $rec/finder.c03.plist 2>&1)"
+on c03 check >/dev/null && ok || bad "c03 differs from its kept value"
+on c02 import >/dev/null
+[[ $(val c02 finder ShowStatusBar) == 1 ]] && ok || bad "c03's kept value reached c02"
 
-# A same_version domain (Spotlight) is not applied on another macOS, and says so.
-defaults write $live/spotlight.plist orderedItems -array '{enabled = 1; name = APPLICATIONS;}'
-run export --dir $live --label c02 >/dev/null
-out=$(run import --dir $other --label c02 --macos 99)
-[[ $out == *"not applied, recorded on another macOS version: spotlight"* && $out != *"spotlight: set"* ]] && ok || bad "spotlight applied across versions: $out"
-[[ ! -f $other/spotlight.plist ]] && ok || bad "spotlight was written"
+# A key a machine has never written keeps its recorded value when that machine exports.
+on c04 import >/dev/null
+defaults delete $tmp/c04/finder.plist ShowSidebar
+defaults write $tmp/c04/finder.plist ShowPathbar -bool true
+on c04 export >/dev/null
+[[ $(recval finder ShowSidebar) == False && $(recval finder ShowPathbar) == True ]] && ok || bad "c04's export dropped a key it never wrote"
 
-# A Mac without a recorded tile's app exports no Dock overlay for that alone.
-rm -f -- $rec/dock.c03.plist
-run import --dir $other --label c03 >/dev/null
-run export --dir $other --label c03 >/dev/null
-[[ ! -f $rec/dock.c03.plist ]] && ok || bad "missing app tile made a c03 dock overlay: $(plutil -p $rec/dock.c03.plist)"
+# Another macOS version: named once; a same_version domain is neither applied nor exported.
+on c02 import >/dev/null
+defaults write $tmp/c02/spotlight.plist orderedItems -array '{enabled = 1; name = APPLICATIONS;}'
+on c02 export >/dev/null
+out=$(on c04 check --macos 99)
+[[ $out == *"this Mac runs 99"* && $out == *"not applied, recorded on another macOS version: spotlight"* ]] && ok || bad "version note: $out"
+out=$(on c04 import --macos 99)
+[[ ! -f $tmp/c04/spotlight.plist ]] && ok || bad "spotlight applied across versions"
+defaults write $tmp/c04/spotlight.plist orderedItems -array '{enabled = 0; name = MUSIC;}'
+out=$(on c04 export --macos 99)
+[[ $out == *"spotlight: recorded on macOS"*"not exported"* && $(plutil -p $rec/spotlight.plist) == *APPLICATIONS* ]] && ok || bad "spotlight exported across versions: $out"
 
 # A key dropped from the allowlist is no longer wanted, even while the record still holds it.
 /usr/bin/python3 -I -c 'import plistlib,sys; p=sys.argv[1]; r=plistlib.load(open(p,"rb")); r["NotAllowlisted"]=1; plistlib.dump(r,open(p,"wb"))' $rec/finder.plist
-out=$(run check --dir $other --label c02)
-[[ $out != *NotAllowlisted* ]] && ok || bad "a key outside the allowlist is wanted: $out"
-
-# A machine that never wrote a shared key records it as not set, and its import leaves it out.
-third=$tmp/third; mkdir -p $third
-defaults write $third/finder.plist ShowPathbar -bool true
-out=$(run export --dir $third --label c04)
-[[ $out == *"finder: "*"it leaves unset"* ]] && ok || bad "export did not record unset keys: $out"
-ns=$(plutil -p $rec/finder.c04.plist)
-[[ $ns == *_not_set*ShowStatusBar* && $ns == *NewWindowTargetPath* ]] && ok || bad "_not_set misses keys: $ns"
-out=$(run import --dir $third --label c04)
-[[ $(defaults read $third/finder.plist ShowStatusBar 2>&1) == *"does not exist"* ]] && ok || bad "an unset key was imported: $out"
-run check --dir $third --label c04 >/dev/null && ok || bad "check wants an unset key"
-fourth=$tmp/fourth; mkdir -p $fourth
-run import --dir $fourth --label c02 >/dev/null
-[[ $(defaults read $fourth/finder.plist ShowStatusBar) == 1 ]] && ok || bad "c04's unset list leaked into c02's import"
+[[ $(on c02 check) != *NotAllowlisted* ]] && ok || bad "a key outside the allowlist is wanted"
 
 print "system-settings: $pass passed, $fail failed"
 (( fail == 0 ))

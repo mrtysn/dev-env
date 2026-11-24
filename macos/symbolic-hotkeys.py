@@ -10,16 +10,21 @@ macOS writes an entry once a shortcut is changed or switched off, and some on it
 has not written keep their defaults, here and on the other machine alike. An entry that already
 matches is left alone, so a re-run changes nothing.
 
-Per machine: symbolic-hotkeys.plist is the shared record, written by the machine named in its
-"_machine" key. Any other machine (--label, from machine-label.sh) records only where it differs, in
-symbolic-hotkeys.<label>.plist, and import applies that on top of the shared record. So the work
-Mac can keep Show Launchpad on F18 while the home Mac has it off.
-Options: --label LABEL (this machine's label); --domain PATH reads and writes a plist file instead
+Shared by default: symbolic-hotkeys.plist is the one record every machine syncs to; an export on
+any machine updates it, and an entry the exporting Mac has never written keeps its recorded value.
+Only the entries machine-keeps.json lists for this machine (--label, from machine-label.sh) go to
+symbolic-hotkeys.<label>.plist instead, laid over the shared record on import here: so the work
+Mac keeps Show Apps on F18 (its Caps Lock, with no Karabiner) while the home Mac has it off.
+Export refuses a record that changed since this Mac last imported it (lib/sync_state.py).
+Options: --label LABEL (this machine's label); --force; --domain PATH reads and writes a plist file instead
 of the user's domain (tests).
 """
 import os, plistlib, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "lib"))
+import sync_state  # noqa: E402
+FORCE = False  # --force: export over a record this Mac is behind on
 RECORD = os.environ.get("SYMBOLIC_HOTKEYS_RECORD") or os.path.join(HERE, "symbolic-hotkeys.plist")  # override: tests
 DOMAIN = "com.apple.symbolichotkeys"
 ACTIVATE = "/System/Library/PrivateFrameworks/SystemAdministration.framework/Resources/activateSettings"
@@ -62,10 +67,6 @@ def shared():
     return {k: v for k, v in load(RECORD).items() if not k.startswith("_")}
 
 
-def owner():
-    return load(RECORD).get("_machine", "")
-
-
 def write(path, data, what):
     blob = plistlib.dumps(data, fmt=plistlib.FMT_XML, sort_keys=True)
     old = open(path, "rb").read() if os.path.exists(path) else None
@@ -77,21 +78,38 @@ def write(path, data, what):
     print(f"✓ exported {what} to macos/{os.path.basename(path)}")
 
 
+def keeps(label):
+    return sync_state.kept("symbolic-hotkeys", "symbolic-hotkeys", label)
+
+
 def export(domain, label):
     live = entries(domain)
-    if not os.path.exists(RECORD) or not owner() or owner() == label:
-        write(RECORD, dict(live, _machine=label or "unknown"), f"{len(live)} keyboard shortcut entries")
-        return 0
+    keep = keeps(label)
+    mine = {k: v for k, v in live.items() if k in keep}
+    path = overlay_path(label) if label else ""
+    if mine:
+        write(path, mine, f"the shortcut entries {label} keeps ({', '.join(name(k) for k in sorted(mine))})")
+    elif path and os.path.exists(path):
+        os.remove(path)
+        print(f"✓ {label} keeps no shortcut entries of its own now, removed macos/{os.path.basename(path)}")
     base = shared()
-    diff = {k: v for k, v in live.items() if base.get(k) != v}
-    write(overlay_path(label), diff, f"{len(diff)} shortcut entries where {label} differs")
+    new = dict(base)  # an entry this Mac never wrote, or keeps for itself, stays as recorded
+    new.update({k: v for k, v in live.items() if k not in keep})
+    if new == base and os.path.exists(RECORD):
+        print("✓ keyboard shortcut entries already match the repo")
+        return 0
+    if sync_state.behind(RECORD) and not FORCE:
+        print("✗ " + sync_state.refusal("keyboard shortcuts", 17))
+        return 1
+    write(RECORD, new, f"{len(new)} keyboard shortcut entries")
+    sync_state.mark(RECORD)
     return 0
 
 
 def wanted(label):
     want = shared()
-    if label and label != owner():
-        want.update(load(overlay_path(label)))
+    keep = keeps(label)
+    want.update({k: v for k, v in load(overlay_path(label)).items() if k in keep} if label else {})
     return want
 
 
@@ -104,6 +122,7 @@ def differing(domain, label=""):
 def import_(domain, label):
     want, todo = differing(domain, label)
     if not todo:
+        sync_state.mark(RECORD)
         print(f"✓ the {len(want)} recorded shortcut entries already match")
         return 0
     whole = read(domain)
@@ -122,6 +141,7 @@ def import_(domain, label):
     if left:
         print(f"✗ still different: {', '.join(name(k) for k in left)}")
         return 1
+    sync_state.mark(RECORD)
     print(f"✓ set {len(todo)} shortcut entr{'y' if len(todo) == 1 else 'ies'}")
     return 0
 
@@ -143,6 +163,8 @@ def main(argv):
     if "--domain" in argv:
         domain = os.path.realpath(argv[argv.index("--domain") + 1])
     label = argv[argv.index("--label") + 1] if "--label" in argv else ""
+    global FORCE
+    FORCE = "--force" in argv
     return {"export": export, "import": import_, "check": check}[argv[0]](domain, label)
 
 

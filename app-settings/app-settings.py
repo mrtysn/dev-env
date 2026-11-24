@@ -10,22 +10,26 @@ writes to a running app (it would overwrite the change when it quits): it names 
 quit and moves on. Export refuses any carried value that holds the home folder's path or an
 email address, since this repo is public.
 
-Per machine: the machine apps.json names as "owner" writes the shared copies. Any other machine
-(--label, from machine-label.sh) writes only where it differs: <app>.<label>.plist with the
-differing keys, and for a whole file <stem>.<label><ext> holding the differing keys of a JSON
-settings file, or the whole file when it is not one (a keymap). Import lays a machine's overlay
-over the shared copy, on that machine only.
+Shared by default: every machine syncs to one copy per app, and an export on any machine updates
+it; a key the exporting Mac has never written keeps its recorded value. Only what machine-keeps.json
+lists for this machine (--label, from machine-label.sh) goes to its own file: keys of an app in
+<app>.<label>.plist, keys of a JSON settings file in <stem>.<label><ext>, or a whole file ("*").
+Import lays those over the shared copy on that machine only. Export refuses a copy that changed since
+this Mac last imported it (lib/sync_state.py); --force overrides.
 
-Options: --label LABEL (this machine's label), --home DIR (default: $HOME), --ignore-running
+Options: --label LABEL (this machine's label), --force, --home DIR (default: $HOME), --ignore-running
 (tests, where HOME is a sandbox), --repo DIR and --apps FILE (tests: where the records and the
 app list live, default this folder).
 """
 import json, os, plistlib, re, shutil, subprocess, sys, time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "lib"))
+import sync_state  # noqa: E402
+FORCE = False  # --force: export over a copy this Mac is behind on
 REPO = HERE                                 # where the records live (--repo)
 APPS = os.path.join(HERE, "apps.json")      # --apps
-LABEL = OWNER = ""                          # this machine's label (--label); the shared copies' machine
+LABEL = ""                                  # this machine's label (--label)
 GREEN, YELLOW, RED, NC = "\033[0;32m", "\033[1;33m", "\033[0;31m", "\033[0m"
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
@@ -35,16 +39,13 @@ def say(colour, text):
 
 
 def load_apps():
-    global OWNER
     with open(APPS) as f:
-        cfg = json.load(f)
-    OWNER = cfg.get("owner", "")
-    return cfg["apps"]
+        return json.load(f)["apps"]
 
 
-def overlaid():
-    """Whether this machine keeps its differences in overlays rather than in the shared copies."""
-    return bool(LABEL) and LABEL != OWNER
+def keeps(record):
+    """What this machine keeps for itself in an app (keys) or a carried file (keys, or "*")."""
+    return sync_state.kept("app-settings", record, LABEL)
 
 
 def plist_overlay_path(a):
@@ -119,16 +120,17 @@ def file_want(a, fn):
     """What this machine should hold for a carried file: ("bytes", data) or ("data", dict); None if the
     repo has no copy."""
     shared = read_bytes(os.path.join(REPO, a["name"], fn))
+    keep = keeps(f"{a['name']}/{fn}")
+    mine = read_bytes(file_overlay_path(a, fn)) if keep else None
+    if mine is not None and "*" in keep:
+        return ("bytes", mine)
     if shared is None:
         return None
-    if overlaid():
-        mine = read_bytes(file_overlay_path(a, fn))
-        if mine is not None:
-            base, patch = parse_loose(shared), parse_loose(mine)
-            if isinstance(base, dict) and isinstance(patch, dict):
-                base.update(patch)
-                return ("data", base)
-            return ("bytes", mine)
+    if mine is not None:
+        base, patch = parse_loose(shared), parse_loose(mine)
+        if isinstance(base, dict) and isinstance(patch, dict):
+            base.update({k: v for k, v in patch.items() if k in keep})
+            return ("data", base)
     return ("bytes", shared)
 
 
@@ -153,9 +155,10 @@ def plist_want(a):
     if os.path.exists(shared):
         with open(shared, "rb") as f:
             want = plistlib.load(f)
-    if overlaid() and os.path.exists(plist_overlay_path(a)):
+    keep = keeps(a["name"])
+    if keep and os.path.exists(plist_overlay_path(a)):
         with open(plist_overlay_path(a), "rb") as f:
-            want.update(plistlib.load(f))
+            want.update({k: v for k, v in plistlib.load(f).items() if k in keep})
     return want
 
 
@@ -163,8 +166,21 @@ def remove_overlay(path, what):
     if not os.path.exists(path):
         return 0
     os.remove(path)
-    say(GREEN, f"✓ {what}: {LABEL} matches the shared copy now, removed its overlay")
+    say(GREEN, f"✓ {what}: {LABEL} keeps nothing of its own now, removed {os.path.basename(path)}")
     return 1
+
+
+def write_shared(path, data, what):
+    """Write a shared copy unless this Mac is behind on it; (repo changed, refused)."""
+    if os.path.exists(path) and read_bytes(path) == data:
+        return 0, 0
+    if sync_state.behind(path) and not FORCE:
+        say(RED, "✗ " + sync_state.refusal(what, 16))
+        return 0, 1
+    write_if_changed(path, data)
+    sync_state.mark(path)
+    say(GREEN, f"✓ exported {what}")
+    return 1, 0
 
 
 def wrong_file(a):
@@ -255,95 +271,88 @@ def unordered(x):
 
 
 def export(apps, home):
-    changed = 0
+    changed = refused = 0
     for a in apps:
         name = a["name"]
         if "files" in a:
-            src_dir = os.path.join(home, a["dir"])
             for fn in a["files"]:
-                src = os.path.join(src_dir, fn)
+                src = os.path.join(home, a["dir"], fn)
                 if not os.path.exists(src):
                     continue
-                with open(src, "rb") as f:
-                    data = f.read()
+                data = read_bytes(src)
                 if home.encode() in data or EMAIL.search(data.decode("utf-8", "replace")):
                     say(RED, f"✗ {name}/{fn} holds a home path or an address: not exported, fix the live file")
                     continue
-                shared_path = os.path.join(REPO, name, fn)
-                if overlaid() and os.path.exists(shared_path):
-                    changed += export_file_overlay(a, fn, read_bytes(shared_path), data)
-                    continue
-                if write_if_changed(shared_path, data):
-                    changed += 1
-                    say(GREEN, f"✓ exported {name}/{fn}")
+                c, r = export_file(a, fn, data)
+                changed, refused = changed + c, refused | r
             continue
         src = os.path.join(home, a["file"])
         if not os.path.exists(src):
             say(YELLOW, f"! {name}: no settings on this machine, skipped")
             continue
         allow = re.compile(a["keys"])
-        live = read_plist(src)
-        kept = {}
-        for k, v in live.items():
+        live = {}
+        for k, v in read_plist(src).items():
             if not allow.fullmatch(k):
                 continue
             if leaks(v, home):
                 say(RED, f"✗ {name}: key {k} holds a home path or an address, not exported")
                 continue
-            kept[k] = v
-        # Keep the repo's copy of a value that is only reordered, so an export writes nothing.
+            live[k] = v
+        keep = keeps(name)
+        changed += export_mine(plist_overlay_path(a), name,
+                               plistlib.dumps({k: v for k, v in live.items() if k in keep}, fmt=plistlib.FMT_XML, sort_keys=True)
+                               if any(k in keep for k in live) else None)
         repo_file = os.path.join(REPO, f"{name}.plist")
-        if overlaid() and os.path.exists(repo_file):
-            with open(repo_file, "rb") as f:
-                stored = plistlib.load(f)
-            diff = {k: v for k, v in kept.items() if not same(stored.get(k), v)}
-            path = plist_overlay_path(a)
-            if os.path.exists(path):  # keep a reordered value as stored, as for the shared copy
-                with open(path, "rb") as f:
-                    before = plistlib.load(f)
-                diff = {k: before[k] if k in before and same(before[k], v) else v for k, v in diff.items()}
-            if not diff:
-                changed += remove_overlay(path, name)
-            elif write_if_changed(path, plistlib.dumps(diff, fmt=plistlib.FMT_XML, sort_keys=True)):
-                changed += 1
-                say(GREEN, f"✓ exported {name}: {len(diff)} keys where {LABEL} differs")
-            continue
+        stored = {}
         if os.path.exists(repo_file):
             with open(repo_file, "rb") as f:
                 stored = plistlib.load(f)
-            for k, v in kept.items():
-                if k in stored and same(stored[k], v):
-                    kept[k] = stored[k]
-        data = plistlib.dumps(kept, fmt=plistlib.FMT_XML, sort_keys=True)
-        if write_if_changed(repo_file, data):
-            changed += 1
-            say(GREEN, f"✓ exported {name} ({len(kept)} keys)")
-    if not changed:
+        new = dict(stored)  # a key this Mac never wrote, or keeps for itself, stays as recorded
+        for k, v in live.items():
+            if k not in keep:
+                # Keep the repo's copy of a value that is only reordered, so an export writes nothing.
+                new[k] = stored[k] if k in stored and same(stored[k], v) else v
+        if new == stored and os.path.exists(repo_file):
+            continue
+        c, r = write_shared(repo_file, plistlib.dumps(new, fmt=plistlib.FMT_XML, sort_keys=True), f"{name} ({len(new)} keys)")
+        changed, refused = changed + c, refused | r
+    if not changed and not refused:
         say(GREEN, "✓ app settings already match the repo")
+    return refused
+
+
+def export_mine(path, what, data):
+    """Write what this machine keeps for itself (None: nothing); 1 when the repo changed."""
+    if data is None:
+        return remove_overlay(path, what)
+    if write_if_changed(path, data):
+        say(GREEN, f"✓ exported {what}: what {LABEL} keeps for itself")
+        return 1
     return 0
 
 
-def export_file_overlay(a, fn, shared, live):
-    """Write this machine's difference from a shared file; returns 1 when the repo changed."""
-    what, path = f"{a['name']}/{fn}", file_overlay_path(a, fn)
-    if file_matches(("bytes", shared), live):
-        return remove_overlay(path, what)
-    base, mine = parse_loose(shared), parse_loose(live)
-    if isinstance(base, dict) and isinstance(mine, dict):
-        diff = {k: v for k, v in mine.items() if base.get(k) != v}
-        gone = sorted(k for k in base if k not in mine)
-        if gone:
-            say(YELLOW, f"! {what}: {LABEL} lacks {', '.join(gone)}; an overlay only sets keys, so import "
-                        "brings them back. Set them here instead of deleting them")
-        if not diff:
-            return remove_overlay(path, what)
-        data, detail = (json.dumps(diff, indent=4, sort_keys=True) + "\n").encode(), f"{len(diff)} keys"
-    else:
-        data, detail = live, "the whole file"
-    if not write_if_changed(path, data):
-        return 0
-    say(GREEN, f"✓ exported {what}: {detail} where {LABEL} differs")
-    return 1
+def export_file(a, fn, live):
+    """Export one carried file: the shared copy, and this machine's kept part. (changed, refused)."""
+    what, shared_path = f"{a['name']}/{fn}", os.path.join(REPO, a["name"], fn)
+    keep = keeps(what)
+    if "*" in keep:
+        return export_mine(file_overlay_path(a, fn), what, live), 0
+    shared = read_bytes(shared_path)
+    mine, base = parse_loose(live), parse_loose(shared) if shared is not None else None
+    if keep and isinstance(mine, dict):
+        changed = export_mine(file_overlay_path(a, fn), what,
+                              (json.dumps({k: v for k, v in mine.items() if k in keep}, indent=4, sort_keys=True) + "\n").encode()
+                              if any(k in keep for k in mine) else None)
+        rest = dict(base) if isinstance(base, dict) else {}
+        rest.update({k: v for k, v in mine.items() if k not in keep})
+        if isinstance(base, dict) and rest == base:
+            return changed, 0
+        c, r = write_shared(shared_path, (json.dumps(rest, indent=4, sort_keys=True) + "\n").encode(), what)
+        return changed + c, r
+    if shared is not None and file_matches(("bytes", shared), live):
+        return 0, 0
+    return write_shared(shared_path, live, what)
 
 
 def status(a, home):
@@ -389,6 +398,7 @@ def import_(apps, home, ignore_running):
             say(YELLOW, f"! {name}: not installed, skipped")
             continue
         if state == "match":
+            mark_shared(a)
             say(GREEN, f"✓ {name} settings already match")
             continue
         if not ignore_running and is_running(a["app"]):
@@ -396,9 +406,18 @@ def import_(apps, home, ignore_running):
             continue
         try:
             load(a, home, diff)
+            if status(a, home)[0] == "match":
+                mark_shared(a)
         except PermissionError as e:
             say(YELLOW, refused(a, e))
     return 0
+
+
+def mark_shared(a):
+    """Record that this machine holds an app's shared copies as they are now."""
+    paths = [os.path.join(REPO, a["name"], fn) for fn in a["files"]] if "files" in a else [os.path.join(REPO, f"{a['name']}.plist")]
+    for path in paths:
+        sync_state.mark(path)
 
 
 def load(a, home, diff):
@@ -463,6 +482,8 @@ def main(argv):
     REPO = os.path.realpath(opt("--repo") or REPO)
     APPS = opt("--apps") or APPS
     LABEL = opt("--label") or ""
+    global FORCE
+    FORCE = "--force" in argv
     if "--home" in argv:
         home = os.path.realpath(argv[argv.index("--home") + 1])  # defaults treats /var and /private/var as two files
     apps, refused = [], 0

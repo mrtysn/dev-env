@@ -1,6 +1,5 @@
 {
-  "_comment": "Apps whose settings dev-env carries. A plist app carries only the keys its `keys` regex matches in full: an allowlist, because this repo is public and an app's preferences also hold locations, licence data, device IDs and window state. `file` is relative to the home folder. `files` apps carry whole files from `dir`. `app` is the bundle that must be installed for import to load them. `owner` is the machine label whose export writes the shared copies; any other machine writes only where it differs, as <app>.<label>.plist or <app>/<stem>.<label><ext>, and import lays that over the shared copy on that machine.",
-  "owner": "c02",
+  "_comment": "Apps whose settings dev-env carries. A plist app carries only the keys its `keys` regex matches in full: an allowlist, because this repo is public and an app's preferences also hold locations, licence data, device IDs and window state. `file` is relative to the home folder. `files` apps carry whole files from `dir`. `app` is the bundle that must be installed for import to load them. Every machine syncs to the shared copies; what one machine keeps for itself is listed in machine-keeps.json at the repo root.",
   "apps": [
     {
       "name": "alt-tab",

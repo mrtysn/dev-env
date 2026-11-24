@@ -519,7 +519,7 @@ fi
 # macOS shortcuts as set in System Settings > Keyboard > Keyboard Shortcuts.
 echo "✓ Exporting macOS keyboard shortcuts"
 if "$SCRIPT_DIR/macos/symbolic-hotkeys.py" export --label "${MACHINE_LABEL:-}"; then
-    note "macos/symbolic-hotkeys.plist (or symbolic-hotkeys.$MACHINE_LABEL.plist on a machine that is not its owner)"
+    note "macos/symbolic-hotkeys.plist (and symbolic-hotkeys.$MACHINE_LABEL.plist for what machine-keeps.json keeps here)"
 else
     warn "symbolic hotkeys export failed"
 fi
@@ -527,7 +527,7 @@ fi
 # macOS settings: only the keys macos/system-settings.json allowlists per domain.
 echo "✓ Exporting macOS settings"
 if "$SCRIPT_DIR/macos/system-settings.py" export --label "${MACHINE_LABEL:-}"; then
-    note "macos/system-settings/ (or <name>.$MACHINE_LABEL.plist overlays on a machine that is not a record's owner)"
+    note "macos/system-settings/ (and <name>.$MACHINE_LABEL.plist for what machine-keeps.json keeps here)"
 else
     warn "macOS settings export failed"
 fi

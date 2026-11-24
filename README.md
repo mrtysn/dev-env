@@ -211,6 +211,28 @@ git -C <this repo> config core.hooksPath "$AGENTS_SHARED/githooks"
   denylist is written there by hand and holds only the employer's own names and internal terms.
   It is never a copy of the home machine's list, which names private projects and people.
 
+### Syncing settings between machines
+
+The keyboard shortcuts, macOS settings and app settings below all sync the same way
+(`lib/sync_state.py`):
+
+- **Shared by default.** Each app or domain has one record, and `export.sh` on any machine
+  updates it with that machine's values. A key the exporting machine has never written keeps its
+  recorded value, so a machine that is not set up yet takes nothing away. Import applies the
+  record on every machine.
+- **Per machine only when declared.** `machine-keeps.json` lists, per machine label, the keys that
+  machine keeps for itself. Only those are written to its `<record>.<label>` file and laid over the
+  shared record there. Today that is c03's Show Apps on F18 (shortcut 160): c03 has no
+  Karabiner, so step 18 maps its Caps Lock to F18. To keep another setting per machine, add it
+  there and export on that machine.
+- **No stale exports.** Each machine stores, outside git, the hash of every record as it last
+  imported or exported it (`~/.local/state/dev-env/applied.json`). Export refuses a record that
+  changed since then, since another machine exported it and this one would put back older
+  values: run the import step it names first. `--force` overrides.
+
+On a machine that is new or behind: `git pull`, then `./import.sh`, then make any change and
+`./export.sh`. An export before the first import is refused for every record that exists.
+
 ### macOS keyboard shortcuts
 
 `export.sh` records every entry macOS has written for System Settings > Keyboard > Keyboard Shortcuts
@@ -220,10 +242,8 @@ entries match on another machine, after asking, and applies them without a logou
 written keep macOS's defaults everywhere. `macos/symbolic-hotkeys.py check` lists recorded entries that
 differ here; `macos/test-symbolic-hotkeys.zsh` tests it on a copy of the settings.
 
-Per machine: `macos/symbolic-hotkeys.plist` belongs to the machine in its `_machine` key (c02). Export
-on any other machine writes only where it differs, to `macos/symbolic-hotkeys.<label>.plist`, and
-import applies that on top of the shared record. c03's file binds Show Launchpad to F18, the key
-step 18 maps Caps Lock to, where the home Mac has Karabiner doing it.
+Synced as "Syncing settings between machines" says; c03 keeps shortcut 160 (Show Apps on F18)
+in `macos/symbolic-hotkeys.c03.plist`.
 
 ### macOS settings
 
@@ -237,10 +257,9 @@ account tokens.
     macos/system-settings.py import --label c02   # into this machine (import.sh step 21)
     macos/system-settings.py check  --label c02   # list what differs here
 
-Per machine as with the keyboard shortcuts: `<name>.plist` is the shared record, owned by the
-machine in its `_machine` key; any other machine exports only its differences, to
-`<name>.<label>.plist`. The home folder is stored as `$HOME`. Dock tiles keep only their URL,
-label, type and bundle id. Import saves each domain it changes to
+Synced as "Syncing settings between machines" says: `<name>.plist` is the shared record, and a
+machine's declared keeps go to `<name>.<label>.plist`. The home folder is stored as `$HOME`. Dock tiles keep only their URL,
+label, type and bundle id, and an export keeps the shared tiles for apps that machine lacks in place. Import saves each domain it changes to
 `~/.macos-settings-backup-<date>/` first. A key never written on the exporting machine is not
 carried. Trackpad, mouse and input source changes take full effect at the next login.
 Across macOS versions: each record keeps the major version it was exported on (`_macos`), and
@@ -251,13 +270,9 @@ of another version, Spotlight's category list (`same_version` in the json) is no
 since versions reshape it. Import writes only the keys that differ (`defaults import` merges), so
 the domain's other keys stay.
 
-Order matters on a Mac that has settings of its own. Export there before its first import, and
-everything it does differently becomes its `<name>.<label>.plist`, which import then keeps. Import
-first, and the shared record replaces them (the backup folder keeps the old values); a setting
-changed afterwards and exported is recorded in the overlay. A shared key the machine has never
-written goes into its overlay's `_not_set` list, and import leaves it alone there: a default the
-machine kept, or a key its macOS no longer reads. After restarting Finder, the Dock and the menu
-bar, import reads their settings again and names any value they wrote back.
+A Mac of another macOS version neither imports nor exports a `same_version` domain. After
+restarting Finder, the Dock and the menu bar, import reads their settings again and names any
+value they wrote back, such as a key that macOS version does not accept.
 Not carried, since macOS keeps them per machine or out of reach: the Finder sidebar, privacy
 grants, displays, login items. `macos/test-system-settings.zsh` tests it on files in a sandbox.
 
@@ -272,18 +287,15 @@ drop would miss. Sublime Text carries its `Packages/User` settings files instead
     app-settings/app-settings.py import --label c02   # into this machine, for installed apps (import.sh step 16)
     app-settings/app-settings.py check  --label c02   # per app: matches or differs
 
-Per machine as with the macOS settings: the machine `apps.json` names as `owner` (c02) writes the
-shared copies; any other machine exports only where it differs, to `<app>.<label>.plist` for a
-plist app, and for a file to `<app>/<stem>.<label><ext>`: the differing keys of a JSON settings
-file (`Preferences.c03.sublime-settings` holds only `font_size`), or the whole file when it is not
-one (a keymap). Import lays a machine's overlay over the shared copy on that machine only, and an
-export that finds the machine matching again removes its overlay. An overlay only sets keys: a
-key deleted on one machine comes back on import, and export says so.
+Synced as "Syncing settings between machines" says. A machine's declared keeps go to
+`<app>.<label>.plist` for a plist app, and for a carried file to `<app>/<stem>.<label><ext>`: the
+kept keys of a JSON settings file, or the whole file when `machine-keeps.json` names `"*"`. A JSON
+settings file with kept keys is stored as plain JSON, without its comments.
 
 Both directions write only what differs, so re-runs change nothing. Import skips a running app
 (it would write its old values back on quit) and says to quit it first. Export refuses a value
 that holds the home folder's path or an email address. `export.sh` runs the export;
-`app-settings/test-app-settings.zsh` checks the overlays on a made-up app, then imports into an empty home twice and checks the second run
+`app-settings/test-app-settings.zsh` checks per-machine keeps on a made-up app, then imports into an empty home twice and checks the second run
 loads nothing. To carry another app, add it to `apps.json` with the keys that are settings, run
 the export, and read the new file before committing.
 
