@@ -243,6 +243,12 @@ machine in its `_machine` key; any other machine exports only its differences, t
 label, type and bundle id. Import saves each domain it changes to
 `~/.macos-settings-backup-<date>/` first. A key never written on the exporting machine is not
 carried. Trackpad, mouse and input source changes take full effect at the next login.
+Across macOS versions: each record keeps the major version it was exported on (`_macos`), and
+check and import name the domains recorded on another one, since a key that version renamed or
+dropped is written, ignored, and still reads as matching. A Dock tile whose app is not on the Mac
+(Launchpad on macOS 26 and later) is left out and named instead of becoming a "?" tile. On a Mac
+of another version, import first, then export: the export then records only where it still
+differs, in its own `<name>.<label>.plist`.
 Not carried, since macOS keeps them per machine or out of reach: the Finder sidebar, privacy
 grants, displays, login items. `macos/test-system-settings.zsh` tests it on files in a sandbox.
 

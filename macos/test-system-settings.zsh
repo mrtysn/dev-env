@@ -58,5 +58,26 @@ o=$(plutil -p $rec/finder.c03.plist 2>&1)
 run check --dir $other --label c03 >/dev/null && ok || bad "c03 differs from its own overlay"
 run check --dir $other --label c02 >/dev/null && bad "c02 should differ from c03's Finder" || ok
 
+# Another macOS version: check and import name it, and the comparison is unchanged.
+out=$(run check --dir $other --label c03 --macos 99)
+[[ $out == *"this Mac runs 99"*finder* ]] && ok || bad "no version note on another macOS: $out"
+out=$(run check --dir $other --label c03)
+[[ $out != *"this Mac runs"* ]] && ok || bad "version note on the same macOS: $out"
+[[ $(plutil -p $rec/finder.plist) == *_macos* && $(plutil -p $rec/finder.c03.plist) == *_macos* ]] && ok || bad "records lack _macos"
+
+# A Dock tile whose app is not on this Mac is left out, named, and not counted as a difference.
+/usr/bin/python3 -I - $rec/dock.plist <<'PY'
+import plistlib, sys
+p = sys.argv[1]; r = plistlib.load(open(p, "rb"))
+r["persistent-apps"].append({"tile-type": "file-tile", "tile-data": {"file-label": "No Such App",
+    "file-data": {"_CFURLString": "file:///Applications/No%20Such%20App.app/", "_CFURLStringType": 15}}})
+plistlib.dump(r, open(p, "wb"))
+PY
+out=$(run check --dir $other --label c02)
+[[ $out == *"tiles not on this Mac, left out: No Such App"* && $out != *"differs here: dock"* ]] && ok || bad "missing app tile: $out"
+out=$(run import --dir $other --label c02)
+[[ $out == *"left out tiles not on this Mac: No Such App"* ]] && ok || bad "import did not name the missing tile: $out"
+[[ $(defaults read $other/dock.plist persistent-apps) != *"No Such App"* ]] && ok || bad "missing app tile was written"
+
 print "system-settings: $pass passed, $fail failed"
 (( fail == 0 ))

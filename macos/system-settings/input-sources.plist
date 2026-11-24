@@ -56,5 +56,7 @@
 	</array>
 	<key>_machine</key>
 	<string>c02</string>
+	<key>_macos</key>
+	<string>15</string>
 </dict>
 </plist>

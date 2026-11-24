@@ -57,6 +57,8 @@
 	<false/>
 	<key>_machine</key>
 	<string>c02</string>
+	<key>_macos</key>
+	<string>15</string>
 	<key>com.apple.mouse.scaling</key>
 	<real>2.5</real>
 	<key>com.apple.sound.beep.flash</key>

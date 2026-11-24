@@ -4,6 +4,8 @@
 <dict>
 	<key>_machine</key>
 	<string>c02</string>
+	<key>_macos</key>
+	<string>15</string>
 	<key>autohide</key>
 	<false/>
 	<key>largesize</key>

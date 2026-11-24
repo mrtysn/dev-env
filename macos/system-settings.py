@@ -13,15 +13,21 @@ Per machine: system-settings/<name>.plist is the shared record, written by the m
 "_machine" key. Any other machine (--label, from machine-label.sh) records only the keys where it
 differs, in <name>.<label>.plist, and import applies that on top of the shared record.
 
+Across macOS versions: each record keeps the macOS major version it was exported on ("_macos"),
+and check and import name the domains recorded on another version, since a key that version
+renamed or dropped is written and then ignored, and still reads as matching. A Dock tile whose
+app is not on this Mac (Launchpad after macOS 15) is left out and named, not set as a "?" tile.
+
 The home folder is recorded as $HOME and expanded on import. Export refuses any other value that
 holds the home path, or an email address, since this repo is public.
 Import first saves each domain it changes, whole, to
 ~/.macos-settings-backup-<date>/<name>.plist; `defaults import <domain> FILE` puts one back.
 Options: --label LABEL (this machine's label); --dir DIR reads and writes DIR/<name>.plist files
 instead of the user's domains and restarts nothing (tests); --record DIR keeps the record there
-instead of macos/system-settings (tests).
+instead of macos/system-settings (tests); --macos N takes N as this Mac's major version (tests).
 """
 import json, os, plistlib, re, subprocess, sys, time
+from urllib.parse import unquote, urlparse
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOME = os.path.expanduser("~")
@@ -32,6 +38,14 @@ ACTIVATE = "/System/Library/PrivateFrameworks/SystemAdministration.framework/Res
 TILE_KEYS = {"file-data", "file-label", "file-type", "bundle-identifier", "arrangement", "displayas",
              "showas", "preferreditemsize", "url", "label"}
 GREEN, YELLOW, RED, NC = "\033[0;32m", "\033[1;33m", "\033[0;31m", "\033[0m"
+
+
+def macos_major():
+    out = subprocess.run(["sw_vers", "-productVersion"], capture_output=True, text=True)
+    return out.stdout.strip().split(".")[0]
+
+
+MACOS = ""  # this Mac's major version, set in main
 
 
 def say(colour, text):
@@ -141,14 +155,47 @@ class Record:
     def owner(self, d):
         return load(self.shared_path(d)).get("_machine", "")
 
+    def version(self, d):
+        return str(load(self.shared_path(d)).get("_macos", ""))
+
     def shared(self, d):
         return {k: v for k, v in load(self.shared_path(d)).items() if not k.startswith("_")}
 
     def wanted(self, d, label):
         want = self.shared(d)
         if label and label != self.owner(d):
-            want.update(load(self.overlay_path(d, label)))
-        return want
+            want.update({k: v for k, v in load(self.overlay_path(d, label)).items() if not k.startswith("_")})
+        return present_tiles(d, want)
+
+
+def tile_path(t):
+    url = t.get("tile-data", {}).get("file-data", {}).get("_CFURLString", "")
+    return unquote(urlparse(local(url)).path) if url.startswith("file://") else ""
+
+
+def present_tiles(d, want):
+    """The wanted settings without Dock tiles whose app or folder is not on this Mac, and their labels."""
+    skipped = []
+    for k in d.get("tiles", []):
+        if isinstance(want.get(k), list):
+            keep = []
+            for t in want[k]:
+                path = tile_path(t)
+                if path and not os.path.exists(path):
+                    skipped.append(t["tile-data"].get("file-label") or os.path.basename(path.rstrip("/")))
+                else:
+                    keep.append(t)
+            want = dict(want, **{k: keep})
+    return want, skipped
+
+
+def version_note(domains, rec):
+    """A line naming the domains recorded on another macOS major version than this Mac's, or ""."""
+    other = {}
+    for d in domains:
+        if os.path.exists(rec.shared_path(d)) and rec.version(d) != MACOS:
+            other.setdefault(rec.version(d) or "an unrecorded version", []).append(d["name"])
+    return "; ".join(f"recorded on macOS {v}, this Mac runs {MACOS}: {', '.join(n)}" for v, n in other.items())
 
 
 def write_if_changed(path, data):
@@ -169,7 +216,7 @@ def export(domains, store, rec, label):
             continue
         owner = rec.owner(d)
         if not os.path.exists(rec.shared_path(d)) or not owner or owner == label:
-            if write_if_changed(rec.shared_path(d), dict(live, _machine=label or "unknown")):
+            if write_if_changed(rec.shared_path(d), dict(live, _machine=label or "unknown", _macos=MACOS)):
                 changed += 1
                 say(GREEN, f"✓ exported {d['name']} ({len(live)} keys)")
             continue
@@ -182,7 +229,7 @@ def export(domains, store, rec, label):
                 changed += 1
                 say(GREEN, f"✓ {d['name']}: {label} matches the shared record now, removed its overlay")
             continue
-        if write_if_changed(path, diff):
+        if write_if_changed(path, dict(diff, _macos=MACOS)):
             changed += 1
             say(GREEN, f"✓ exported {d['name']}: {len(diff)} keys where {label} differs")
     if not changed:
@@ -191,16 +238,26 @@ def export(domains, store, rec, label):
 
 
 def differing(d, store, rec, label):
-    want = rec.wanted(d, label)
+    want, skipped = rec.wanted(d, label)
     have = carried(d, store.read(d))
-    return want, {k: v for k, v in want.items() if have.get(k) != v}
+    return want, {k: v for k, v in want.items() if have.get(k) != v}, skipped
+
+
+def warn_versions(domains, rec):
+    note = version_note(domains, rec)
+    if note:
+        say(YELLOW, f"! {note}. A key that macOS renamed or dropped is written and then ignored, "
+                    "and still reads as matching: look at those settings once by hand.")
 
 
 def import_(domains, store, rec, label):
     restart, bad, total = set(), 0, 0
     backup = ""
+    warn_versions(domains, rec)
     for d in domains:
-        want, todo = differing(d, store, rec, label)
+        want, todo, skipped = differing(d, store, rec, label)
+        if skipped:
+            say(YELLOW, f"! {d['name']}: left out tiles not on this Mac: {', '.join(skipped)}")
         if not todo:
             continue
         whole = store.read(d)
@@ -235,8 +292,11 @@ def import_(domains, store, rec, label):
 
 def check(domains, store, rec, label):
     bad = 0
+    warn_versions(domains, rec)
     for d in domains:
-        _, todo = differing(d, store, rec, label)
+        _, todo, skipped = differing(d, store, rec, label)
+        if skipped:
+            print(f"! {d['name']}: tiles not on this Mac, left out: {', '.join(skipped)}")
         for k in sorted(todo):
             bad = 1
             print(f"differs here: {d['name']} {k}")
@@ -254,6 +314,8 @@ def main(argv):
     store = Store(os.path.realpath(opt("--dir")) if "--dir" in argv else "")
     rec = Record(opt("--record") or os.path.join(HERE, "system-settings"))
     label = opt("--label")
+    global MACOS
+    MACOS = opt("--macos") or macos_major()
     return {"export": export, "import": import_, "check": check}[argv[0]](load_domains(), store, rec, label)
 
 
