@@ -1,7 +1,7 @@
 # Single source of truth for the machine → label → profiles mapping.
 #   c02 = Home Mac (personal)     c03 = Work Mac (work, plus a personal config folder)
 # Sourced by export.sh and import.sh; the label names every per-machine file:
-# .zshrc.<label>, Brewfile.<label>, tmux/<label>.conf, asdf/tool-versions.<label>.
+# .zshrc.<label>, Brewfile.<label>, tmux/<label>.conf.
 #
 # MACHINE_PROFILES lists the agent profiles this machine runs (see README, "Profiles").
 # The first entry is the machine's primary profile: it picks the Brewfile.<profile> layer

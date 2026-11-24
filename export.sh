@@ -56,7 +56,7 @@ echo "  - $SCRIPT_DIR/.phoenix.js"
 echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/${MACHINE_LABEL:-<label>}.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
-echo "  - $SCRIPT_DIR/asdf/tool-versions.${MACHINE_LABEL:-<label>} (this machine's only)"
+echo "  - $SCRIPT_DIR/asdf/tool-versions (pins raised to this machine's newer runtimes)"
 echo ""
 echo "Your actual config files will NOT be modified."
 echo ""
@@ -196,13 +196,15 @@ fi
 
 # Export asdf runtime pins — per-machine file, one-sided write (same convention
 # as .zshrc.<label>): each machine backs up only its own pins.
-echo "✓ Exporting asdf tool-versions ($ZSH_LABEL)"
-if [[ -n "$ZSH_LABEL" ]] && [ -f ~/.tool-versions ]; then
-    mkdir -p asdf
-    copy_atomic ~/.tool-versions "asdf/tool-versions.$ZSH_LABEL"
-    note "asdf/tool-versions.$ZSH_LABEL"
+echo "✓ Exporting asdf tool-versions"
+if [ -f ~/.tool-versions ]; then
+    if "$SCRIPT_DIR/asdf/sync-tool-versions.py" export --label "${MACHINE_LABEL:-}"; then
+        note "asdf/tool-versions (shared; the newest version wins)"
+    else
+        warn "asdf pins export failed"
+    fi
 else
-    warn "no ~/.tool-versions or unknown machine label — asdf pins not exported"
+    warn "no ~/.tool-versions: asdf pins not exported"
 fi
 
 # Export tmux config

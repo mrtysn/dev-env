@@ -643,24 +643,15 @@ if $CHECK; then
         check_report 2
     fi
 
-    # Step 3: the pinned file, plus each pinned runtime installed (never installs anything)
-    if [[ -z "$BREW_LABEL" || ! -s "asdf/tool-versions.$BREW_LABEL" ]] || ! command_exists asdf; then
-        check_skip 3 "no asdf/tool-versions.<label> in the repo for this machine, or asdf missing"
+    # Step 3: the runtimes import would raise or add (never one this Mac runs newer)
+    if [[ ! -s asdf/tool-versions ]] || ! command_exists asdf; then
+        check_skip 3 "no asdf/tool-versions in the repo, or asdf missing"
     else
-        install_file "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
-        plugins=" $(asdf plugin list 2>/dev/null | tr '\n' ' ') "
-        while read -r tool versions; do
-            [[ -z "$tool" || "$tool" == \#* ]] && continue
-            if [[ "$plugins" != *" $tool "* ]]; then
-                CHECK_CHANGES+=("asdf plugin $tool")
-                continue
-            fi
-            [[ "$versions" == system ]] && continue
-            have="$(cd ~ && asdf list "$tool" 2>/dev/null | sed -E 's/^[ *]+//')"
-            for v in ${=versions}; do
-                print -r -- "$have" | grep -qxF "$v" || CHECK_CHANGES+=("$tool $v (not installed)")
+        if ! out="$("$SCRIPT_DIR/asdf/sync-tool-versions.py" check --label "${MACHINE_LABEL:-}" 2>&1)"; then
+            for line in "${(@f)out}"; do
+                [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("asdf ${line#differs here: }")
             done
-        done < "asdf/tool-versions.$BREW_LABEL"
+        fi
         check_report 3
     fi
 
@@ -993,39 +984,22 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 if want_step 3; then
 echo "=== Step 3: asdf Runtimes ==="
-# Per-machine pins (asdf/tool-versions.<label>) — same one-sided convention as
-# .zshrc.<label>: this machine only ever reads its own file.
-if [[ -n "$BREW_LABEL" ]] && [ -s "asdf/tool-versions.$BREW_LABEL" ] && command -v asdf >/dev/null 2>&1; then
-    print "${BLUE}Runtimes ($BREW_LABEL):${NC} $(tr '\n' ' ' < "asdf/tool-versions.$BREW_LABEL")"
-    if ask_yes_no asdf-runtimes "Install asdf plugins and runtimes? (runtime builds can take a while)"; then
-        # Pins older than what this machine runs mean export.sh has not run since an upgrade:
-        # importing them would switch every runtime back.
-        if [ -f ~/.tool-versions ] && ! cmp -s "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions; then
-            print "${YELLOW}! ~/.tool-versions differs from the repo's pins (< repo, > this machine):${NC}"
-            diff "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions | grep '^[<>]' || true
-            print "${YELLOW}  If this machine's versions are the newer ones, run export.sh first instead.${NC}"
-        fi
-        install_file "asdf/tool-versions.$BREW_LABEL" ~/.tool-versions
-        while read -r tool _version; do
-            [[ -z "$tool" || "$tool" == \#* ]] && continue
-            if asdf plugin list 2>/dev/null | grep -qx "$tool"; then
-                print "${GREEN}✓ asdf plugin $tool already added${NC}"
-            else
-                print "${YELLOW}→ Adding asdf plugin $tool...${NC}"
-                asdf plugin add "$tool" || print "${RED}✗ plugin $tool failed${NC}"
-            fi
-        done < "asdf/tool-versions.$BREW_LABEL"
-        # Per tool: a bare `asdf install` exits non-zero on a `system` pin (the OS's own java),
-        # which it cannot install, so every run reported a failure.
-        while read -r tool version; do
-            [[ -z "$tool" || "$tool" == \#* || "$version" == system ]] && continue
-            (cd ~ && asdf install "$tool" "$version") || print "${RED}✗ $tool $version failed to install${NC}"
-        done < "asdf/tool-versions.$BREW_LABEL"
+# One shared record (asdf/tool-versions); the newest version wins: a runtime the repo has newer,
+# or this Mac lacks, is installed and pinned, and one this Mac runs newer is left alone.
+TOOL_VERSIONS="$SCRIPT_DIR/asdf/sync-tool-versions.py"
+if [[ -s asdf/tool-versions ]] && command -v asdf >/dev/null 2>&1; then
+    if "$TOOL_VERSIONS" check --label "${MACHINE_LABEL:-}" >/dev/null; then
+        print "${GREEN}✓ asdf runtimes are at or above the repo's pins${NC}"
     else
-        print "${YELLOW}! Skipped asdf runtimes${NC}"
+        "$TOOL_VERSIONS" check --label "${MACHINE_LABEL:-}" | sed 's/^differs here: /  /'
+        if ask_yes_no asdf-runtimes "Install these asdf runtimes? (runtime builds can take a while)"; then
+            "$TOOL_VERSIONS" import --label "${MACHINE_LABEL:-}" || print "${RED}✗ some asdf runtimes did not install${NC}"
+        else
+            print "${YELLOW}! Skipped asdf runtimes${NC}"
+        fi
     fi
 else
-    print "${YELLOW}! No asdf/tool-versions.$BREW_LABEL in repo (or asdf missing), skipping${NC}"
+    print "${YELLOW}! No asdf/tool-versions in repo (or asdf missing), skipping${NC}"
 fi
 echo ""
 fi

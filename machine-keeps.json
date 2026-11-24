@@ -1,5 +1,5 @@
 {
-  "_comment": "Settings a machine keeps for itself. Everything else the settings tools carry is shared: an export on any machine writes it for all. Per machine label, \"<tool>/<record>\" lists the keys that machine keeps, written to <record>.<label> on export and laid over the shared record on import. Tools: system-settings (records are the names in macos/system-settings.json), symbolic-hotkeys (record symbolic-hotkeys, keys are shortcut ids), app-settings (records are app names, or <app>/<file> for a carried file; \"*\" keeps the whole file).",
+  "_comment": "Settings a machine keeps for itself. Everything else the settings tools carry is shared: an export on any machine writes it for all. Per machine label, \"<tool>/<record>\" lists the keys that machine keeps, written to <record>.<label> on export and laid over the shared record on import. Tools: system-settings (records are the names in macos/system-settings.json), symbolic-hotkeys (record symbolic-hotkeys, keys are shortcut ids), app-settings (records are app names, or <app>/<file> for a carried file; \"*\" keeps the whole file), asdf (record tool-versions, keys are tool names, kept in asdf/tool-versions.<label>).",
   "c03": {
     "symbolic-hotkeys/symbolic-hotkeys": ["160"]
   }

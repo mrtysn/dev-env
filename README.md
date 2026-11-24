@@ -53,7 +53,7 @@ Two things select what a machine gets.
 
 - **Machine label** (`c02`, `c03`, ...): `machine-label.sh` maps the Mac's LocalHostName to it.
   The label names every per-machine file: `.zshrc.<label>`, `Brewfile.<label>`,
-  `tmux/<label>.conf`, `asdf/tool-versions.<label>`. `.zshrc.loader` repeats the hostname
+  `tmux/<label>.conf`. `.zshrc.loader` repeats the hostname
   cases, because shell startup must not depend on this repo.
 - **Profile** (`personal` or `work`): what a Claude config folder, and the machine as a whole,
   is used for. `machine-label.sh` lists each machine's profiles; the first is its primary one.
@@ -392,7 +392,7 @@ Sets up your terminal from this repo configuration.
 What it does:
 1. Installs Homebrew (if not present)
 2. Installs brew dependencies via `brew bundle`: `Brewfile`, `Brewfile.<primary profile>`, `Brewfile.<label>` (includes FiraCode Nerd Font), all but their `mas` lines
-3. Installs this machine's asdf plugins and runtimes from `asdf/tool-versions.<label>`
+3. Installs the asdf runtimes `asdf/tool-versions` pins newer than this machine has, or that it lacks, with their plugins (`asdf/sync-tool-versions.py`); a runtime this machine runs newer is left alone
 4. Installs Oh-My-Zsh (if not present)
 5. Clones all custom plugins
 6. Sets up Homebrew command-not-found
@@ -413,7 +413,12 @@ What it does:
 21. Sets the macOS settings as recorded (`macos/system-settings/`, written by `export.sh`; see "macOS settings"), asking first, then restarts Finder, the Dock and the menu bar as needed
 
 `./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
-A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them. Step 3 skips a machine whose `asdf/tool-versions.<label>` is empty.
+Runtime pins: `update-all` bumps this machine's runtimes, `export.sh` raises `asdf/tool-versions` to
+any that are newer, and the other machine's import installs them. Pins only move up; to move one
+down, edit the file and run `asdf/sync-tool-versions.py import --allow-downgrade`. A tool a machine
+pins its own way goes in `machine-keeps.json` (`"asdf/tool-versions": ["java"]`).
+
+A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them.
 
 The script is idempotent: a second run installs nothing and writes nothing. A file that already
 matches the repo is left alone (`already matches`), and only a file that differs is backed up
@@ -751,7 +756,7 @@ asdf global dotnet latest
 - `Brewfile` - Shared brew, cask and Mac App Store dependencies, hand-curated — never `brew bundle dump`ed
 - `Brewfile.personal` / `Brewfile.work` - Per-profile brew dependencies
 - `Brewfile.c02` / `Brewfile.c03` - Machine-specific brew dependencies
-- `asdf/tool-versions.<label>` - Per-machine runtime pins (each machine exports/imports only its own)
+- `asdf/tool-versions` - Shared asdf runtime pins: the newest version either machine has exported wins (`asdf/sync-tool-versions.py`)
 - `agents/claude/` - Claude settings base, `overlays/`, and the scripts that merge, check and set up config folders
 - `iterm-profiles/` - iTerm2 dynamic profile configurations
   - `default.json` - Full Default profile
@@ -818,9 +823,8 @@ Feel free to use, modify, and share.
 
 ## Known Gaps
 
-- **The c03 files are empty until the work Mac exports.** `.zshrc.c03`,
-  `tmux/c03.conf` and `asdf/tool-versions.c03` were added before the machine
-  existed; its first `./export.sh` fills them.
+- **The c03 files are empty until the work Mac exports.** `.zshrc.c03` and
+  `tmux/c03.conf` were added before the machine existed; its first `./export.sh` fills them.
 - **A loader case added in the repo is lost by exporting first.** `export.sh`
   copies the live `~/.zshrc` over `.zshrc.loader`; it warns when the repo copy maps
   a machine the live file lacks. Run `import.sh` step 8 on each machine after
