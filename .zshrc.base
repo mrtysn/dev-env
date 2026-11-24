@@ -474,6 +474,53 @@ _update-all-spicetify-reapply() {
   mkdir -p "${stamp:h}" && print -r -- "$now" >| "$stamp"
 }
 
+# `mas upgrade`, minus the apps the App Store refused on an earlier run. For some apps the App
+# Store will not start an update that mas asks for: it shows an Apple ID error popup for each,
+# and mas prints "No downloads initiated for ADAM ID <id>" (Keynote, Numbers and Pages, Nov
+# 2026). Its own Updates page updates them after a sign-in. A refused app is recorded with its
+# installed version and left out of later runs, so no run opens those popups again, until its
+# version changes (updated in the App Store) or a newer release arrives, and it is tried again.
+_update-all-mas-upgrade() {
+  local state="${XDG_CACHE_HOME:-$HOME/.cache}/update-all/mas-refused"
+  local row='^ *([0-9]+) +(.*[^ ]) +\(([^ ]+) -> ([^)]+)\)' refusal='No downloads initiated for ADAM ID ([0-9]+)'
+  local line id ver err rc=0 other=0
+  local -A refused name have want
+  local -a todo held refused_now ask names
+  if [[ -f $state ]]; then
+    while IFS=$'\t' read -r id ver; do [[ -n $id ]] && refused[$id]=$ver; done < "$state"
+  fi
+  # "361309726  Pages  (15.1.1 -> 16.0)": a refusal holds while both versions are unchanged
+  for line in ${(f)"$(mas outdated 2>/dev/null)"}; do
+    [[ $line =~ $row ]] || continue
+    id=$match[1]; name[$id]=$match[2]; have[$id]=$match[3]; want[$id]=$match[4]
+    if [[ ${refused[$id]-} == "$match[3] $match[4]" ]]; then held+=($id); else todo+=($id); fi
+  done
+  if (( ! ${#todo} && ! ${#held} )); then
+    echo "mas: nothing to upgrade"
+    return 0
+  fi
+  if (( ${#todo} )); then
+    err=$(mktemp) || return 1
+    mas upgrade $todo 2>"$err"; rc=$?
+    for line in ${(f)"$(<$err)"}; do
+      if [[ $line =~ $refusal ]]; then refused_now+=($match[1])
+      else print -r -- "$line" >&2; other=1; fi
+    done
+    command rm -f -- "$err"
+    # every error was a refusal: the stage did what mas can do, the rest is the Action needed line
+    (( rc && ! other && ${#refused_now} )) && rc=0
+  fi
+  ask=($held $refused_now)
+  mkdir -p "${state:h}"
+  : >| "$state"
+  for id in $ask; do print -r -- "$id"$'\t'"${have[$id]} ${want[$id]}" >> "$state"; done
+  if (( ${#ask} )); then
+    for id in $ask; do names+=("${name[$id]:-$id}"); done
+    print -r -- "Action needed: the App Store will not update ${(j:, :)names} through mas (it shows an Apple ID error popup instead). Update them from App Store > Updates, signing in when it asks; uall leaves them out until their version changes."
+  fi
+  return $rc
+}
+
 _update-all-stage() {
   cd "$HOME" || return 1
   case "$1" in
@@ -495,13 +542,11 @@ _update-all-stage() {
       elif (( signed_in == 1 )); then
         echo "no App Store account signed in: mas skipped"
         return 78
-      elif [[ -z "$(mas outdated 2>/dev/null)" ]]; then
-        echo "mas: nothing to upgrade"
-      elif (( ! ${UPDATE_ALL_MAS_SUDO:-0} )); then
+      elif (( ! ${UPDATE_ALL_MAS_SUDO:-0} )) && [[ -n "$(mas outdated 2>/dev/null)" ]]; then
         echo "Action needed: mas upgrades need the sudo password and this shell has no terminal; run mas upgrade in a terminal"
         return 78
       else
-        mas upgrade
+        _update-all-mas-upgrade
       fi ;;
     spicetify) _update-all-spicetify-reapply ;;
     local-builds) _update-all-local-builds ;;
@@ -787,7 +832,7 @@ update-all() {
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
   local mas_sudo=0
   { (( EUID == 0 )) || [[ -t 0 ]] || sudo -n true 2>/dev/null } && mas_sudo=1
-  local stage_env="$(typeset -f _mas-signed-in _update-all-stage _update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
+  local stage_env="$(typeset -f _mas-signed-in _update-all-mas-upgrade _update-all-stage_update-all-brew-upgrade _update-all-manual-update-steps _update-all-upgrade-manual-update-casks _update-all-spicetify-reapply _update-all-local-builds _pnpm-migrate-globals _pnpm-global-manifests \
     _pnpm-shims-broken _pnpm-fix-shims _happy-daemon-refresh _unquarantine-notarized-casks \
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins \
     _update-all-custom-heads _upgrade_custom_plugin upgrade_oh_my_zsh_custom)"
