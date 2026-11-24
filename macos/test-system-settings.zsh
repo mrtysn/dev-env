@@ -60,7 +60,7 @@ run check --dir $other --label c02 >/dev/null && bad "c02 should differ from c03
 
 # Another macOS version: check and import name it, and the comparison is unchanged.
 out=$(run check --dir $other --label c03 --macos 99)
-[[ $out == *"this Mac runs 99"*finder* ]] && ok || bad "no version note on another macOS: $out"
+[[ $out == *"this Mac runs 99 (all of them)"* ]] && ok || bad "no version note on another macOS: $out"
 out=$(run check --dir $other --label c03)
 [[ $out != *"this Mac runs"* ]] && ok || bad "version note on the same macOS: $out"
 [[ $(plutil -p $rec/finder.plist) == *_macos* && $(plutil -p $rec/finder.c03.plist) == *_macos* ]] && ok || bad "records lack _macos"
@@ -78,6 +78,31 @@ out=$(run check --dir $other --label c02)
 out=$(run import --dir $other --label c02)
 [[ $out == *"left out tiles not on this Mac: No Such App"* ]] && ok || bad "import did not name the missing tile: $out"
 [[ $(defaults read $other/dock.plist persistent-apps) != *"No Such App"* ]] && ok || bad "missing app tile was written"
+
+# Import writes only what differs and keeps the domain's other keys.
+defaults write $other/finder.plist FXRecentFolders -string "kept"
+defaults write $live/finder.plist ShowStatusBar -bool true; run export --dir $live --label c02 >/dev/null
+out=$(run import --dir $other --label c02)
+[[ $out == *"finder: set ShowStatusBar"* ]] && ok || bad "import did not set just the new key: $out"
+[[ $(defaults read $other/finder.plist FXRecentFolders) == kept ]] && ok || bad "import removed an uncarried key"
+
+# A same_version domain (Spotlight) is not applied on another macOS, and says so.
+defaults write $live/spotlight.plist orderedItems -array '{enabled = 1; name = APPLICATIONS;}'
+run export --dir $live --label c02 >/dev/null
+out=$(run import --dir $other --label c02 --macos 99)
+[[ $out == *"not applied, recorded on another macOS version: spotlight"* && $out != *"spotlight: set"* ]] && ok || bad "spotlight applied across versions: $out"
+[[ ! -f $other/spotlight.plist ]] && ok || bad "spotlight was written"
+
+# A Mac without a recorded tile's app exports no Dock overlay for that alone.
+rm -f -- $rec/dock.c03.plist
+run import --dir $other --label c03 >/dev/null
+run export --dir $other --label c03 >/dev/null
+[[ ! -f $rec/dock.c03.plist ]] && ok || bad "missing app tile made a c03 dock overlay: $(plutil -p $rec/dock.c03.plist)"
+
+# A key dropped from the allowlist is no longer wanted, even while the record still holds it.
+/usr/bin/python3 -I -c 'import plistlib,sys; p=sys.argv[1]; r=plistlib.load(open(p,"rb")); r["NotAllowlisted"]=1; plistlib.dump(r,open(p,"wb"))' $rec/finder.plist
+out=$(run check --dir $other --label c02)
+[[ $out != *NotAllowlisted* ]] && ok || bad "a key outside the allowlist is wanted: $out"
 
 print "system-settings: $pass passed, $fail failed"
 (( fail == 0 ))

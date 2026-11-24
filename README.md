@@ -246,9 +246,16 @@ carried. Trackpad, mouse and input source changes take full effect at the next l
 Across macOS versions: each record keeps the major version it was exported on (`_macos`), and
 check and import name the domains recorded on another one, since a key that version renamed or
 dropped is written, ignored, and still reads as matching. A Dock tile whose app is not on the Mac
-(Launchpad on macOS 26 and later) is left out and named instead of becoming a "?" tile. On a Mac
-of another version, import first, then export: the export then records only where it still
-differs, in its own `<name>.<label>.plist`.
+(Launchpad, on the macOS 27 Mac) is left out and named instead of becoming a "?" tile. On a Mac
+of another version, Spotlight's category list (`same_version` in the json) is not applied,
+since versions reshape it. Import writes only the keys that differ (`defaults import` merges), so
+the domain's other keys stay.
+
+Order matters on a Mac that has settings of its own. Export there before its first import, and
+everything it does differently becomes its `<name>.<label>.plist`, which import then keeps. Import
+first, and the shared record replaces them (the backup folder keeps the old values); a setting
+changed afterwards and exported is recorded in the overlay. An overlay cannot unset a key: a key
+the shared record holds is always applied.
 Not carried, since macOS keeps them per machine or out of reach: the Finder sidebar, privacy
 grants, displays, login items. `macos/test-system-settings.zsh` tests it on files in a sandbox.
 

@@ -1,5 +1,5 @@
 {
-  "_comment": "macOS settings dev-env carries between machines, one entry per preferences domain. `keys` is an allowlist regex each key must match in full: this repo is public, and these domains also hold window positions, recent folders, analytics stamps and account tokens. `host` reads the domain with `defaults -currentHost`. `restart` names the processes to restart after an import changes the domain. `tiles` names keys holding Dock tile lists, which are reduced to what a tile needs (URL, label, type, bundle id) so per-machine bookmarks, GUIDs and dates neither leave the machine nor count as a difference. A key this machine has never written is not recorded, and stays at macOS's default elsewhere.",
+  "_comment": "macOS settings dev-env carries between machines, one entry per preferences domain. `keys` is an allowlist regex each key must match in full: this repo is public, and these domains also hold window positions, recent folders, analytics stamps and account tokens. `host` reads the domain with `defaults -currentHost`. `restart` names the processes to restart after an import changes the domain. `same_version` applies a domain only on the macOS version it was recorded on, for values a new version reshapes. `tiles` names keys holding Dock tile lists, which are reduced to what a tile needs (URL, label, type, bundle id) so per-machine bookmarks, GUIDs and dates neither leave the machine nor count as a difference. A key this machine has never written is not recorded, and stays at macOS's default elsewhere.",
   "domains": [
     {
       "name": "finder",
@@ -38,7 +38,7 @@
     {
       "name": "input-sources",
       "domain": "com.apple.HIToolbox",
-      "keys": "AppleEnabledInputSources|AppleSelectedInputSources|AppleCurrentKeyboardLayoutInputSourceID|AppleDictationAutoEnable"
+      "keys": "AppleEnabledInputSources|AppleDictationAutoEnable"
     },
     {
       "name": "window-manager",
@@ -73,6 +73,7 @@
     {
       "name": "spotlight",
       "domain": "com.apple.Spotlight",
+      "same_version": true,
       "keys": "orderedItems"
     }
   ]

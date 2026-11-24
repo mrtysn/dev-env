@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>AppleCurrentKeyboardLayoutInputSourceID</key>
-	<string>com.apple.keylayout.US</string>
 	<key>AppleDictationAutoEnable</key>
 	<integer>1</integer>
 	<key>AppleEnabledInputSources</key>
@@ -35,23 +33,6 @@
 			<string>com.apple.PressAndHold</string>
 			<key>InputSourceKind</key>
 			<string>Non Keyboard Input Method</string>
-		</dict>
-	</array>
-	<key>AppleSelectedInputSources</key>
-	<array>
-		<dict>
-			<key>Bundle ID</key>
-			<string>com.apple.PressAndHold</string>
-			<key>InputSourceKind</key>
-			<string>Non Keyboard Input Method</string>
-		</dict>
-		<dict>
-			<key>InputSourceKind</key>
-			<string>Keyboard Layout</string>
-			<key>KeyboardLayout ID</key>
-			<integer>0</integer>
-			<key>KeyboardLayout Name</key>
-			<string>U.S.</string>
 		</dict>
 	</array>
 	<key>_machine</key>
