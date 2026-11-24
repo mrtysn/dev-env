@@ -8,7 +8,7 @@
     "AIFeatureStreamingResponses": true,
     "AITermAPI": 2,
     "AIVectorStore": 0,
-    "AddNewTabAtEndOfTabs": false,
+    "AddNewTabAtEndOfTabs": true,
     "AiMaxTokens": 1050000,
     "AiModel": "gpt-5.5",
     "AiResponseMaxTokens": 128000,
