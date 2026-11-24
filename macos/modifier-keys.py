@@ -15,7 +15,11 @@ preferences (com.apple.keyboard.modifiermapping.<vendor>-<product>-0); it applie
 when it next connects, or at the next login. The HID keyboard filter reads it as a general remap
 table, so F-key-to-media pairs work there as well as modifier swaps. Only devices the config names
 are carried, and never an Apple keyboard, whose top row already sends media keys. Caps Lock goes
-through capslock-to-f18.zsh instead.
+through capslock-to-f18.zsh instead, and lives in a separate property (UserKeyMapping) of the same
+keyboard; the two do not overwrite each other.
+To see what a connected keyboard actually has, read ioreg (`ioreg -r -c IOHIDEventService -l`, its
+HIDEventServiceProperties): `hidutil property --get HIDKeyboardModifierMappingPairs` prints (null)
+even while the mapping is live.
 Option: --domain PATH reads and writes a plist file instead of the current host's global domain (tests).
 """
 import json, os, plistlib, subprocess, sys
