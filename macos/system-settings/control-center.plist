@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>NSStatusItem Visible AudioVideoModule</key>
+	<false/>
+	<key>NSStatusItem Visible Battery</key>
+	<false/>
+	<key>NSStatusItem Visible BentoBox</key>
+	<true/>
+	<key>NSStatusItem Visible Bluetooth</key>
+	<false/>
+	<key>NSStatusItem Visible Clock</key>
+	<true/>
+	<key>NSStatusItem Visible Display</key>
+	<false/>
+	<key>NSStatusItem Visible FocusModes</key>
+	<false/>
+	<key>NSStatusItem Visible Hearing</key>
+	<false/>
+	<key>NSStatusItem Visible NowPlaying</key>
+	<true/>
+	<key>NSStatusItem Visible ScreenMirroring</key>
+	<true/>
+	<key>NSStatusItem Visible Shortcuts</key>
+	<true/>
+	<key>NSStatusItem Visible Sound</key>
+	<true/>
+	<key>NSStatusItem Visible StageManager</key>
+	<false/>
+	<key>NSStatusItem Visible WiFi</key>
+	<false/>
+	<key>_machine</key>
+	<string>c02</string>
+</dict>
+</plist>

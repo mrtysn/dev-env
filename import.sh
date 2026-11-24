@@ -901,6 +901,15 @@ if $CHECK; then
         check_report 20
     fi
 
+    # Step 21
+    if ! out="$("$SCRIPT_DIR/macos/system-settings.py" check --label "${MACHINE_LABEL:-}" 2>&1)"; then
+        for line in "${(@f)out}"; do
+            [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
+        done
+        (( ${#CHECK_CHANGES} )) || CHECK_CHANGES+=("macOS settings (system-settings.py check failed)")
+    fi
+    check_report 21
+
     echo ""
     if (( CHECK_BAD )); then
         print "${RED}✗ import.sh would change something (nothing was written)${NC}"
@@ -1792,6 +1801,27 @@ else
         else
             print "${YELLOW}! Skipped the App Store apps${NC}"
         fi
+    fi
+fi
+echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 21: macOS settings (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+if want_step 21; then
+echo "=== Step 21: macOS Settings ==="
+# Finder, Dock, global UI and input, trackpad and mouse, screenshots, menu bar and Control Center,
+# as macos/system-settings.json allowlists them and the machine that last exported recorded them.
+SYSSET="$SCRIPT_DIR/macos/system-settings.py"
+if "$SYSSET" check --label "${MACHINE_LABEL:-}" >/dev/null; then
+    print "${GREEN}✓ Recorded macOS settings already match${NC}"
+else
+    "$SYSSET" check --label "${MACHINE_LABEL:-}" | sed 's/^/  /'
+    if ask_yes_no macos-settings "Set these macOS settings as recorded (restarts Finder, the Dock and the menu bar as needed)?"; then
+        "$SYSSET" import --label "${MACHINE_LABEL:-}" || print "${RED}✗ some macOS settings still differ${NC}"
+    else
+        print "${YELLOW}! Skipped macOS settings${NC}"
     fi
 fi
 echo ""

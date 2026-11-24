@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>FlashDateSeparators</key>
+	<false/>
+	<key>IsAnalog</key>
+	<false/>
+	<key>ShowAMPM</key>
+	<true/>
+	<key>ShowDate</key>
+	<integer>2</integer>
+	<key>ShowDayOfWeek</key>
+	<false/>
+	<key>ShowSeconds</key>
+	<false/>
+	<key>_machine</key>
+	<string>c02</string>
+</dict>
+</plist>

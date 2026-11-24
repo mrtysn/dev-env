@@ -225,6 +225,27 @@ on any other machine writes only where it differs, to `macos/symbolic-hotkeys.<l
 import applies that on top of the shared record. c03's file binds Show Launchpad to F18, the key
 step 18 maps Caps Lock to, where the home Mac has Karabiner doing it.
 
+### macOS settings
+
+`macos/system-settings.json` lists the preference domains that move between machines (Finder,
+Dock, global UI and keyboard, trackpad and mouse, input sources, window tiling, screenshots, menu
+bar clock, Control Center, Spotlight categories) and, per domain, an **allowlist** of keys, for
+the same reason as app settings: these domains also hold window positions, recent folders and
+account tokens.
+
+    macos/system-settings.py export --label c02   # this machine's settings into macos/system-settings/
+    macos/system-settings.py import --label c02   # into this machine (import.sh step 21)
+    macos/system-settings.py check  --label c02   # list what differs here
+
+Per machine as with the keyboard shortcuts: `<name>.plist` is the shared record, owned by the
+machine in its `_machine` key; any other machine exports only its differences, to
+`<name>.<label>.plist`. The home folder is stored as `$HOME`. Dock tiles keep only their URL,
+label, type and bundle id. Import saves each domain it changes to
+`~/.macos-settings-backup-<date>/` first. A key never written on the exporting machine is not
+carried. Trackpad, mouse and input source changes take full effect at the next login.
+Not carried, since macOS keeps them per machine or out of reach: the Finder sidebar, privacy
+grants, displays, login items. `macos/test-system-settings.zsh` tests it on files in a sandbox.
+
 ### App settings
 
 `app-settings/apps.json` lists the apps whose settings move between machines and, per app, an
@@ -354,6 +375,7 @@ What it does:
 18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; the machine's shortcuts bind F18, as c03 binds it to Show Apps), and each keyboard gets the modifier swaps `karabiner/karabiner.json` makes for it (`macos/modifier-keys.py`; applies when the keyboard reconnects or at the next login)
 19. Links `~/MY Applications` to `~/Applications` (`macos/my-applications-link.zsh`)
 20. Installs the Mac App Store apps the Brewfile layers list (`mas` lines) that are not installed yet; needs an Apple ID signed in and a terminal for the sudo password (see "Brewfile layers")
+21. Sets the macOS settings as recorded (`macos/system-settings/`, written by `export.sh`; see "macOS settings"), asking first, then restarts Finder, the Dock and the menu bar as needed
 
 `./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
 A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them. Step 3 skips a machine whose `asdf/tool-versions.<label>` is empty.
@@ -399,6 +421,7 @@ refuse a call without one.
 | `copy-window-configs`, `copy-lazygit-configs` | 13, 14 | yes/no |
 | `name-guard-pre-push` (15), `app-settings` (16), `macos-shortcuts` (17), `caps-lock-f18` and `karabiner-modifier-keys` (18) | as listed | yes/no |
 | `mas-signed-in`, `mas-apps` | 20 | yes/no; an unanswered `mas-signed-in` counts as signed out. With no terminal, step 20 skips anyway: mas needs the sudo password typed |
+| `macos-settings` | 21 | yes/no |
 
 ## Detailed Installation Steps
 

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AirDrop</key>
+	<integer>8</integer>
+	<key>AirplayRecieverEnabled</key>
+	<true/>
+	<key>Battery</key>
+	<integer>9</integer>
+	<key>BatteryShowPercentage</key>
+	<true/>
+	<key>Bluetooth</key>
+	<integer>8</integer>
+	<key>Display</key>
+	<integer>8</integer>
+	<key>Hearing</key>
+	<integer>9</integer>
+	<key>KeyboardBrightness</key>
+	<integer>1</integer>
+	<key>ScreenMirroring</key>
+	<integer>18</integer>
+	<key>Sound</key>
+	<integer>18</integer>
+	<key>StageManager</key>
+	<integer>8</integer>
+	<key>VoiceControl</key>
+	<integer>8</integer>
+	<key>WiFi</key>
+	<integer>8</integer>
+	<key>_machine</key>
+	<string>c02</string>
+</dict>
+</plist>

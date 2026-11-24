@@ -516,6 +516,14 @@ else
     warn "symbolic hotkeys export failed"
 fi
 
+# macOS settings: only the keys macos/system-settings.json allowlists per domain.
+echo "✓ Exporting macOS settings"
+if "$SCRIPT_DIR/macos/system-settings.py" export --label "${MACHINE_LABEL:-}"; then
+    note "macos/system-settings/ (or <name>.$MACHINE_LABEL.plist overlays on a machine that is not a record's owner)"
+else
+    warn "macOS settings export failed"
+fi
+
 # Absolute home paths in exported files break the repo on any other machine (and leak
 # the layout). The live files are the source, so say which one to fix.
 echo "✓ Checking exports for hardcoded home paths"

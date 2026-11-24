@@ -1,0 +1,79 @@
+{
+  "_comment": "macOS settings dev-env carries between machines, one entry per preferences domain. `keys` is an allowlist regex each key must match in full: this repo is public, and these domains also hold window positions, recent folders, analytics stamps and account tokens. `host` reads the domain with `defaults -currentHost`. `restart` names the processes to restart after an import changes the domain. `tiles` names keys holding Dock tile lists, which are reduced to what a tile needs (URL, label, type, bundle id) so per-machine bookmarks, GUIDs and dates neither leave the machine nor count as a difference. A key this machine has never written is not recorded, and stays at macOS's default elsewhere.",
+  "domains": [
+    {
+      "name": "finder",
+      "domain": "com.apple.finder",
+      "restart": ["Finder"],
+      "keys": "AppleShowAllFiles|FXDefaultSearchScope|FXEnableExtensionChangeWarning|FXPreferredViewStyle|FXPreferredGroupBy|FXArrangeGroupViewBy|FXRemoveOldTrashItems|NewWindowTarget|NewWindowTargetPath|QuitMenuItem|Show(Pathbar|StatusBar|Sidebar|PreviewPane|TabView)|Show\\w+OnDesktop|WarnOnEmptyTrash|_FXSortFoldersFirst\\w*|_FXShowPosixPathInTitle|_FXEnableColumnAutoSizing"
+    },
+    {
+      "name": "dock",
+      "domain": "com.apple.dock",
+      "restart": ["Dock"],
+      "tiles": ["persistent-apps", "persistent-others"],
+      "keys": "autohide|autohide-delay|autohide-time-modifier|tilesize|largesize|magnification|mineffect|orientation|launchanim|minimize-to-application|show-process-indicators|show-recents|static-only|mru-spaces|expose-group-apps|showAppExposeGestureEnabled|showMissionControlGestureEnabled|showLaunchpadGestureEnabled|showDesktopGestureEnabled|wvous-(tl|tr|bl|br)-(corner|modifier)|persistent-apps|persistent-others"
+    },
+    {
+      "name": "global",
+      "domain": "NSGlobalDomain",
+      "restart": ["Finder", "SystemUIServer"],
+      "keys": "AppleInterfaceStyle|AppleInterfaceStyleSwitchesAutomatically|AppleAquaColorVariant|AppleAccentColor|AppleHighlightColor|AppleReduceDesktopTinting|AppleShowScrollBars|AppleScrollerPagingBehavior|AppleKeyboardUIMode|AppleMiniaturizeOnDoubleClick|AppleActionOnDoubleClick|AppleShowAllExtensions|AppleEnableSwipeNavigateWithScrolls|AppleSpacesSwitchOnActivate|AppleWindowTabbingMode|AppleFontSmoothing|AppleLanguages|AppleLocale|AppleICUDateFormatStrings|AppleICUForce24HourTime|AppleMeasurementUnits|AppleMetricUnits|AppleTemperatureUnit|AppleFirstWeekday|KeyRepeat|InitialKeyRepeat|ApplePressAndHoldEnabled|NSAutomatic\\w+Enabled|WebAutomatic\\w+Enabled|KB_(Double|Single)QuoteOption|NSUserQuotesArray|NSCloseAlwaysConfirmsChanges|NSQuitAlwaysKeepsWindows|NSDocumentSaveNewDocumentsToCloud|NSNavPanelExpandedStateForSaveMode2?|PMPrintingExpandedStateForPrint2?|NSTableViewDefaultSizeMode|NSRecentDocumentsLimit|NSWindowResizeTime|NSToolbarTitleViewRolloverDelay|com\\.apple\\.mouse\\.\\w+|com\\.apple\\.trackpad\\.\\w+|com\\.apple\\.swipescrolldirection|com\\.apple\\.springing\\.\\w+|com\\.apple\\.sound\\.beep\\.\\w+|com\\.apple\\.sound\\.uiaudio\\.enabled|com\\.apple\\.keyboard\\.fnState"
+    },
+    {
+      "name": "trackpad",
+      "domain": "com.apple.AppleMultitouchTrackpad",
+      "keys": "(?!version$|UserPreferences$)\\w+"
+    },
+    {
+      "name": "trackpad-bluetooth",
+      "domain": "com.apple.driver.AppleBluetoothMultitouch.trackpad",
+      "keys": "(?!version$|UserPreferences$)\\w+"
+    },
+    {
+      "name": "mouse",
+      "domain": "com.apple.AppleMultitouchMouse",
+      "keys": "(?!version$|UserPreferences$)\\w+"
+    },
+    {
+      "name": "input-sources",
+      "domain": "com.apple.HIToolbox",
+      "keys": "AppleEnabledInputSources|AppleSelectedInputSources|AppleCurrentKeyboardLayoutInputSourceID|AppleDictationAutoEnable"
+    },
+    {
+      "name": "window-manager",
+      "domain": "com.apple.WindowManager",
+      "keys": "(?!Has|Last)\\w+"
+    },
+    {
+      "name": "screencapture",
+      "domain": "com.apple.screencapture",
+      "restart": ["SystemUIServer"],
+      "keys": "target|location|type|disable-shadow|show-thumbnail|include-date|showsClicks|showsCursor"
+    },
+    {
+      "name": "menu-bar-clock",
+      "domain": "com.apple.menuextra.clock",
+      "restart": ["ControlCenter"],
+      "keys": "\\w+"
+    },
+    {
+      "name": "control-center",
+      "domain": "com.apple.controlcenter",
+      "restart": ["ControlCenter"],
+      "keys": "NSStatusItem Visible (?!Item-)\\w+"
+    },
+    {
+      "name": "control-center-host",
+      "domain": "com.apple.controlcenter",
+      "host": true,
+      "restart": ["ControlCenter"],
+      "keys": "AirDrop|AirplayRecieverEnabled|Battery|BatteryShowPercentage|Bluetooth|Display|FocusModes|Hearing|KeyboardBrightness|NowPlaying|ScreenMirroring|Sound|StageManager|UserSwitcher|VoiceControl|WiFi"
+    },
+    {
+      "name": "spotlight",
+      "domain": "com.apple.Spotlight",
+      "keys": "orderedItems"
+    }
+  ]
+}
