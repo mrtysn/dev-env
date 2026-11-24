@@ -54,7 +54,8 @@ out=$(run check --dir $other --label c03)
 run export --dir $other --label c03 >/dev/null
 o=$(plutil -p $rec/finder.c03.plist 2>&1)
 [[ $o == *ShowPathbar* && $o != *NewWindowTargetPath* ]] && ok || bad "c03 overlay is not just the difference: $o"
-[[ $(plutil -p $rec/finder.plist) == *'"ShowPathbar" => 1'* ]] && ok || bad "c03 export changed the shared record"
+# plutil -p prints a true boolean as 1 on older macOS and as true on macOS 27.
+[[ $(plutil -p $rec/finder.plist) == *'"ShowPathbar" => '(1|true)* ]] && ok || bad "c03 export changed the shared record"
 run check --dir $other --label c03 >/dev/null && ok || bad "c03 differs from its own overlay"
 run check --dir $other --label c02 >/dev/null && bad "c02 should differ from c03's Finder" || ok
 
