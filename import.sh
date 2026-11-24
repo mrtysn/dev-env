@@ -304,7 +304,9 @@ iterm_guid_clashes() {
     defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
 import json, os, plistlib, sys
 try:
-    saved = {b.get("Guid") for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
+    # iTerm2 also lists the dynamic profiles it loaded, marked with their file: those are these files, not a clash.
+    saved = {b.get("Guid") for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])
+             if "Dynamic Profile Filename" not in b and not b.get("Is Dynamic Profile")}
 except Exception:
     sys.exit(2)
 for path in sys.argv[1:]:
@@ -333,7 +335,8 @@ def restore(obj):
         return [restore(item) for item in obj]
     return obj
 try:
-    saved = {b.get("Guid"): b for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])}
+    saved = {b.get("Guid"): b for b in plistlib.loads(sys.stdin.buffer.read()).get("New Bookmarks", [])
+             if "Dynamic Profile Filename" not in b and not b.get("Is Dynamic Profile")}  # a loaded dynamic copy
     repo = restore(json.load(open(sys.argv[1]))).get("Profiles", [])
 except Exception:
     sys.exit(2)
