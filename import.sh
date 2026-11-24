@@ -376,6 +376,49 @@ except Exception as e:
 PYTHON_EOF
 }
 
+# Saved, non-dynamic iTerm2 profiles that share a name with a repo profile but are not it: on a fresh machine,
+# the stock Monaco 12 "Default" iTerm2 made on first launch stays beside the repo's "Default". iTerm2 picks a
+# profile by name for AppleScript and escape sequences, so tabs made by name ("create tab with profile
+# Default") can come up in the stock one's font. Prints "<guid>\t<name>\t<font>" per twin; exit 2 when unreadable.
+iterm_name_twins() {
+    defaults export com.googlecode.iterm2 - 2>/dev/null | python3 -I -c '
+import json, plistlib, sys
+try:
+    prefs = plistlib.loads(sys.stdin.buffer.read())
+    repo = [p for path in sys.argv[1:] for p in json.load(open(path)).get("Profiles", [])]
+except Exception:
+    sys.exit(2)
+names = {p.get("Name") for p in repo}
+guids = {p.get("Guid") for p in repo}
+for b in prefs.get("New Bookmarks", []):
+    if b.get("Name") in names and b.get("Guid") not in guids and "Dynamic Profile Filename" not in b:
+        print("\t".join([b.get("Guid", ""), b.get("Name", ""), b.get("Normal Font", "?")]))
+' "$@"
+}
+
+# Remove the saved iTerm2 profile with this Guid. Writes the plist itself, so only while iTerm2 is quit; the caller
+# backs the plist up first. Refuses the default profile.
+iterm_profile_remove() {
+    python3 -I - "$1" <<'PYTHON_EOF'
+import os, plistlib, sys
+plist_path = os.path.expanduser("~/Library/Preferences/com.googlecode.iterm2.plist")
+try:
+    with open(plist_path, "rb") as f:
+        plist = plistlib.load(f)
+    if plist.get("Default Bookmark Guid") == sys.argv[1]:
+        print("  Not removed: it is iTerm2's default profile", file=sys.stderr)
+        sys.exit(1)
+    plist["New Bookmarks"] = [b for b in plist.get("New Bookmarks", []) if b.get("Guid") != sys.argv[1]]
+    tmp = plist_path + ".tmp"
+    with open(tmp, "wb") as f:
+        plistlib.dump(plist, f)
+    os.replace(tmp, plist_path)
+except Exception as e:
+    print(f"  Failed to remove the profile: {e}", file=sys.stderr)
+    sys.exit(1)
+PYTHON_EOF
+}
+
 # Step 9's app-level settings: merge the export into the iTerm2 plist; with --check, only compare.
 iterm_settings_py() {
     python3 - "$@" <<'PYTHON_EOF'
@@ -683,6 +726,12 @@ if $CHECK; then
             else
                 cmp -s "$pf" "$twin" || CHECK_CHANGES+=("iTerm2 profile ${pf:t:r}")
             fi
+        done
+        twins="$(iterm_name_twins $profile_files)" || twins=""
+        for twin_line in "${(@f)twins}"; do
+            [[ -n "$twin_line" ]] || continue
+            parts=("${(@ps:\t:)twin_line}")
+            CHECK_CHANGES+=("iTerm2 has a second profile named \"${parts[2]}\" (${parts[3]}, Guid ${parts[1]}) beside the repo's: tabs made by name can take its font. import.sh removes it, with iTerm2 quit")
         done
         for tmux_key in OpenTmuxWindowsIn AutoHideTmuxClientSession TmuxUsesDedicatedProfile; do
             defaults read com.googlecode.iterm2 "$tmux_key" &>/dev/null || CHECK_CHANGES+=("iTerm2 tmux pref $tmux_key unset (clo warns about it; export it on a machine that has it)")
@@ -1217,6 +1266,21 @@ else
                         else
                             cp "$profile" "$ITERM_DYNAMIC_PROFILES_DIR/dev-config-$filename"
                             print "${GREEN}✓ Installed ${filename%.json}${NC}"
+                        fi
+                    done
+                    twins="$(iterm_name_twins "${FULL_PROFILES[@]}")" || twins=""
+                    for twin_line in "${(@f)twins}"; do
+                        [[ -n "$twin_line" ]] || continue
+                        parts=("${(@ps:\t:)twin_line}")
+                        print "${YELLOW}! iTerm2 has a second profile named \"${parts[2]}\" (${parts[3]}) beside the repo's; tabs made by name can come up in its font${NC}"
+                        if ps -Ao comm= | grep -qE '(^|/)iTerm2$'; then
+                            print "${BLUE}  Quit iTerm2 completely and re-run to remove it${NC}"
+                        elif ask_yes_no "remove-name-twin:${parts[1]}" "Remove the extra \"${parts[2]}\" profile (${parts[3]})? (the iTerm2 plist is backed up first)" y; then
+                            iterm_plist="$HOME/Library/Preferences/com.googlecode.iterm2.plist"
+                            cp "$iterm_plist" "$iterm_plist.backup-$(date +%Y%m%d-%H%M%S)" &&
+                                iterm_profile_remove "${parts[1]}" &&
+                                killall cfprefsd 2>/dev/null
+                            print "${GREEN}✓ Removed the extra \"${parts[2]}\" profile${NC}"
                         fi
                     done
                     print "${BLUE}  Restart iTerm2 and select your preferred profile${NC}"
