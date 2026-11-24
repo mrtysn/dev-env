@@ -86,6 +86,7 @@ cask "localsend"                # AirDrop-like file sending (tap above)
 cask "keka"                     # file archiver
 cask "kekaexternalhelper"       # helper app for Keka
 cask "foxitreader"              # PDF reader
+brew "poppler"                  # PDF command-line tools (pdftotext, pdfimages, pdftoppm)
 cask "syntax-highlight"         # Quick Look for source files
 cask "iina"                     # media player
 cask "vlc"                      # media player
@@ -120,3 +121,4 @@ mas "Spaced", id: 1666327168              # break reminder
 mas "uBlock Origin Lite", id: 6745342698  # Safari content blocker
 mas "Unsplash Wallpapers", id: 1284863847 # wallpapers
 mas "Velja", id: 1607635845               # browser picker
+mas "Xcode", id: 497799835                # Apple's IDE and SDKs; a large download
