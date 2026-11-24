@@ -835,7 +835,7 @@ Feel free to use, modify, and share.
 Referenced by the environment but excluded from this (public) repo — set up manually on a new machine:
 
 - `claude` CLI — native installer, not brew-managed
-- `~/.gitconfig` + `~/.gitconfig-personal` — git identity / includeIf split
+- `~/.gitconfig` — the git identity, one for every repo (add an `includeIf "gitdir:<folder>/"` section there to give a folder its own)
 - `~/.ssh/config` — ssh hosts (security material)
 - `~/.config/repo-tabs/repos.txt` — same reason; seeds itself via `repo-tabs focus`
 - Claude hooks (`~/.claude*/hooks/`) — referenced by synced settings.json; pending content review
