@@ -718,7 +718,9 @@ and changes nothing.
 **A menu shortcut is removed by moving it, not by emptying it.** `NSUserKeyEquivalents` maps a
 menu item's exact title (with its `…`) to a key; iTerm2 reads it at launch. An empty value is
 ignored and the default shortcut stays. The repo moves each unwanted shortcut to `@~^$`
-(⌃⌥⇧⌘F20, a chord no keyboard sends), which iTerm2 applies.
+(⌃⌥⇧⌘F20, a chord no keyboard sends), which iTerm2 applies. Take each title from the installed
+iTerm2's own menu, not from its source: titles change between releases ("Fold Selected Lines" in
+the source is "Fold/Unfold" in 3.7.8), and a title that matches no item is silently ignored.
 
 **iTerm2 must be quit before importing.** It rewrites its plist from memory on quit, so
 settings written while it is running are silently discarded. `import.sh` checks for a running
