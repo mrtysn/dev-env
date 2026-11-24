@@ -6,9 +6,16 @@ brew "mise"                     # runtime version manager
 # Access
 cask "teleport-connect"         # Teleport client (bundles tsh) for server and database access
 cask "gcloud-cli"               # Google Cloud CLI
+cask "okta-verify"              # Okta sign-in approvals
+cask "1password"                # password manager
+# Communication
+cask "slack"                    # team chat
 # Meetings
 cask "granola"                  # meeting notes
 # Issue tracking
 cask "linear"                   # Linear desktop app; updates itself
+# Everyday
+cask "chatgpt"                  # ChatGPT desktop app
+cask "shottr"                   # screenshot tool
 # Editors
 cask "visual-studio-code"       # editor; this Mac only, Sublime is the editor elsewhere
