@@ -388,6 +388,15 @@
             "type": "command"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/record-clo-session.zsh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/record-clo-session.zsh\"; exit 0",
+            "timeout": 5,
+            "type": "command"
+          }
+        ]
       }
     ],
     "SessionStart": [
@@ -423,6 +432,15 @@
         "hooks": [
           {
             "command": "$HOME/.config/iterm2/cc-status",
+            "type": "command"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "command": "f=\"${CLAUDE_CONFIG_DIR:-$HOME/.claude}/paths.local.sh\"; [ -r \"$f\" ] && . \"$f\"; [ -n \"${AGENTS_SHARED_DIR:-}\" ] && [ -x \"$AGENTS_SHARED_DIR/hooks/record-clo-session.zsh\" ] && exec \"$AGENTS_SHARED_DIR/hooks/record-clo-session.zsh\"; exit 0",
+            "timeout": 5,
             "type": "command"
           }
         ]
