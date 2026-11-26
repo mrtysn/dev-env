@@ -434,18 +434,63 @@ _update-all-custom-heads() {
   done
 }
 
+# The question a stage is waiting on, read from its log: the last non-blank line, printed when it
+# asks for YES/NO, y/n or a password. Prints nothing and returns 1 otherwise.
+_update-all-pending-question() {
+  local line
+  line=$(tail -c 600 -- "$1" 2>/dev/null | LC_ALL=C sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' \
+    | LC_ALL=C grep -v '^[[:space:]]*$' | tail -n 1)
+  print -r -- "$line" | LC_ALL=C grep -E '\(Enter YES or NO\)|Please enter YES or NO|\[[Yy]/[Nn]\]|[Pp]assword[^:]*:[[:space:]]*$'
+}
+
+# Runs beside a stage until killed: one macOS notification each time the stage stops at a question.
+_update-all-watch-for-question() {
+  local log=$1 stage=$2 asked=0 question
+  while sleep 2; do
+    if ! question=$(_update-all-pending-question "$log"); then
+      asked=0
+    elif (( ! asked )); then
+      asked=1
+      if (( $+commands[terminal-notifier] )); then
+        terminal-notifier -title "update-all is waiting" -message "$stage asks: $question" >/dev/null 2>&1
+      else
+        osascript -e 'on run argv' -e 'display notification (item 1 of argv) with title "update-all is waiting"' \
+          -e 'end run' "$stage asks: $question" >/dev/null 2>&1
+      fi
+    fi
+  done
+}
+
+# After Ctrl-C in a stage: s skips it and goes on; any other key, a second Ctrl-C, or no
+# terminal quits.
+_update-all-ask-skip() {
+  setopt local_options local_traps
+  [[ -t 0 ]] || return 1
+  trap 'return 1' INT
+  local key
+  read -k 1 "key?==> Interrupted during $1. s = skip it and go on, any other key = quit: " || return 1
+  print
+  [[ $key == [sS] ]]
+}
+
 # `brew upgrade`, repeated after reinstalling a cask whose install receipt names an app
 # that is gone (brew: "It seems the App source '...' is not there"): a reinstall forces the
 # uninstall and skips the missing app. Each cask is reinstalled once per run.
+# brew runs under its own `script`, so its output is saved for that check while it still writes
+# to a terminal: through a pipe, a formula's licence question stays in brew's output buffer and
+# the run hangs on an invisible prompt. --no-ask: on a terminal brew would otherwise confirm
+# every upgrade. Returns 130 on Ctrl-C (`script` reports a signal death as its number, 2).
 _update-all-brew-upgrade() {
   local out rc token
   local -a fixed=()
   out=$(mktemp) || return 1
   while :; do
-    brew upgrade 2>&1 | tee "$out"
-    rc=${pipestatus[1]}
+    script -q -F "$out" brew upgrade --no-ask
+    rc=$?
+    (( rc == 2 || rc == 130 )) && { rc=130; break; }
     (( rc )) || break
-    token=$(sed -n "s/^Error: \([^:]*\): It seems the App source .* is not there.*/\1/p" "$out" | head -n 1)
+    token=$(LC_ALL=C sed -e $'s/\x1b\\[[0-9;?]*[A-Za-z]//g' -e $'s/\r//g' "$out" \
+      | sed -n "s/^.*Error: \([^:]*\): It seems the App source .* is not there.*/\1/p" | head -n 1)
     [[ -n $token && ${fixed[(Ie)$token]} == 0 ]] || break
     fixed+=($token)
     print -P "%B==> $token: receipt names an app that is gone, reinstalling%b"
@@ -826,7 +871,7 @@ update-all() {
 
   local -a stages=(brew spicetify pnpm asdf uv mas omz omz-plugins local-builds)
   local -A stage_status stage_secs
-  local stage start rc failed=0 omz_days omz_verbose omz_cooldown
+  local stage start rc watch_pid failed=0 omz_days omz_verbose omz_cooldown
   zstyle -s ':omz:update' frequency omz_days || omz_days=${UPDATE_ZSH_DAYS:-13}
   zstyle -s ':omz:update' verbose omz_verbose || omz_verbose=default
   zstyle -s ':omz:update' cooldown omz_cooldown || omz_cooldown=0
@@ -868,16 +913,26 @@ update-all() {
     fi
     print -P "%B==> $stage%b"
     start=$EPOCHSECONDS
-    script -q "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown} UPDATE_ALL_MAS_SUDO=$mas_sudo; trap 'exit 130' INT; _update-all-stage $stage"
+    _update-all-watch-for-question "$run_dir/$stage.log" $stage &
+    watch_pid=$!
+    # -F: the log is written as the output arrives, which the watcher reads
+    script -q -F "$run_dir/$stage.log" zsh -c "$stage_env; zmodload zsh/datetime; export ZSH=${(q)ZSH} ZSH_CUSTOM=${(q)ZSH_CUSTOM} ZSH_CACHE_DIR=${(q)ZSH_CACHE_DIR} OMZ_UPDATE_DAYS=${(q)omz_days} OMZ_UPDATE_VERBOSE=${(q)omz_verbose} OMZ_UPDATE_COOLDOWN=${(q)omz_cooldown} UPDATE_ALL_MAS_SUDO=$mas_sudo; trap 'exit 130' INT; _update-all-stage $stage"
     rc=$?
+    kill $watch_pid
+    stage_secs[$stage]=$(( EPOCHSECONDS - start ))
     # Ctrl-C reaches the stage through the pty, not this shell: it ends the stage
-    # (130) and would otherwise start the next one. Treat it as abort-the-run.
+    # (130) and would otherwise start the next one. Ask whether to go on or quit.
     if (( rc == 130 )); then
+      print
+      if _update-all-ask-skip $stage; then
+        stage_status[$stage]=interrupted
+        failed=1
+        continue
+      fi
       kill $su_pid 2>/dev/null
       print -P "\n%B==> Interrupted during $stage%b  (logs: $run_dir)"
       return 130
     fi
-    stage_secs[$stage]=$(( EPOCHSECONDS - start ))
     # 78: the stage skipped its work on purpose and said why (its "Action needed" line lands in the errors below)
     if (( rc == 78 )); then stage_status[$stage]=skipped
     elif (( rc )); then stage_status[$stage]="FAILED ($rc)"; failed=1; else stage_status[$stage]=ok; fi
