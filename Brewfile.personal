@@ -5,7 +5,7 @@ cask "sourcetree"               # repo-tabs st mode
 
 # Kept off work machines (moved from the shared Brewfile 2026-11-23)
 brew "syncthing"                # continuous file synchronisation
-cask "rustdesk"                 # remote desktop
+cask "rustdesk"                 # remote desktop; uninstalled from c03 2026-11-27 (a managed laptop allows no remote-access tools)
 
 # Picked 2026-11-17: games, media, VPNs, VMs and personal tooling
 cask "mullvad-vpn"
