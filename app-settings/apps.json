@@ -5,7 +5,7 @@
       "name": "alt-tab",
       "app": "/Applications/AltTab.app",
       "file": "Library/Preferences/com.lwouis.alt-tab-macos.plist",
-      "keys": "appearanceSize|appearanceStyle|appearanceVisibility|exceptions|fontHeight|hide[A-Z]\\w*|holdShortcut\\d*|iconSize|menubarIcon|menubarIconShown|\\w*[Ss]hortcut\\w*|showOnScreen|showWindowlessApps\\d*|showTabsAsWindows|theme|titleTruncation|updatePolicy|crashPolicy|windowMaxWidthInRow|windowOrder|appsToShow\\d*|spacesToShow\\d*|screensToShow\\d*|showMinimizedWindows\\d*|showHiddenWindows\\d*|showFullscreenWindows\\d*|windowDisplayDelay|mouseHoverEnabled|cursorFollowFocusEnabled|preferencesVersion"
+      "keys": "appearanceSize|appearanceStyle|appearanceVisibility|captureWindowsInBackground|exceptions|fontHeight|hide[A-Z]\\w*|holdShortcut\\d*|iconSize|menubarIcon|menubarIconShown|\\w*[Ss]hortcut\\w*|showOnScreen|showWindowlessApps\\d*|showTabsAsWindows|theme|titleTruncation|updatePolicy|crashPolicy|windowMaxWidthInRow|windowOrder|appsToShow\\d*|spacesToShow\\d*|screensToShow\\d*|showMinimizedWindows\\d*|showHiddenWindows\\d*|showFullscreenWindows\\d*|windowDisplayDelay|mouseHoverEnabled|cursorFollowFocusEnabled|preferencesVersion"
     },
     {
       "name": "mos",
