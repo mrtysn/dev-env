@@ -707,7 +707,6 @@ _update-all-local-builds() {
 # Add a row to handle another package.
 _update-all-manual-update-steps() {
   print -r -- $'macfuse\treboot, then allow the macFUSE system extension under System Settings > Privacy & Security'
-  print -r -- $'karabiner-elements\tre-approve its driver extension if macOS asks (System Settings > Privacy & Security)'
 }
 
 # Upgrade the outdated ones among those packages, which `brew upgrade` leaves alone.

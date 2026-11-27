@@ -1,13 +1,13 @@
 #!/bin/zsh
-# Test modifier-keys.py on a made-up Karabiner config and a plist file (--domain): the real
-# keyboard preferences are never read or written.
+# Test modifier-keys.py on a made-up record and a plist file (--domain): the real keyboard
+# preferences are never read or written.
 set -u -o pipefail
 here=${0:A:h}
 tool=$here/modifier-keys.py
 tmp=${$(mktemp -d):A}   # resolved: defaults treats /var and /private/var as two files
 trap 'rm -rf -- "$tmp"' EXIT
 dom=$tmp/global.plist
-export MODIFIER_KEYS_KARABINER=$tmp/karabiner.json
+export MODIFIER_KEYS_MAPPINGS=$tmp/keyboard-mappings.json
 pass=0 fail=0
 ok()  { pass=$((pass + 1)); }
 bad() { fail=$((fail + 1)); print -r -- "FAIL: $1"; }
@@ -19,24 +19,21 @@ d = plistlib.load(open(sys.argv[1], "rb")).get(sys.argv[2], [])
 print(" ".join(sorted("%x>%x" % (p["HIDKeyboardModifierMappingSrc"], p["HIDKeyboardModifierMappingDst"]) for p in d)))' $dom $1
 }
 
-# An external keyboard with a Cmd/Opt swap, an Apple keyboard, and F4/F5 overridden as on the M2.
-cat > $MODIFIER_KEYS_KARABINER <<'JSON'
-{"profiles": [{"name": "Default profile", "selected": true,
-  "fn_function_keys": [{"from": {"key_code": "f4"}, "to": [{"key_code": "launchpad"}]},
-                       {"from": {"key_code": "f5"}, "to": [{"key_code": "f5"}]}],
-  "devices": [
-    {"identifiers": {"is_keyboard": true, "vendor_id": 4152, "product_id": 5666},
-     "simple_modifications": [{"from": {"key_code": "left_command"}, "to": [{"key_code": "left_option"}]},
-                              {"from": {"key_code": "left_option"}, "to": [{"key_code": "left_command"}]}]},
-    {"identifiers": {"is_keyboard": true, "vendor_id": 1452, "product_id": 832},
-     "simple_modifications": [{"from": {"key_code": "left_command"}, "to": [{"key_code": "left_option"}]}]}]}]}
+# An external keyboard with a Cmd/Opt swap and its F row as on the M2, and built-in F4/F5 overrides.
+cat > $MODIFIER_KEYS_MAPPINGS <<'JSON'
+{"keyboards": [
+  {"name": "Apex", "vendor_id": 4152, "product_id": 5666,
+   "modifiers": {"left_command": "left_option", "left_option": "left_command"},
+   "function_keys": {"f1": "display_brightness_decrement", "f2": "display_brightness_increment",
+                     "f3": "mission_control", "f4": "launchpad", "f5": "f5", "f6": "do_not_disturb",
+                     "f7": "rewind", "f8": "play_or_pause", "f9": "fast_forward",
+                     "f10": "mute", "f11": "volume_decrement", "f12": "volume_increment"}}],
+ "built_in_function_keys": {"f4": "launchpad", "f5": "f5"}}
 JSON
 ext=com.apple.keyboard.modifiermapping.4152-5666-0
-apple=com.apple.keyboard.modifiermapping.1452-832-0
 
 out=$($tool check --domain $dom); rc=$?
 [[ $rc == 1 && $out == *"keyboard 4152-5666-0"* ]] && ok || bad "check on an empty domain: rc $rc, $out"
-[[ $out != *"1452-832"* ]] && ok || bad "an Apple keyboard was listed: $out"
 
 $tool import --domain $dom >/dev/null && ok || bad "import failed"
 got=$(pairs $ext)
@@ -50,8 +47,7 @@ want=(
     700000043\>c000000e2 700000044\>c000000ea 700000045\>c000000e9   # F10-F12
 )
 [[ $got == ${(j: :)${(o)want}} ]] && ok || bad "stored pairs: $got"
-[[ $got != *70000003e* ]] && ok || bad "F5 was mapped though the config keeps it as F5: $got"
-[[ -z $(pairs $apple) ]] && ok || bad "an Apple keyboard got a mapping"
+[[ $got != *70000003e* ]] && ok || bad "F5 was mapped though the record keeps it as F5: $got"
 
 out=$($tool check --domain $dom); rc=$?
 [[ $rc == 0 ]] && ok || bad "check after import: rc $rc, $out"
@@ -86,7 +82,7 @@ print -r -- '+-o AppleHIDKeyboardEventDriverV2  <class X>
 unset MODIFIER_KEYS_IOREG
 
 # A target the table does not know is refused by name, before anything is written.
-sed -i '' 's/"key_code": "launchpad"/"consumer_key_code": "no_such_key"/' $MODIFIER_KEYS_KARABINER
+sed -i '' 's/"f4": "launchpad", "f5": "f5", "f6"/"f4": "no_such_key", "f5": "f5", "f6"/' $MODIFIER_KEYS_MAPPINGS
 out=$($tool import --domain $tmp/other.plist 2>&1); rc=$?
 [[ $rc != 0 && $out == *"no_such_key"*"TARGET"* && ! -e $tmp/other.plist ]] && ok || bad "unknown target: rc $rc, $out"
 

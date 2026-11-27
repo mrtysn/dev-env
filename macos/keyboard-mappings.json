@@ -1,0 +1,34 @@
+{
+  "_comment": "Key mappings step 18 applies with macOS's own settings (macos/modifier-keys.py, macos/capslock-to-f18.zsh). Caps Lock sends F18 on every keyboard, and shortcut 160 (symbolic-hotkeys.plist) makes F18 open Launchpad (Show Apps on macOS 27). keyboards: external keyboards by USB vendor and product id, each with its modifier swaps and the whole F1-F12 row as it should act (an external keyboard has no Fn layer). built_in_function_keys: only the top-row keys of the Mac's own keyboard that differ from Apple's default. Key and target names are those in modifier-keys.py's TARGET table.",
+  "keyboards": [
+    {
+      "name": "SteelSeries Apex 3 TKL",
+      "vendor_id": 4152,
+      "product_id": 5666,
+      "modifiers": {
+        "left_command": "left_option",
+        "left_option": "left_command",
+        "right_command": "right_option",
+        "right_option": "right_command"
+      },
+      "function_keys": {
+        "f1": "display_brightness_decrement",
+        "f2": "display_brightness_increment",
+        "f3": "mission_control",
+        "f4": "launchpad",
+        "f5": "f5",
+        "f6": "do_not_disturb",
+        "f7": "rewind",
+        "f8": "play_or_pause",
+        "f9": "fast_forward",
+        "f10": "mute",
+        "f11": "volume_decrement",
+        "f12": "volume_increment"
+      }
+    }
+  ],
+  "built_in_function_keys": {
+    "f4": "launchpad",
+    "f5": "f5"
+  }
+}

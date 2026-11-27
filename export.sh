@@ -43,7 +43,7 @@ echo "Computer: $HOSTNAME"
 echo "User: $USERNAME"
 echo ""
 echo "This will export your ~/.zshrc, ~/.p10k.zsh, tmux config, iTerm2 profiles and app-level"
-echo "settings and Phoenix + Karabiner configs to this repository, and checks every Claude Code"
+echo "settings and the Phoenix config to this repository, and checks every Claude Code"
 echo "config folder against the repo's base + profile settings."
 echo ""
 echo "Files in this repo that may be overwritten:"
@@ -53,7 +53,6 @@ echo "  - $SCRIPT_DIR/plugins.list"
 echo "  - $SCRIPT_DIR/iterm-profiles/*.json"
 echo "  - $SCRIPT_DIR/iterm-settings.json"
 echo "  - $SCRIPT_DIR/.phoenix.js"
-echo "  - $SCRIPT_DIR/karabiner/karabiner.json"
 echo "  - $SCRIPT_DIR/tmux/${MACHINE_LABEL:-<label>}.conf (based on hostname)"
 echo "  - $SCRIPT_DIR/lazygit/config.yml, lazygit/themes/*.yml, repo-tabs/theme-*"
 echo "  - $SCRIPT_DIR/asdf/tool-versions (pins raised to this machine's newer runtimes)"
@@ -436,9 +435,9 @@ EOF
     note "iterm-profiles/font-only.json"
 fi
 
-# Export window & keyboard configs (Phoenix window manager, Karabiner keymaps)
-# Both are portable, non-secret text — safe for this public repo.
-echo "✓ Exporting window & keyboard configs"
+# Export the Phoenix window manager config: portable, non-secret text, safe for this public repo.
+# Key mappings live in macos/keyboard-mappings.json, edited by hand; no app writes them.
+echo "✓ Exporting window manager config"
 
 if [ -f ~/.phoenix.js ]; then
     copy_atomic ~/.phoenix.js .phoenix.js
@@ -446,16 +445,6 @@ if [ -f ~/.phoenix.js ]; then
     note ".phoenix.js"
 else
     warn "~/.phoenix.js not found, skipping"
-fi
-
-# Karabiner: only karabiner.json — never assets/ or automatic_backups/ (churny local state).
-if [ -f ~/.config/karabiner/karabiner.json ]; then
-    mkdir -p karabiner
-    copy_atomic ~/.config/karabiner/karabiner.json karabiner/karabiner.json
-    echo "  Exported ~/.config/karabiner/karabiner.json"
-    note "karabiner/karabiner.json"
-else
-    warn "~/.config/karabiner/karabiner.json not found, skipping"
 fi
 
 # Check Claude Code settings, every config folder on this machine.
@@ -539,7 +528,7 @@ fi
 echo "✓ Checking exports for hardcoded home paths"
 # Every file the export writes, not only the hand-edited ones: an app or iTerm2 can store a path itself.
 for f in .zshrc.base .zshrc.loader ".zshrc.$ZSH_LABEL" ".zshrc.combined.$ZSH_LABEL" .p10k.zsh plugins.list \
-         iterm-profiles/*.json(N) iterm-settings.json .phoenix.js karabiner/karabiner.json tmux/*.conf(N) \
+         iterm-profiles/*.json(N) iterm-settings.json .phoenix.js tmux/*.conf(N) \
          lazygit/**/*(N.) repo-tabs/**/*(N.) asdf/*(N.) app-settings/**/*(N.) macos/*.plist(N) \
          agents/claude/settings.json agents/claude/overlays/*.json(N); do
     [[ -f "$f" ]] || continue

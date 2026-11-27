@@ -499,17 +499,15 @@ if len(changed) > 10:
 PYTHON_EOF
 }
 
-# Step 13: each config only where its app is installed (work-profile machines get neither).
+# Step 13: the Phoenix config only where Phoenix is installed (work-profile machines do not get it).
 detect_window_configs() {
-    WANT_PHOENIX=false; WANT_KARABINER=false
+    WANT_PHOENIX=false
     [ -f .phoenix.js ] && [ -d /Applications/Phoenix.app ] && WANT_PHOENIX=true
-    [ -f karabiner/karabiner.json ] && [ -d /Applications/Karabiner-Elements.app ] && WANT_KARABINER=true
     return 0
 }
 
 install_window_configs() {
     [ "$WANT_PHOENIX" = true ] && install_file .phoenix.js ~/.phoenix.js
-    [ "$WANT_KARABINER" = true ] && install_file karabiner/karabiner.json ~/.config/karabiner/karabiner.json
     return 0
 }
 
@@ -805,8 +803,8 @@ if $CHECK; then
 
     # Step 13
     detect_window_configs
-    if [ "$WANT_PHOENIX" = false ] && [ "$WANT_KARABINER" = false ]; then
-        check_skip 13 "neither Phoenix nor Karabiner-Elements is installed"
+    if [ "$WANT_PHOENIX" = false ]; then
+        check_skip 13 "Phoenix is not installed"
     else
         install_window_configs
         check_report 13
@@ -870,17 +868,14 @@ if $CHECK; then
     fi
 
     # Step 18
-    if [[ -d /Applications/Karabiner-Elements.app ]]; then
-        check_skip 18 "Karabiner-Elements maps the keys here"
-    else
-        "$SCRIPT_DIR/macos/capslock-to-f18.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("Caps Lock to F18 login agent")
-        if ! out="$("$SCRIPT_DIR/macos/modifier-keys.py" check 2>&1)"; then
-            for line in "${(@f)out}"; do
-                [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
-            done
-        fi
-        check_report 18
+    "$SCRIPT_DIR/macos/remove-karabiner.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("Karabiner-Elements left on this Mac")
+    "$SCRIPT_DIR/macos/capslock-to-f18.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("Caps Lock to F18 login agent")
+    if ! out="$("$SCRIPT_DIR/macos/modifier-keys.py" check 2>&1)"; then
+        for line in "${(@f)out}"; do
+            [[ "$line" == "differs here: "* ]] && CHECK_CHANGES+=("${line#differs here: }")
+        done
     fi
+    check_report 18
 
     # Step 19
     "$SCRIPT_DIR/macos/my-applications-link.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("~/MY Applications link")
@@ -1554,18 +1549,17 @@ fi
 # Step 13: Window & Keyboard Configs (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want_step 13; then
-echo "=== Step 13: Window & Keyboard Configs ==="
+echo "=== Step 13: Window Manager Config ==="
 
-# Each config only where its app is installed: both apps are in Brewfile.personal, so a
-# work-profile machine gets neither app nor config.
+# Only where Phoenix is installed: it is in Brewfile.personal, so a work-profile machine gets
+# neither app nor config.
 detect_window_configs
 
-if [ "$WANT_PHOENIX" = false ] && [ "$WANT_KARABINER" = false ]; then
-    print "${YELLOW}! Neither Phoenix nor Karabiner-Elements is installed, skipping their configs${NC}"
+if [ "$WANT_PHOENIX" = false ]; then
+    print "${YELLOW}! Phoenix is not installed, skipping its config${NC}"
 else
     print "${BLUE}Available configs:${NC}"
-    [ "$WANT_PHOENIX" = true ] && echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
-    [ "$WANT_KARABINER" = true ] && echo "  - karabiner/karabiner.json → ~/.config/karabiner/karabiner.json (Karabiner keymaps)"
+    echo "  - .phoenix.js → ~/.phoenix.js (Phoenix window manager)"
 
     if ask_yes_no copy-window-configs "Copy window & keyboard configs? (existing files that differ will be backed up)"; then
         install_window_configs
@@ -1696,35 +1690,42 @@ echo ""
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Step 18: the keyboard where Karabiner is absent (optional)
+# Step 18: keyboard mappings with macOS's own settings (optional)
 # ═══════════════════════════════════════════════════════════════════════════════
 if want_step 18; then
-echo "=== Step 18: Keyboard without Karabiner ==="
-# Karabiner-Elements (personal profile) maps the keys itself. Elsewhere macOS's own settings do:
-# a login agent maps Caps Lock to F18 with hidutil (the machine's shortcuts, step 17, bind F18),
-# and each external keyboard karabiner/karabiner.json names gets its modifier swaps and Karabiner's
-# F-key media mappings (F1-F12 as brightness, Mission Control, play/pause, volume...).
+echo "=== Step 18: Keyboard Mappings ==="
+# macOS's own settings map the keys macos/keyboard-mappings.json names: a login agent maps Caps Lock
+# to F18 with hidutil (step 17's shortcut 160 binds F18 to Show Launchpad) and gives the built-in
+# keyboard its top-row overrides, and each external keyboard there gets its modifier swaps and its
+# F1-F12 row. Karabiner-Elements, which did this before, is removed where any of it is left.
+NOKARABINER="$SCRIPT_DIR/macos/remove-karabiner.zsh"
 CAPSLOCK="$SCRIPT_DIR/macos/capslock-to-f18.zsh"
 MODKEYS="$SCRIPT_DIR/macos/modifier-keys.py"
-if [[ -d /Applications/Karabiner-Elements.app ]]; then
-    print "${GREEN}✓ Karabiner-Elements maps the keys here${NC}"
+if "$NOKARABINER" --check >/dev/null 2>&1; then
+    print "${GREEN}✓ no Karabiner-Elements left on this Mac${NC}"
 else
-    if "$CAPSLOCK" --check >/dev/null 2>&1; then
-        print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
-    elif ask_yes_no caps-lock-f18 "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
-        "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
+    "$NOKARABINER" --check | sed 's/^/  /'
+    if ask_yes_no remove-karabiner "Remove what is left of Karabiner-Elements (asks for your password)?"; then
+        "$NOKARABINER" || print "${YELLOW}! some of Karabiner-Elements is still here; see above${NC}"
     else
-        print "${YELLOW}! Skipped Caps Lock to F18${NC}"
+        print "${YELLOW}! Kept Karabiner-Elements' leftovers${NC}"
     fi
-    if "$MODKEYS" check >/dev/null 2>&1; then
-        print "${GREEN}✓ keyboard mappings already match Karabiner's config${NC}"
+fi
+if "$CAPSLOCK" --check >/dev/null 2>&1; then
+    print "${GREEN}✓ Caps Lock to F18 agent already installed${NC}"
+elif ask_yes_no caps-lock-f18 "Map Caps Lock to F18 at every login (a hidutil login agent)?"; then
+    "$CAPSLOCK" || print "${RED}✗ could not install the Caps Lock agent${NC}"
+else
+    print "${YELLOW}! Skipped Caps Lock to F18${NC}"
+fi
+if "$MODKEYS" check >/dev/null 2>&1; then
+    print "${GREEN}✓ keyboard mappings already match macos/keyboard-mappings.json${NC}"
+else
+    "$MODKEYS" check | sed 's/^/  /'
+    if ask_yes_no keyboard-mappings "Set these keyboards' modifier keys and F-key media keys as macos/keyboard-mappings.json has them?"; then
+        "$MODKEYS" import || print "${RED}✗ some keyboard mappings still differ${NC}"
     else
-        "$MODKEYS" check | sed 's/^/  /'
-        if ask_yes_no karabiner-modifier-keys "Set these keyboards' modifier keys and F-key media keys as Karabiner's config has them?"; then
-            "$MODKEYS" import || print "${RED}✗ some keyboard mappings still differ${NC}"
-        else
-            print "${YELLOW}! Skipped keyboard mappings${NC}"
-        fi
+        print "${YELLOW}! Skipped keyboard mappings${NC}"
     fi
 fi
 echo ""
