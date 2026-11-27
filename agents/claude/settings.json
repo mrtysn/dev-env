@@ -699,5 +699,6 @@
     "type": "command"
   },
   "switchModelsOnFlag": false,
-  "tui": "fullscreen"
+  "tui": "fullscreen",
+  "promptSuggestionEnabled": false
 }
