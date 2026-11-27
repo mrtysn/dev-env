@@ -16,12 +16,14 @@
 # .zshrc.loader) carries its own copy of the hostname → label mapping — shell startup
 # must not depend on this repo, whose path differs per machine.
 # One case per machine: add a LocalHostName here (and in .zshrc.loader) to bind it.
+# ~/.zshrc.label, a one-line label kept on the machine and out of the repo, wins over the
+# hostname: it binds a Mac whose name an MDM sets, without publishing that name.
 #
 # "Unknown" is scutil's own not-set sentinel, but it's also what a sandboxed
 # shell prints when it can't reach configd — a silently wrong answer, not an
 # error. Never treat it as a real unmapped machine: stop instead of exporting
 # partial data under a bogus label.
-RESOLVED_HOST="$(scutil --get LocalHostName 2>/dev/null || hostname -s)"
+RESOLVED_HOST="$(cat ~/.zshrc.label 2>/dev/null || scutil --get LocalHostName 2>/dev/null || hostname -s)"
 if [[ "$RESOLVED_HOST" == "Unknown" ]]; then
     echo "machine-label.sh: scutil returned \"Unknown\" for LocalHostName." >&2
     echo "This is either a genuinely unset hostname, or a sandboxed shell unable to reach" >&2
@@ -31,8 +33,8 @@ if [[ "$RESOLVED_HOST" == "Unknown" ]]; then
     exit 1
 fi
 case "$RESOLVED_HOST" in
-    mrtysn-mbp-m2max)  MACHINE_LABEL="c02"; MACHINE_NAME="C02 (Home)"; MACHINE_PROFILES=(personal) ;;
-    mrtysn-mbp-m5)     MACHINE_LABEL="c03"; MACHINE_NAME="C03 (Work)"; MACHINE_PROFILES=(work personal) ;;
+    c02|mrtysn-mbp-m2max)  MACHINE_LABEL="c02"; MACHINE_NAME="C02 (Home)"; MACHINE_PROFILES=(personal) ;;
+    c03|mrtysn-mbp-m5)     MACHINE_LABEL="c03"; MACHINE_NAME="C03 (Work)"; MACHINE_PROFILES=(work personal) ;;
     *)                 MACHINE_LABEL="";    MACHINE_NAME="unknown";    MACHINE_PROFILES=() ;;
 esac
 # The optional import.sh steps a machine always declines: neither the run nor --check takes them

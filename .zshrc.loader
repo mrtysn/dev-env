@@ -8,11 +8,12 @@
 
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
 
-# Machine detection via LocalHostName — `hostname -s` is unreliable on some LANs
-# (it can resolve to a DHCP name like "192"). Falls back to hostname -s if unset.
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;  # C02 · Home
-  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;  # C03 · Work
+# Machine detection: ~/.zshrc.label (one line, "c02" or "c03") wins when present. It stays on
+# the machine, never in this repo, for a Mac whose name an MDM sets. Otherwise LocalHostName —
+# `hostname -s` is unreliable on some LANs (it can resolve to a DHCP name like "192").
+case "$(cat ~/.zshrc.label 2>/dev/null || scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+  c02|mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;  # C02 · Home
+  c03|mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;  # C03 · Work
 esac
 
 # Added by LM Studio CLI (lms)

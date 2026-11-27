@@ -251,9 +251,9 @@ zshrc_loader_inline() {
     # see that file's header (shell startup can't depend on the repo).
     cat << 'EOF'
 [[ -f ~/.zshrc.base ]] && source ~/.zshrc.base
-case "$(scutil --get LocalHostName 2>/dev/null || hostname -s)" in
-  mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
-  mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
+case "$(cat ~/.zshrc.label 2>/dev/null || scutil --get LocalHostName 2>/dev/null || hostname -s)" in
+  c02|mrtysn-mbp-m2max)  [[ -f ~/.zshrc.c02 ]] && source ~/.zshrc.c02 ;;
+  c03|mrtysn-mbp-m5)     [[ -f ~/.zshrc.c03 ]] && source ~/.zshrc.c03 ;;
 esac
 EOF
 }

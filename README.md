@@ -52,6 +52,8 @@ git push
 Two things select what a machine gets.
 
 - **Machine label** (`c02`, `c03`, ...): `machine-label.sh` maps the Mac's LocalHostName to it.
+  A Mac whose name an MDM sets gets the label from `~/.zshrc.label` instead (one line, e.g.
+  `c03`), which stays on that machine and out of this repo: `echo c03 > ~/.zshrc.label`.
   The label names every per-machine file: `.zshrc.<label>`, `Brewfile.<label>`,
   `tmux/<label>.conf`. `.zshrc.loader` repeats the hostname
   cases, because shell startup must not depend on this repo.
