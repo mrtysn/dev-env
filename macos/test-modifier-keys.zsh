@@ -56,6 +56,35 @@ want=(
 out=$($tool check --domain $dom); rc=$?
 [[ $rc == 0 ]] && ok || bad "check after import: rc $rc, $out"
 
+# Caps Lock set to No Action on the built-in keyboard (0-0-0) is reported, and import takes it out.
+caps=com.apple.keyboard.modifiermapping.0-0-0
+defaults write $dom $caps -array '<dict><key>HIDKeyboardModifierMappingDst</key><integer>30064771072</integer><key>HIDKeyboardModifierMappingSrc</key><integer>30064771129</integer></dict>'
+out=$($tool check --domain $dom); rc=$?
+[[ $rc == 1 && $out == *"keyboard 0-0-0 has Caps Lock"* ]] && ok || bad "Caps Lock set to none not reported: rc $rc, $out"
+$tool import --domain $dom >/dev/null && ok || bad "import with Caps Lock set to none failed"
+[[ -z $(pairs $caps) ]] && ok || bad "Caps Lock pair left in place: $(pairs $caps)"
+# Caps Lock left as Caps Lock, or already F18, is not touched.
+defaults write $dom $caps -array '<dict><key>HIDKeyboardModifierMappingDst</key><integer>30064771129</integer><key>HIDKeyboardModifierMappingSrc</key><integer>30064771129</integer></dict>'
+$tool check --domain $dom >/dev/null && ok || bad "Caps Lock as Caps Lock was reported"
+
+# The built-in keyboard: its Fn layer's F4 (Spotlight) and F5 (Dictation) become F18 and F5.
+export MODIFIER_KEYS_IOREG=$tmp/ioreg.txt
+cat > $MODIFIER_KEYS_IOREG <<'IOREG'
++-o AppleHIDKeyboardEventDriverV2  <class AppleHIDKeyboardEventDriverV2, id 0x1, registered>
+  |   "Built-In" = Yes
+  |   "VendorID" = 0
+  |   "ProductID" = 0
+  |   "FnFunctionUsageMap" = "0x0007003a,0x00ff0005,0x0007003d,0x000c0221,0x0007003e,0x000c00cf,0x0007003f,0x0001009b"
+IOREG
+out=$($tool builtin)
+[[ $out == '{"matching": {"VendorID": 0, "ProductID": 0, "PrimaryUsagePage": 1, "PrimaryUsage": 6}, "pairs": [[51539608097, 30064771181], [51539607759, 30064771134]]}' ]] \
+    && ok || bad "built-in pairs: $out"
+# No built-in keyboard (a desktop Mac): nothing.
+print -r -- '+-o AppleHIDKeyboardEventDriverV2  <class X>
+  |   "Built-In" = No' > $MODIFIER_KEYS_IOREG
+[[ $($tool builtin) == '{}' ]] && ok || bad "a Mac without a built-in keyboard got pairs"
+unset MODIFIER_KEYS_IOREG
+
 # A target the table does not know is refused by name, before anything is written.
 sed -i '' 's/"key_code": "launchpad"/"consumer_key_code": "no_such_key"/' $MODIFIER_KEYS_KARABINER
 out=$($tool import --domain $tmp/other.plist 2>&1); rc=$?

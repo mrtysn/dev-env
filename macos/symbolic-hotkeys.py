@@ -13,8 +13,8 @@ matches is left alone, so a re-run changes nothing.
 Shared by default: symbolic-hotkeys.plist is the one record every machine syncs to; an export on
 any machine updates it, and an entry the exporting Mac has never written keeps its recorded value.
 Only the entries machine-keeps.json lists for this machine (--label, from machine-label.sh) go to
-symbolic-hotkeys.<label>.plist instead, laid over the shared record on import here: so the work
-Mac keeps Show Apps on F18 (its Caps Lock, with no Karabiner) while the home Mac has it off.
+symbolic-hotkeys.<label>.plist instead, laid over the shared record on import here. No machine
+keeps an entry today: Show Launchpad (Show Apps on macOS 27) on F18, the key Caps Lock sends, is shared.
 Export refuses a record that changed since this Mac last imported it (lib/sync_state.py).
 Options: --label LABEL (this machine's label); --force; --domain PATH reads and writes a plist file instead
 of the user's domain (tests).

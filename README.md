@@ -222,8 +222,7 @@ The keyboard shortcuts, macOS settings and app settings below all sync the same 
   record on every machine.
 - **Per machine only when declared.** `machine-keeps.json` lists, per machine label, the keys that
   machine keeps for itself. Only those are written to its `<record>.<label>` file and laid over the
-  shared record there. Today that is c03's Show Apps on F18 (shortcut 160): c03 has no
-  Karabiner, so step 18 maps its Caps Lock to F18. To keep another setting per machine, add it
+  shared record there. No machine keeps a key today. To keep a setting per machine, add it
   there and export on that machine.
 - **No stale exports.** Each machine stores, outside git, the hash of every record as it last
   imported or exported it (`~/.local/state/dev-env/applied.json`). Export refuses a record that
@@ -242,8 +241,8 @@ entries match on another machine, after asking, and applies them without a logou
 written keep macOS's defaults everywhere. `macos/symbolic-hotkeys.py check` lists recorded entries that
 differ here; `macos/test-symbolic-hotkeys.zsh` tests it on a copy of the settings.
 
-Synced as "Syncing settings between machines" says; c03 keeps shortcut 160 (Show Apps on F18)
-in `macos/symbolic-hotkeys.c03.plist`.
+Synced as "Syncing settings between machines" says. Shortcut 160 (Show Launchpad, Show Apps on
+macOS 27) is on F18 on every machine: step 18 makes Caps Lock and F4 send F18.
 
 ### macOS settings
 
@@ -407,7 +406,7 @@ What it does:
 15. Routes this clone's pushes through agents-shared's name guard
 16. Loads the app settings in `app-settings/` for each app that is installed (see "App settings"). macshot's ⇧⌘9 does nothing until macshot has been opened once and granted Screen Recording. Launch each app once before its first import: Lunar, for one, switches its own brightness mode on first launch and would overwrite what step 16 loaded. An app whose settings sit in a group container (coconutBattery) needs it opened once first, and the terminal allowed to access data from other apps (System Settings > Privacy & Security); the step names which and carries on
 17. Sets the macOS keyboard shortcuts as recorded (`macos/symbolic-hotkeys.plist`, written by `export.sh`): on or off, and their keys, asking first
-18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; the machine's shortcuts bind F18, as c03 binds it to Show Apps), and each external keyboard `karabiner/karabiner.json` names gets its modifier swaps plus F1–F12 as media keys, Karabiner's defaults with the config's overrides (`macos/modifier-keys.py`, tested by `macos/test-modifier-keys.zsh`; applies when the keyboard reconnects or at the next login). Karabiner's Launchpad target becomes F18 (Show Apps), since macOS 27 has no Launchpad. Such a keyboard has no Fn layer, so plain F1–F12 are then unreachable on it, as under Karabiner
+18. On a Mac without Karabiner-Elements, does with macOS's own settings what Karabiner does: a login agent maps Caps Lock to F18 with `hidutil` (`macos/capslock-to-f18.zsh`; step 17's shared shortcut 160 binds F18 to Show Launchpad, Show Apps on macOS 27) and gives the built-in keyboard the config's F-key overrides (F4 to F18, F5 as plain F5), read through its Fn layer (`modifier-keys.py builtin`); a Caps Lock that Modifier Keys sets to another key or to none is taken out, since it would block the agent; and each external keyboard `karabiner/karabiner.json` names gets its modifier swaps plus F1–F12 as media keys, Karabiner's defaults with the config's overrides (`macos/modifier-keys.py`, tested by `macos/test-modifier-keys.zsh`; applies when the keyboard reconnects or at the next login). Karabiner's Launchpad target becomes F18 (Show Apps), since macOS 27 has no Launchpad. Such a keyboard has no Fn layer, so plain F1–F12 are then unreachable on it, as under Karabiner
 19. Links `~/MY Applications` to `~/Applications` (`macos/my-applications-link.zsh`)
 20. Installs the Mac App Store apps the Brewfile layers list (`mas` lines) that are not installed yet; needs an Apple ID signed in and a terminal for the sudo password (see "Brewfile layers")
 21. Sets the macOS settings as recorded (`macos/system-settings/`, written by `export.sh`; see "macOS settings"), asking first, then restarts Finder, the Dock and the menu bar as needed

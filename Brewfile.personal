@@ -1,6 +1,5 @@
 # Personal profile — installed on machines whose primary profile is personal (machine-label.sh).
 # Casks here need a system grant or a driver extension that a managed machine may refuse.
-cask "karabiner-elements"       # keymaps (karabiner/karabiner.json synced; installs a driver extension)
 cask "phoenix"                  # window manager (.phoenix.js synced; needs Accessibility)
 cask "sourcetree"               # repo-tabs st mode
 
