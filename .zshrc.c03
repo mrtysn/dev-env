@@ -1,9 +1,5 @@
 # C03 · Work Mac (mrtysn-mbp-m5) — machine-specific shell config. Empty until the machine needs some.
 
-# On macOS 27 the Spotlight and Apps UI run inside the "Siri AI" process. When Cmd+Space or the Apps
-# key does nothing (window created but never shown, Nov 23 2026), restarting it fixes it; launchd respawns it.
-alias restart-spotlight-ui='killall "Siri AI"'
-
 # Volta: Node and pnpm per project, read from each repo's package.json.
 # VOLTA_FEATURE_PNPM makes Volta manage pnpm, which a repo's packageManager field pins.
 export VOLTA_HOME="$HOME/.volta"
