@@ -3,14 +3,17 @@
 # settings (step 18), so a Mac keeps none of it.
 #   remove-karabiner.zsh           remove what can be removed; sudo asks for a password once
 #   remove-karabiner.zsh --check   list what is left (exit 1 if anything)
-# `brew uninstall --cask` removes the app and its packages but not its driver extension, and the
-# driver can only be deactivated by Karabiner's own uninstaller while the app is installed
-# (systemextensionsctl uninstall refuses while System Integrity Protection is on). So when only the
-# driver is left, this says to reinstall the cask, run that uninstaller, and run this again.
+# `brew uninstall --cask` removes the app and its packages but not its driver extension, and neither
+# does Karabiner's own Uninstall button (which also fails while its background services await
+# approval). The driver goes only through its manager app's `deactivate`, which macOS confirms with
+# the admin password; systemextensionsctl uninstall refuses while System Integrity Protection is on.
+# The manager ships in the cask's driver package, so it runs first, before brew deletes it; when only
+# the driver is left and the manager is gone, this says to reinstall the cask and run it again.
 # Daemons left running from a deleted app stop at the next restart.
 set -u -o pipefail
 CASK=karabiner-elements
 APP=/Applications/Karabiner-Elements.app
+MANAGER=/Applications/.Karabiner-VirtualHIDDevice-Manager.app/Contents/MacOS/Karabiner-VirtualHIDDevice-Manager
 # The cask's uninstall and zap paths (brew info --cask --json=v2 karabiner-elements).
 USER_PATHS=(
     "$HOME/.config/karabiner"
@@ -60,6 +63,10 @@ if [[ "${1:-}" == --check ]]; then
     exit 0
 fi
 
+if driver_active && [[ -x $MANAGER ]]; then
+    print "→ deactivating Karabiner's driver extension; macOS asks for the admin password"
+    "$MANAGER" deactivate || print "✗ the driver manager could not deactivate the driver"
+fi
 if cask_installed; then
     brew uninstall --cask --zap $CASK || print "✗ brew could not uninstall $CASK"
 fi
@@ -70,9 +77,12 @@ for p in $SYSTEM_PATHS; do
     [[ -e "$p" ]] && { sudo rm -rf -- "$p" && print "✓ removed $p" || print "✗ could not remove $p"; }
 done
 if driver_active; then
-    print "✗ Karabiner's driver extension is still active. Only Karabiner's own uninstaller removes it:"
-    print "  brew install --cask $CASK, then Karabiner-Elements > Settings > Misc > Uninstall Karabiner-Elements,"
-    print "  then run this step again."
+    if [[ -x $MANAGER ]]; then
+        print "✗ Karabiner's driver extension is still active; macOS may finish removing it at the next restart."
+    else
+        print "✗ Karabiner's driver extension is still active, and its manager app is gone. Reinstall the cask"
+        print "  (brew install --cask $CASK), which brings the manager back, then run this step again."
+    fi
 fi
 jobs=$(running_jobs)
 if [[ -n $jobs ]]; then
