@@ -797,27 +797,41 @@ _update-all-asdf-latest() {
   fi
 }
 
+# True when version $1 is newer than version $2.
+_update-all-version-newer() {
+  [[ "$1" != "$2" && "$(print -rl -- "$1" "$2" | sort -V | tail -n 1)" == "$1" ]]
+}
+
 # Moves each ~/.tool-versions pin to the newest release on its own line: install
 # first, re-pin only once the install succeeded, so a failed install leaves the old
 # pin and the old version working. A move to a new line (3.12 -> 3.13) is never made
 # here, and per-project pins are untouched. Old versions stay installed. dotnet is
 # skipped because its newest release on the line can jump SDK feature bands
 # (10.0.1xx -> 10.0.4xx) and break a global.json build; java is the system JDK.
+# A pin never moves down: a plugin that cannot reach its download host can report
+# an old release as the newest. The file is read whole before the loop because
+# `asdf set` rewrites it, which would shift a reader still inside it.
 _update-all-bump-asdf-pins() {
   local -a manual=(dotnet java)   # a function-local list: the stage's fresh zsh gets functions, not variables
-  local tv="$HOME/.tool-versions" tool ver latest rc=0
+  local tv="$HOME/.tool-versions" line tool ver latest rc=0
   [[ -f "$tv" ]] || return 0
-  while read -r tool ver _; do
+  local -a pins=("${(@f)$(<"$tv")}")
+  for line in "${pins[@]}"; do
+    read -r tool ver _ <<< "$line"
     [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
     (( ${manual[(Ie)$tool]} )) && continue
     latest="$(_update-all-asdf-latest "$tool" "$ver")"
     [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    if ! _update-all-version-newer "$latest" "$ver"; then
+      echo "Action needed: asdf reports $latest as the newest $tool on this line, older than the pin $ver; pin left. Check that the $tool plugin can reach its download host"
+      continue
+    fi
     echo "$tool $ver -> $latest"
     asdf install "$tool" "$latest" && asdf set --home "$tool" "$latest" || {
       echo "Error: could not move $tool from $ver to $latest; pin left at $ver"
       rc=1
     }
-  done < "$tv"
+  done
   return $rc
 }
 
@@ -831,7 +845,7 @@ _update-all-report-asdf-pins() {
   while read -r tool ver _; do
     [[ -z "$tool" || "$tool" == \#* || "$ver" == system ]] && continue
     latest="$(_update-all-asdf-latest "$tool" "$ver")"
-    [[ -n "$latest" && "$latest" != "$ver" ]] || continue
+    [[ -n "$latest" ]] && _update-all-version-newer "$latest" "$ver" || continue
     tools+=("$tool"); vers+=("$ver"); latests+=("$latest")
   done < "$tv"
   (( ${#tools} )) || return 0
@@ -888,6 +902,7 @@ update-all() {
     _pnpm-migrate-globals _pnpm-global-manifests _pnpm-shims-broken _pnpm-fix-shims
     _happy-daemon-refresh _unquarantine-notarized-casks
     _update-all-bump-asdf-pins _update-all-asdf-latest _update-all-asdf-plugins
+    _update-all-version-newer
     _update-all-custom-heads
   )
   local -a optional_stage_fns=(_upgrade_custom_plugin upgrade_oh_my_zsh_custom)

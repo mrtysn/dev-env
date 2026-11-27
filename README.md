@@ -415,7 +415,8 @@ What it does:
 Runtime pins: `update-all` bumps this machine's runtimes, `export.sh` raises `asdf/tool-versions` to
 any that are newer, and the other machine's import installs them. Pins only move up; to move one
 down, edit the file and run `asdf/sync-tool-versions.py import --allow-downgrade`. A tool a machine
-pins its own way goes in `machine-keeps.json` (`"asdf/tool-versions": ["java"]`).
+pins its own way goes in `machine-keeps.json` (`"asdf/tool-versions": ["java"]`). `update-all` never
+lowers a pin either: an older "newest" release is reported and left (`test-update-all-asdf-pins.zsh`).
 
 A machine can decline optional steps for good: `MACHINE_SKIP_STEPS` in `machine-label.sh` (c03 declines step 14), which both the run and `--check` leave out unless `--steps` names them.
 
