@@ -86,7 +86,8 @@ if driver_active; then
 fi
 jobs=$(running_jobs)
 if [[ -n $jobs ]]; then
-    print "! Karabiner services still running from the deleted app; they stop at the next restart:"
+    print "! Karabiner services still running from the deleted app; they stop at the next restart, and may"
+    print "  recreate /Library/Application Support/org.pqrs before then: run this step again after restarting:"
     for j in ${(f)jobs}; do print -r -- "  $j"; done
 fi
 out=$(report)
