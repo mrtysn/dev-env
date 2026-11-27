@@ -473,19 +473,19 @@ _update-all-ask-skip() {
   [[ $key == [sS] ]]
 }
 
-# `brew upgrade`, repeated after reinstalling a cask whose install receipt names an app
+# `brew upgrade <args>`, repeated after reinstalling a cask whose install receipt names an app
 # that is gone (brew: "It seems the App source '...' is not there"): a reinstall forces the
 # uninstall and skips the missing app. Each cask is reinstalled once per run.
 # brew runs under its own `script`, so its output is saved for that check while it still writes
 # to a terminal: through a pipe, a formula's licence question stays in brew's output buffer and
 # the run hangs on an invisible prompt. --no-ask: on a terminal brew would otherwise confirm
 # every upgrade. Returns 130 on Ctrl-C (`script` reports a signal death as its number, 2).
-_update-all-brew-upgrade() {
+_update-all-brew-run() {
   local out rc token
   local -a fixed=()
   out=$(mktemp) || return 1
   while :; do
-    script -q -F "$out" brew upgrade --no-ask
+    script -q -F "$out" brew upgrade --no-ask "$@"
     rc=$?
     (( rc == 2 || rc == 130 )) && { rc=130; break; }
     (( rc )) || break
@@ -497,6 +497,31 @@ _update-all-brew-upgrade() {
     brew reinstall --cask "$token" || { rc=$?; break; }
   done
   command rm -f -- "$out"
+  return $rc
+}
+
+# Casks Homebrew lists as outdated although the installed version is the offered one, so an
+# upgrade reinstalls the same app on every run. Seen with a self-updating cask whose version
+# carries a hash after the comma (roblox), which brew compares with the app's build number.
+_update-all-brew-same-version-casks() {
+  brew outdated --cask --json=v2 2>/dev/null | jq -r '.casks[]
+    | select(.current_version != "latest" and .installed_versions == [.current_version])
+    | .name' 2>/dev/null
+}
+
+# `brew upgrade`, leaving out the casks above: when there are any, formulae are upgraded as a
+# group and the other outdated casks by name.
+_update-all-brew-upgrade() {
+  local -a held=(${(f)"$(_update-all-brew-same-version-casks)"})
+  (( ${#held} )) || { _update-all-brew-run; return }
+  print "held back, installed version is the one offered: ${(j:, :)held}"
+  local -a casks=(${(f)"$(brew outdated --cask --json=v2 2>/dev/null \
+    | jq -r '.casks[] | select(.pinned | not) | .name')"})
+  casks=(${casks:|held})
+  local rc=0
+  _update-all-brew-run --formula || rc=$?
+  (( rc == 130 )) && return $rc
+  if (( ${#casks} )); then _update-all-brew-run --cask $casks || rc=$?; fi
   return $rc
 }
 
@@ -897,6 +922,7 @@ update-all() {
   # the optional ones come from the omz autoupdate plugin, whose absence skips omz-plugins.
   local -a stage_fns=(
     _mas-signed-in _update-all-mas-upgrade _update-all-stage _update-all-brew-upgrade
+    _update-all-brew-run _update-all-brew-same-version-casks
     _update-all-manual-update-steps _update-all-upgrade-manual-update-casks
     _update-all-spicetify-reapply _update-all-local-builds
     _pnpm-migrate-globals _pnpm-global-manifests _pnpm-shims-broken _pnpm-fix-shims

@@ -5,6 +5,7 @@
 # brew is a made-up function or program; nothing is upgraded and no notification is sent.
 # Run: ./test-update-all-prompts.zsh
 emulate -L zsh
+setopt extended_glob
 
 here=${0:A:h}
 base=$here/.zshrc.base
@@ -15,7 +16,8 @@ check() {  # check <label> <condition...>
   if "$@"; then print "ok   $label"; else print "FAIL $label"; fails=1; fi
 }
 
-for fn in _update-all-pending-question _update-all-ask-skip _update-all-brew-upgrade; do
+brew_fns=(_update-all-brew-upgrade _update-all-brew-run _update-all-brew-same-version-casks)
+for fn in _update-all-pending-question _update-all-ask-skip $brew_fns; do
   body=$(sed -n "/^$fn() {\$/,/^}\$/p" "$base")
   [[ -n $body ]] || { print -u2 "$fn not found in $base"; exit 1 }
   eval "$body"
@@ -41,6 +43,14 @@ mkdir $tmp/bin
 cat > $tmp/bin/brew <<'EOF'
 #!/bin/zsh
 case $FAKE_BREW in
+  held|only-held)
+    if [[ $1 == outdated ]]; then
+      row() { print -rn -- "{\"name\":\"$1\",\"installed_versions\":[\"$2\"],\"current_version\":\"$3\",\"pinned\":$4}" }
+      print -n '{"casks":['; row loops 1.0,abc 1.0,abc false
+      [[ $FAKE_BREW == held ]] && { print -n ,; row newer 1.0 2.0 false; print -n ,; row stuck 1.0 2.0 true }
+      print ']}'
+    else print "args: $*"; fi
+    exit 0 ;;
   ask) [[ -t 1 ]] && print "stdout is a terminal"; print "args: $*"; exit 0 ;;
   interrupt) exit 130 ;;
   signal) kill -INT $$ ; sleep 5 ;;
@@ -52,7 +62,7 @@ case $FAKE_BREW in
 esac
 EOF
 chmod +x $tmp/bin/brew
-run() { FAKE_BREW=$1 FAKE_DONE=$tmp/done PATH=$tmp/bin:$PATH zsh -fc "$(typeset -f _update-all-brew-upgrade); _update-all-brew-upgrade" </dev/null 2>&1 }
+run() { FAKE_BREW=$1 FAKE_DONE=$tmp/done PATH=$tmp/bin:$PATH zsh -fc "$(typeset -f $brew_fns); _update-all-brew-upgrade" </dev/null 2>&1 }
 
 out=$(run ask)
 check "brew writes to a terminal" eval '[[ $out == *"stdout is a terminal"* ]]'
@@ -62,5 +72,11 @@ run signal >/dev/null;    check "death by SIGINT returns 130" test $? -eq 130
 out=$(run missing); rc=$?
 check "a missing app is reinstalled" eval '[[ $out == *"reinstalled someapp"* ]]'
 check "and the retried upgrade succeeds" test $rc -eq 0
+out=$(run held)
+check "a cask at the offered version is named as held" eval '[[ $out == *"held back"*loops* ]]'
+check "formulae are still upgraded" eval '[[ $out == *"args: upgrade --no-ask --formula"* ]]'
+check "only the other unpinned casks are upgraded" eval '[[ $out == *"args: upgrade --no-ask --cask newer"[[:space:]]# ]]'
+out=$(run only-held)
+check "with only held casks, no cask upgrade runs" eval '[[ $out != *"--cask"* ]]'
 
 exit $fails
