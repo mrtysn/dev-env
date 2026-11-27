@@ -412,6 +412,7 @@ What it does:
 19. Links `~/MY Applications` to `~/Applications` (`macos/my-applications-link.zsh`)
 20. Installs the Mac App Store apps the Brewfile layers list (`mas` lines) that are not installed yet; needs an Apple ID signed in and a terminal for the sudo password (see "Brewfile layers")
 21. Sets the macOS settings as recorded (`macos/system-settings/`, written by `export.sh`; see "macOS settings"), asking first, then restarts Finder, the Dock and the menu bar as needed
+22. Links `~/Downloads/ff-sidebery` to `~/backups/ff-sidebery` (`macos/sidebery-backup-link.zsh`), moving an existing `ff-sidebery` folder there first. Sidebery's snapshot auto-export goes through Firefox's downloads API, which writes only inside the download folder, so its path setting (`ff-sidebery/snapshot-%Y.%M.%D-%h.%m.%s`) cannot name `~/backups` itself
 
 `./import.sh --steps 16,17` (or ranges, `2-5,16`) runs only those steps; with `--check` it compares only those.
 Runtime pins: `update-all` bumps this machine's runtimes, `export.sh` raises `asdf/tool-versions` to
@@ -464,6 +465,7 @@ refuse a call without one.
 | `name-guard-pre-push` (15), `app-settings` (16), `macos-shortcuts` (17), `remove-karabiner`, `caps-lock-f18` and `keyboard-mappings` (18) | as listed | yes/no |
 | `mas-signed-in`, `mas-apps` | 20 | yes/no; an unanswered `mas-signed-in` counts as signed out. With no terminal, step 20 skips anyway: mas needs the sudo password typed |
 | `macos-settings` | 21 | yes/no |
+| `sidebery-backup-link` | 22 | yes/no |
 
 ## Detailed Installation Steps
 

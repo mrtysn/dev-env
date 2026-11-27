@@ -899,6 +899,10 @@ if $CHECK; then
     fi
     check_report 21
 
+    # Step 22
+    "$SCRIPT_DIR/macos/sidebery-backup-link.zsh" --check >/dev/null 2>&1 || CHECK_CHANGES+=("~/Downloads/ff-sidebery link")
+    check_report 22
+
     echo ""
     if (( CHECK_BAD )); then
         print "${RED}✗ import.sh would change something (nothing was written)${NC}"
@@ -1802,6 +1806,22 @@ else
     else
         print "${YELLOW}! Skipped macOS settings${NC}"
     fi
+fi
+echo ""
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Step 22: Sidebery snapshots into ~/backups (optional)
+# ═══════════════════════════════════════════════════════════════════════════════
+if want_step 22; then
+echo "=== Step 22: Sidebery snapshot link ==="
+SIDEBERY_LINK="$SCRIPT_DIR/macos/sidebery-backup-link.zsh"
+if "$SIDEBERY_LINK" --check >/dev/null 2>&1; then
+    print "${GREEN}✓ ~/Downloads/ff-sidebery already links to ~/backups/ff-sidebery${NC}"
+elif ask_yes_no sidebery-backup-link "Link ~/Downloads/ff-sidebery to ~/backups/ff-sidebery (moves an existing ff-sidebery folder there first)?"; then
+    "$SIDEBERY_LINK" || print "${RED}✗ could not create the link${NC}"
+else
+    print "${YELLOW}! Skipped the Sidebery snapshot link${NC}"
 fi
 echo ""
 fi
