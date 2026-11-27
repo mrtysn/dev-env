@@ -14,11 +14,13 @@ bad() { fail=$((fail + 1)); print -r -- "FAIL: $1"; }
 
 domain=$tmp/hotkeys.plist
 defaults export com.apple.symbolichotkeys - > $domain
-# The copy has 30 on and 31 on macOS's keys; the record has 30 off and 31 on the swapped keys.
+# The copy has 30 on and 31 on macOS's keys, and 160 off whatever this Mac has; the record has 30 off
+# and 31 on the swapped keys.
 /usr/bin/python3 -I - "$domain" "$tmp/record.plist" <<'PY'
 import plistlib, sys
 d = plistlib.load(open(sys.argv[1], "rb"))
 d.setdefault("AppleSymbolicHotKeys", {})["30"] = {"enabled": True, "value": {"parameters": [52, 21, 1441792], "type": "standard"}}
+d["AppleSymbolicHotKeys"]["160"] = {"enabled": False, "value": {"parameters": [65535, 65535, 0], "type": "standard"}}
 d["AppleSymbolicHotKeys"]["31"] = {"enabled": True, "value": {"parameters": [52, 21, 1441792], "type": "standard"}}
 plistlib.dump(d, open(sys.argv[1], "wb"))
 plistlib.dump({"30": {"enabled": False, "value": {"parameters": [52, 21, 1441792], "type": "standard"}},
